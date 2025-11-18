@@ -1,5 +1,6 @@
 
 
+
 import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 import { Product, Category, Personalization, Promotion, PersonalizationOption, Zone, Table, AppSettings, Order } from '../types';
 import { INITIAL_SETTINGS } from '../constants';
@@ -438,6 +439,24 @@ export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created
         throw error;
     }
 };
+
+export const updateOrder = async (orderId: string, updates: Partial<Order>): Promise<void> => {
+    // Map camelCase to snake_case for DB updates if necessary
+    const dbUpdates: any = { ...updates };
+    if (updates.branchId) { dbUpdates.branch_id = updates.branchId; delete dbUpdates.branchId; }
+    if (updates.orderType) { dbUpdates.order_type = updates.orderType; delete dbUpdates.orderType; }
+    if (updates.tableId) { dbUpdates.table_id = updates.tableId; delete dbUpdates.tableId; }
+    if (updates.generalComments) { dbUpdates.general_comments = updates.generalComments; delete dbUpdates.generalComments; }
+    if (updates.paymentStatus) { dbUpdates.payment_status = updates.paymentStatus; delete dbUpdates.paymentStatus; }
+    // NOTE: payment_status column needs to exist in DB, assumed to be added via migration if not present
+    
+    const { error } = await getClient().from('orders').update(dbUpdates).eq('id', orderId);
+    if (error) {
+        console.error('Error updating order:', error);
+        throw error;
+    }
+};
+
 
 export const subscribeToNewOrders = (callback: (payload: any) => void) => {
     const client = getClient();

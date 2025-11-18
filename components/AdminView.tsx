@@ -1,15 +1,16 @@
 
 
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { useTheme } from '../hooks/useTheme';
 // Fix: Moved ShippingCostType import from '../constants' to here to resolve export error.
-import { Product, Category, Order, OrderStatus, Conversation, AdminChatMessage, OrderType, Personalization, PersonalizationOption, Promotion, DiscountType, PromotionAppliesTo, Zone, Table, AppSettings, Currency, BranchSettings, PaymentSettings, ShippingSettings, PaymentMethod, DaySchedule, Schedule, ShippingCostType, TimeRange, PrintingMethod } from '../types';
+import { Product, Category, Order, OrderStatus, Conversation, AdminChatMessage, OrderType, Personalization, PersonalizationOption, Promotion, DiscountType, PromotionAppliesTo, Zone, Table, AppSettings, Currency, BranchSettings, PaymentSettings, ShippingSettings, PaymentMethod, DaySchedule, Schedule, ShippingCostType, TimeRange, PrintingMethod, PaymentStatus } from '../types';
 import { MOCK_ORDERS, MOCK_CONVERSATIONS, INITIAL_SETTINGS, CURRENCIES } from '../constants';
 import { generateProductDescription, getAdvancedInsights } from '../services/geminiService';
-import { getProducts, getCategories, saveProduct, deleteProduct, saveCategory, deleteCategory, getPersonalizations, savePersonalization, deletePersonalization, getPromotions, savePromotion, deletePromotion, updateProductAvailability, updatePersonalizationOptionAvailability, getZones, saveZone, deleteZone, saveZoneLayout, getAppSettings, saveAppSettings, subscribeToNewOrders, unsubscribeFromChannel } from '../services/supabaseService';
+import { getProducts, getCategories, saveProduct, deleteProduct, saveCategory, deleteCategory, getPersonalizations, savePersonalization, deletePersonalization, getPromotions, savePromotion, deletePromotion, updateProductAvailability, updatePersonalizationOptionAvailability, getZones, saveZone, deleteZone, saveZoneLayout, getAppSettings, saveAppSettings, subscribeToNewOrders, unsubscribeFromChannel, updateOrder } from '../services/supabaseService';
 // Fix: Imported IconComponent to resolve usage error.
-import { IconComponent, IconHome, IconMenu, IconAvailability, IconShare, IconTutorials, IconProducts, IconOrders, IconAnalytics, IconChatAdmin, IconLogout, IconSearch, IconBell, IconEdit, IconPlus, IconTrash, IconSparkles, IconSend, IconMoreVertical, IconExternalLink, IconCalendar, IconChevronDown, IconX, IconReceipt, IconSettings, IconStore, IconDelivery, IconPayment, IconClock, IconTableLayout, IconPrinter, IconChevronUp, IconPencil, IconDuplicate, IconGripVertical, IconPercent, IconInfo, IconTag, IconLogoutAlt, IconSun, IconMoon, IconExpand, IconArrowLeft, IconWhatsapp, IconQR, IconPlayCircle, IconLocationMarker, IconUpload, IconCheck, IconBluetooth, IconUSB } from '../constants';
+import { IconComponent, IconHome, IconMenu, IconAvailability, IconShare, IconTutorials, IconProducts, IconOrders, IconAnalytics, IconChatAdmin, IconLogout, IconSearch, IconBell, IconEdit, IconPlus, IconTrash, IconSparkles, IconSend, IconMoreVertical, IconExternalLink, IconCalendar, IconChevronDown, IconX, IconReceipt, IconSettings, IconStore, IconDelivery, IconPayment, IconClock, IconTableLayout, IconPrinter, IconChevronUp, IconPencil, IconDuplicate, IconGripVertical, IconPercent, IconInfo, IconTag, IconLogoutAlt, IconSun, IconMoon, IconExpand, IconArrowLeft, IconWhatsapp, IconQR, IconPlayCircle, IconLocationMarker, IconUpload, IconCheck, IconBluetooth, IconUSB, IconToggleOn, IconToggleOff } from '../constants';
 import CustomerView from './CustomerView';
 
 // FIX: Moved IconEye definition to the top of the file to resolve 'Cannot find name' error in PromotionModal.
@@ -52,7 +53,7 @@ const Sidebar: React.FC<{ currentPage: AdminViewPage; setCurrentPage: (page: Adm
                     <button
                         key={item.id}
                         onClick={() => setCurrentPage(item.id)}
-                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${currentPage === item.id ? 'bg-green-50 text-green-700 dark:bg-green-900/50 dark:text-green-300' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${currentPage === item.id ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                     >
                         {item.icon}
                         <span className="font-semibold">{item.name}</span>
@@ -1281,6 +1282,281 @@ const MenuManagement: React.FC = () => {
 
 
 // --- Order Management Components ---
+
+const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onUpdateStatus: (id: string, status: OrderStatus) => void; onUpdatePayment: (id: string, status: PaymentStatus) => void }> = ({ order, onClose, onUpdateStatus, onUpdatePayment }) => {
+    const [isClosing, setIsClosing] = useState(false);
+
+    if (!order) return null;
+
+    const handleClose = () => {
+        setIsClosing(true);
+        setTimeout(() => {
+            setIsClosing(false);
+            onClose();
+        }, 300);
+    };
+
+    const handleCopyOrder = () => {
+         const text = `Pedido #${order.id.slice(0,5)}\nCliente: ${order.customer.name}\nTotal: $${order.total.toFixed(2)}\n\nItems:\n${order.items.map(i => `- ${i.quantity}x ${i.name}`).join('\n')}`;
+         navigator.clipboard.writeText(text).then(() => alert('Pedido copiado'));
+    };
+    
+    const handlePrint = () => {
+        window.print();
+    };
+
+    const handleCompleteOrder = () => {
+        onUpdatePayment(order.id, 'paid');
+        onUpdateStatus(order.id, OrderStatus.Completed);
+        handleClose();
+    };
+
+    const formattedDate = new Date(order.createdAt).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: 'numeric', minute: 'numeric', hour12: true });
+
+    return (
+        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${isClosing ? 'pointer-events-none' : ''}`}>
+            <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isClosing ? 'opacity-0' : 'opacity-100'}`} onClick={handleClose}></div>
+            <div className={`bg-white dark:bg-gray-800 w-full max-w-2xl rounded-xl shadow-2xl transform transition-all duration-300 flex flex-col max-h-[90vh] ${isClosing ? 'scale-95 opacity-0 translate-y-4' : 'scale-100 opacity-100 translate-y-0'}`}>
+                
+                {/* Header */}
+                <div className="p-6 border-b dark:border-gray-700 flex justify-between items-start">
+                    <div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{formattedDate}</p>
+                        <div className="flex items-center gap-2">
+                             <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{order.customer.name} <span className="font-normal text-gray-500">#{order.id.slice(0, 5).toUpperCase()}</span></h2>
+                             {order.paymentStatus === 'paid' && <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-bold">PAGADO</span>}
+                        </div>
+                        <p className="text-gray-600 dark:text-gray-300 font-mono text-sm">{order.customer.phone}</p>
+                        
+                         <div className="mt-4 flex gap-2">
+                            <span className={`px-3 py-1 rounded-full text-sm font-bold ${order.orderType === OrderType.Delivery ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'}`}>
+                                {order.orderType || 'Pedido'}
+                            </span>
+                             {order.tableId && (
+                                <span className="px-3 py-1 rounded-full text-sm font-bold bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
+                                    Mesa {order.tableId}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    
+                     <div className="relative group">
+                        <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"><IconMoreVertical /></button>
+                        <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 shadow-lg rounded-lg border dark:border-gray-700 hidden group-hover:block z-10">
+                             <button onClick={handleCopyOrder} className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"><IconDuplicate className="h-4 w-4"/> Copiar pedido</button>
+                             <button onClick={() => window.open(`https://wa.me/${order.customer.phone.replace(/\D/g,'')}`, '_blank')} className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"><IconWhatsapp className="h-4 w-4"/> Contactar cliente</button>
+                             <button onClick={() => { onUpdateStatus(order.id, OrderStatus.Cancelled); handleClose(); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 text-red-500 flex items-center gap-2"><IconX className="h-4 w-4"/> Cancelar pedido</button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900/50">
+                     {/* Address if Delivery */}
+                     {order.orderType === OrderType.Delivery && (
+                         <div className="mb-6 bg-white dark:bg-gray-800 p-4 rounded-lg border dark:border-gray-700">
+                             <h4 className="font-bold text-sm text-emerald-600 mb-2 flex items-center gap-2 cursor-pointer">
+                                 Mostrar datos de envío <IconChevronDown className="h-4 w-4"/>
+                             </h4>
+                             <div className="text-sm text-gray-700 dark:text-gray-300 space-y-1 pl-6 border-l-2 border-gray-200 dark:border-gray-700">
+                                 <p><span className="font-semibold">Dirección:</span> {order.customer.address.calle} #{order.customer.address.numero}, {order.customer.address.colonia}</p>
+                                 {order.customer.address.referencias && <p><span className="font-semibold">Ref:</span> {order.customer.address.referencias}</p>}
+                             </div>
+                         </div>
+                     )}
+
+                     {/* Items */}
+                     <div className="space-y-4">
+                         <h3 className="font-bold text-gray-700 dark:text-gray-300 mb-2">{order.items.length} productos</h3>
+                         {order.items.map((item, idx) => (
+                             <div key={idx} className="flex justify-between items-start py-2 border-b dark:border-gray-700 last:border-0">
+                                 <div className="flex gap-3">
+                                     <span className="font-bold text-gray-900 dark:text-gray-100">{item.quantity} x</span>
+                                     <div>
+                                         <p className="font-medium text-gray-800 dark:text-gray-200">{item.name}</p>
+                                         {item.comments && <p className="text-xs text-gray-500 italic bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-200 px-2 py-0.5 rounded inline-block mt-1">Nota: {item.comments}</p>}
+                                     </div>
+                                 </div>
+                                 <span className="font-semibold text-gray-700 dark:text-gray-300">${(item.price * item.quantity).toFixed(2)}</span>
+                             </div>
+                         ))}
+                     </div>
+                     
+                     {order.generalComments && (
+                         <div className="mt-6 p-3 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800 rounded-md text-sm text-yellow-800 dark:text-yellow-200">
+                             <span className="font-bold">Comentarios generales:</span> {order.generalComments}
+                         </div>
+                     )}
+                </div>
+
+                {/* Footer */}
+                <div className="p-6 bg-white dark:bg-gray-800 border-t dark:border-gray-700">
+                     <div className="space-y-1 mb-6 text-sm">
+                         <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                             <span>Productos</span>
+                             <span>${order.total.toFixed(2)}</span>
+                         </div>
+                         <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                             <span>Costo de envío</span>
+                             <span className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 text-xs px-2 rounded">Por definir</span>
+                         </div>
+                         <div className="flex justify-between text-xl font-bold text-gray-900 dark:text-white pt-3 border-t dark:border-gray-700 mt-2">
+                             <span>Total</span>
+                             <div className="text-right">
+                                 <span>${order.total.toFixed(2)}</span>
+                                 <span className="block text-xs font-normal text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full mt-1 text-center">Efectivo</span>
+                             </div>
+                         </div>
+                     </div>
+                     
+                     <div className="flex gap-4">
+                         <button onClick={handlePrint} className="px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
+                             <IconPrinter className="h-5 w-5"/> Imprimir
+                         </button>
+                         <button onClick={handleCompleteOrder} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
+                             <IconCheck className="h-5 w-5"/> Cobrar pedido
+                         </button>
+                     </div>
+                     
+                     <div className="text-right mt-2">
+                         <span className="text-xs text-gray-500">Cliente pagará con $500 (Cambio: ${(500 - order.total).toFixed(2)})</span>
+                     </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const OrderStatusBadge: React.FC<{status: OrderStatus}> = ({status}) => {
+    const colors = {
+        [OrderStatus.Pending]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
+        [OrderStatus.Confirmed]: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
+        [OrderStatus.Preparing]: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300',
+        [OrderStatus.Ready]: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300',
+        [OrderStatus.Delivering]: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/50 dark:text-cyan-300',
+        [OrderStatus.Completed]: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300',
+        [OrderStatus.Cancelled]: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300',
+    };
+    
+    const labels = {
+        [OrderStatus.Pending]: 'Nuevo',
+        [OrderStatus.Confirmed]: 'Confirmado',
+        [OrderStatus.Preparing]: 'Preparando',
+        [OrderStatus.Ready]: 'Listo',
+        [OrderStatus.Delivering]: 'En camino',
+        [OrderStatus.Completed]: 'Completado',
+        [OrderStatus.Cancelled]: 'Cancelado',
+    };
+
+    return (
+        <span className={`px-2 py-1 rounded-md text-xs font-bold ${colors[status] || 'bg-gray-100 text-gray-800'}`}>
+            {labels[status]}
+        </span>
+    );
+};
+
+
+const OrderCard: React.FC<{ order: Order; onClick: () => void }> = ({ order, onClick }) => (
+    <div onClick={onClick} className={`rounded-lg shadow-sm p-4 cursor-pointer transition-all hover:shadow-md border-l-4 bg-white dark:bg-gray-800 ${order.status === OrderStatus.Pending ? 'border-yellow-500' : order.status === OrderStatus.Preparing ? 'border-indigo-500' : order.status === OrderStatus.Ready ? 'border-purple-500' : 'border-gray-300'}`}>
+        <div className="flex justify-between items-start mb-2">
+            <div>
+                <p className="font-bold text-lg text-gray-900 dark:text-gray-100">{order.customer.name}</p>
+                <p className="text-xs text-gray-500 font-mono">#{order.id.slice(0,5)}</p>
+            </div>
+             <span className="font-bold text-emerald-600 dark:text-emerald-400">${order.total.toFixed(2)}</span>
+        </div>
+        <div className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+            {order.items.slice(0, 2).map((item, i) => <p key={i}>- {item.quantity}x {item.name}</p>)}
+            {order.items.length > 2 && <p className="text-xs text-gray-400">+ {order.items.length - 2} más</p>}
+        </div>
+        <div className="flex justify-between items-center mt-2">
+             <span className={`text-xs px-2 py-0.5 rounded border ${order.orderType === OrderType.Delivery ? 'border-blue-200 text-blue-700 bg-blue-50' : 'border-purple-200 text-purple-700 bg-purple-50'}`}>
+                 {order.orderType === OrderType.Delivery ? 'Domicilio' : 'Recoger'}
+             </span>
+             {/* Visual indicator of time elapsed could go here */}
+             <span className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+        </div>
+    </div>
+);
+
+const OrdersKanbanBoard: React.FC<{ orders: Order[], onOrderClick: (order: Order) => void }> = ({ orders, onOrderClick }) => {
+    const columns = [
+        { status: OrderStatus.Pending, title: 'Nuevos', color: 'bg-yellow-900/20 text-yellow-700 dark:text-yellow-500' },
+        { status: OrderStatus.Preparing, title: 'Preparando', color: 'bg-indigo-900/20 text-indigo-700 dark:text-indigo-500' },
+        { status: OrderStatus.Ready, title: 'Listos', color: 'bg-purple-900/20 text-purple-700 dark:text-purple-500' },
+        { status: OrderStatus.Delivering, title: 'En Reparto', color: 'bg-cyan-900/20 text-cyan-700 dark:text-cyan-500' },
+    ];
+
+    return (
+        <div className="flex space-x-4 overflow-x-auto pb-4 h-full">
+            {columns.map(col => (
+                <div key={col.status} className="w-80 flex-shrink-0 flex flex-col">
+                    <h3 className={`font-bold mb-3 p-3 rounded-lg text-center uppercase text-sm tracking-wider ${col.color}`}>
+                        {col.title} ({orders.filter(o => o.status === col.status).length})
+                    </h3>
+                    <div className="space-y-3 flex-1 overflow-y-auto p-1">
+                        {orders.filter(o => o.status === col.status).map(order => (
+                            <OrderCard key={order.id} order={order} onClick={() => onOrderClick(order)} />
+                        ))}
+                        {orders.filter(o => o.status === col.status).length === 0 && (
+                            <div className="text-center py-10 text-gray-400 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
+                                Sin pedidos
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+const OrderListView: React.FC<{ orders: Order[], onOrderClick: (order: Order) => void }> = ({ orders, onOrderClick }) => {
+    return (
+        <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg border dark:border-gray-700 overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-900/50">
+                    <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pedido</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Nombre</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tipo</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Fecha</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pago</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
+                    </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {orders.map(order => (
+                        <tr key={order.id} onClick={() => onOrderClick(order)} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-gray-100">#{order.id.slice(0, 6)}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{order.customer.name}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${order.orderType === OrderType.Delivery ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200' : 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200'}`}>
+                                    {order.orderType === OrderType.Delivery ? 'Domicilio' : 'Para llevar'}
+                                </span>
+                            </td>
+                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                {new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                                <OrderStatusBadge status={order.status} />
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                                 <span className={`px-2 py-1 rounded-md text-xs font-bold ${order.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                    {order.paymentStatus === 'paid' ? 'Pagado' : 'Pendiente'}
+                                </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-gray-100 text-right">
+                                ${order.total.toFixed(2)}
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+};
+
 const EmptyOrdersView: React.FC<{ onNewOrderClick: () => void }> = ({ onNewOrderClick }) => (
     <div className="text-center py-16 px-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
         <div className="mx-auto h-16 w-16 text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
@@ -1301,168 +1577,45 @@ const EmptyOrdersView: React.FC<{ onNewOrderClick: () => void }> = ({ onNewOrder
     </div>
 );
 
-const EmptyTablesView: React.FC<{ onConfigureClick: () => void }> = ({ onConfigureClick }) => (
-    <div className="text-center py-16 px-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-        <div className="mx-auto h-16 w-16 text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-            <IconTableLayout className="h-10 w-10" />
-        </div>
-        <h3 className="mt-4 text-lg font-semibold text-gray-800 dark:text-gray-200">Permite que tus clientes realicen su pedido desde su mesa</h3>
-        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">Aquí llegarán las alertas de nuevas comandas, llamadas al mesero o solicitudes de cuenta.</p>
-        <div className="mt-6">
-            <button onClick={onConfigureClick} className="text-emerald-600 font-semibold text-sm hover:text-emerald-700">
-                Configurar zonas y mesas &rarr;
-            </button>
-        </div>
-    </div>
-);
-
-const OrderStatusColors: { [key in OrderStatus]: string } = {
-    [OrderStatus.Pending]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
-    [OrderStatus.Confirmed]: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
-    [OrderStatus.Preparing]: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300',
-    [OrderStatus.Ready]: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300',
-    [OrderStatus.Delivering]: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/50 dark:text-cyan-300',
-    [OrderStatus.Completed]: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300',
-    [OrderStatus.Cancelled]: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300',
-};
-
-const OrderStatusCardColors: { [key in OrderStatus]: string } = {
-    [OrderStatus.Pending]: 'bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 dark:border-yellow-500',
-    [OrderStatus.Confirmed]: 'bg-blue-100 border-l-4 border-blue-500 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 dark:border-blue-500',
-    [OrderStatus.Preparing]: 'bg-indigo-100 border-l-4 border-indigo-500 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300 dark:border-indigo-500',
-    [OrderStatus.Ready]: 'bg-purple-100 border-l-4 border-purple-500 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300 dark:border-purple-500',
-    [OrderStatus.Delivering]: 'bg-cyan-100 border-l-4 border-cyan-500 text-cyan-800 dark:bg-cyan-900/50 dark:text-cyan-300 dark:border-cyan-500',
-    [OrderStatus.Completed]: 'bg-green-100 border-l-4 border-green-500 text-green-800 dark:bg-green-900/50 dark:text-green-300 dark:border-green-500',
-    [OrderStatus.Cancelled]: 'bg-red-100 border-l-4 border-red-500 text-red-800 dark:bg-red-900/50 dark:text-red-300 dark:border-red-500',
-};
-
-const OrderCard: React.FC<{ order: Order; onUpdateStatus: (orderId: string, newStatus: OrderStatus) => void }> = ({ order, onUpdateStatus }) => (
-    <div className={`rounded-lg shadow-sm p-4 ${OrderStatusCardColors[order.status]}`}>
-        <div className="flex justify-between items-start">
-            <div>
-                <p className="font-bold">{order.customer.name}</p>
-                <p className="text-sm opacity-70">{order.id}</p>
-            </div>
-            <p className="font-bold">${order.total.toFixed(2)}</p>
-        </div>
-        <div className="mt-2 text-sm">
-            {order.items.map(item => <p key={item.id}>- {item.quantity}x {item.name}</p>)}
-        </div>
-        <div className="mt-4 flex space-x-2">
-            {order.status !== OrderStatus.Pending && <button onClick={() => onUpdateStatus(order.id, OrderStatus.Pending)} className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-600 dark:text-gray-200 rounded">◂ Pendiente</button>}
-            {order.status !== OrderStatus.Preparing && <button onClick={() => onUpdateStatus(order.id, OrderStatus.Preparing)} className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-600 dark:text-gray-200 rounded">Preparando ▸</button>}
-        </div>
-    </div>
-);
-
-const OrderColumn: React.FC<{ status: OrderStatus; orders: Order[]; onUpdateStatus: (orderId: string, newStatus: OrderStatus) => void }> = ({ status, orders, onUpdateStatus }) => (
-    <div className="w-80 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 flex-shrink-0">
-        <h3 className={`font-semibold mb-4 px-2 py-1 rounded text-center ${OrderStatusColors[status]}`}>{status} ({orders.length})</h3>
-        <div className="space-y-4">
-            {orders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateStatus} />)}
-        </div>
-    </div>
-);
-
-const OrdersKanbanBoard: React.FC<{ orders: Order[], setOrders: (value: Order[] | ((val: Order[]) => Order[])) => void }> = ({ orders, setOrders }) => {
-    const columns: OrderStatus[] = [OrderStatus.Pending, OrderStatus.Preparing, OrderStatus.Ready, OrderStatus.Completed];
-
-    const updateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
-        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
-    };
-
-    return (
-        <div className="flex space-x-4 overflow-x-auto pb-4 -m-6 p-6">
-            {columns.map(status => (
-                <OrderColumn key={status} status={status} orders={orders.filter(o => o.status === status)} onUpdateStatus={updateOrderStatus} />
-            ))}
-        </div>
-    );
-};
-
 const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
-    const [orderType, setOrderType] = useState<OrderType>(OrderType.DineIn);
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const dropdownRef = useRef<HTMLDivElement>(null);
-
-    const orderTypeDescriptions: { [key in OrderType]: string } = {
-        [OrderType.DineIn]: "Pedido para consumir en el local, sin una mesa asignada.",
-        [OrderType.TakeAway]: "Productos envueltos.",
-        [OrderType.Delivery]: "Servicio a domicilio propio o de terceros.",
-    };
-
-    const handleSelectType = (type: OrderType) => {
-        setOrderType(type);
-        setIsDropdownOpen(false);
-    };
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-                setIsDropdownOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
-
+    // Placeholder for manual order creation
     if (!isOpen) return null;
-
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-end">
-            <div className="bg-white dark:bg-gray-800 h-full w-full max-w-lg flex flex-col">
-                <div className="p-6 border-b dark:border-gray-700 flex justify-between items-center">
-                    <h2 className="text-xl font-semibold">Agrega un pedido</h2>
-                    <button onClick={onClose}><IconX /></button>
-                </div>
-                <div className="p-6 flex-1 flex flex-col">
-                    <div className="flex-grow">
-                        <label htmlFor="orderType" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Tipo de pedido</label>
-                        <div className="relative mt-1" ref={dropdownRef}>
-                            <button
-                                type="button"
-                                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm pl-3 pr-10 py-2 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                            >
-                                <span className="block truncate">{orderType}</span>
-                                <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                                    <IconChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                                </span>
-                            </button>
-                            {isDropdownOpen && (
-                                <ul className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-900 shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
-                                    {Object.values(OrderType).map(type => (
-                                        <li
-                                            key={type}
-                                            onClick={() => handleSelectType(type)}
-                                            className="text-gray-900 dark:text-gray-200 cursor-default select-none relative py-2 pl-3 pr-9 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                        >
-                                            <span className="font-semibold block truncate">{type}</span>
-                                            <span className="text-gray-500 dark:text-gray-400 text-xs block">{orderTypeDescriptions[type]}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
-                    </div>
-                    <div className="bg-gray-100 dark:bg-gray-900/50 p-6 rounded-md">
-                        <h3 className="font-semibold">Vista previa</h3>
-                        {/* Preview content will go here */}
-                    </div>
-                </div>
-                <div className="p-6 border-t dark:border-gray-700 bg-white dark:bg-gray-800 flex justify-end items-center space-x-3">
-                    <button onClick={onClose} className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">Cancelar</button>
-                    <button className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700">Continuar</button>
-                </div>
+         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-end">
+            <div className="bg-white dark:bg-gray-800 h-full w-full max-w-lg flex flex-col p-6">
+                 <h2 className="text-xl font-bold mb-4">Nuevo Pedido Manual</h2>
+                 <p>Funcionalidad para crear pedidos manualmente (POS) próximamente.</p>
+                 <button onClick={onClose} className="mt-4 px-4 py-2 bg-gray-200 rounded">Cerrar</button>
             </div>
-        </div>
-    );
-};
+         </div>
+    )
+}
 
 const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettingsClick }) => {
     const [orders, setOrders] = usePersistentState<Order[]>('orders', MOCK_ORDERS);
     const [activeTab, setActiveTab] = useState('panel-pedidos');
     const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
+    const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+    const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
+    const [storeOpen, setStoreOpen] = useState(true);
+
+    const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+        try {
+            await updateOrder(orderId, { status: newStatus });
+            setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+        } catch (e) {
+            alert("Error updating order status");
+        }
+    };
+    
+    const updatePaymentStatus = async (orderId: string, newStatus: PaymentStatus) => {
+        try {
+             await updateOrder(orderId, { paymentStatus: newStatus });
+             setOrders(prev => prev.map(o => o.id === orderId ? { ...o, paymentStatus: newStatus } : o));
+        } catch (e) {
+            alert("Error updating payment status");
+        }
+    }
 
     const tabs = [
         { id: 'panel-pedidos', title: 'Panel de pedidos' },
@@ -1476,10 +1629,57 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                 if (orders.length === 0) {
                     return <EmptyOrdersView onNewOrderClick={() => setIsNewOrderModalOpen(true)} />;
                 }
-                return <OrdersKanbanBoard orders={orders} setOrders={setOrders} />;
+                return (
+                    <div className="h-[calc(100vh-200px)] flex flex-col">
+                         <div className="flex justify-between items-center mb-4 px-1">
+                            <div className="flex items-center space-x-2">
+                                <button onClick={() => setViewMode('board')} className={`p-2 rounded-md ${viewMode === 'board' ? 'bg-white shadow dark:bg-gray-700 text-emerald-600' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}><IconTableLayout className="h-5 w-5"/></button>
+                                <button onClick={() => setViewMode('list')} className={`p-2 rounded-md ${viewMode === 'list' ? 'bg-white shadow dark:bg-gray-700 text-emerald-600' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}><IconMenu className="h-5 w-5"/></button>
+                            </div>
+                            
+                            <div className="flex items-center gap-3">
+                                <div className="relative group">
+                                     <button className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${storeOpen ? 'border-green-200 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'border-red-200 bg-red-50 text-red-700'}`}>
+                                        <div className={`w-2 h-2 rounded-full ${storeOpen ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                        {storeOpen ? 'Abierto' : 'Cerrado'}
+                                        <IconChevronDown className="h-4 w-4"/>
+                                    </button>
+                                    <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 shadow-lg rounded-lg border dark:border-gray-700 hidden group-hover:block z-10 p-1">
+                                        <button onClick={() => setStoreOpen(o => !o)} className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 rounded flex items-center gap-2 text-red-600">
+                                             <IconToggleOff className="h-4 w-4"/> {storeOpen ? 'Pausar pedidos' : 'Reanudar pedidos'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <button onClick={() => setIsNewOrderModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-lg shadow-emerald-900/20 transition-all">
+                                    <IconPlus className="h-5 w-5" /> Nuevo pedido
+                                </button>
+                            </div>
+                         </div>
+                        
+                        {viewMode === 'board' ? (
+                             <OrdersKanbanBoard orders={orders} onOrderClick={setSelectedOrder} />
+                        ) : (
+                             <OrderListView orders={orders} onOrderClick={setSelectedOrder} />
+                        )}
+                    </div>
+                );
 
             case 'panel-mesas':
-                return <EmptyTablesView onConfigureClick={onSettingsClick} />;
+                return (
+                    <div className="text-center py-16 px-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <div className="mx-auto h-16 w-16 text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                            <IconTableLayout className="h-10 w-10" />
+                        </div>
+                        <h3 className="mt-4 text-lg font-semibold text-gray-800 dark:text-gray-200">Gestión de Mesas</h3>
+                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">Aquí podrás ver el estado de tus mesas en tiempo real.</p>
+                        <div className="mt-6">
+                            <button onClick={onSettingsClick} className="text-emerald-600 font-semibold text-sm hover:text-emerald-700">
+                                Configurar zonas y mesas &rarr;
+                            </button>
+                        </div>
+                    </div>
+                );
             case 'comandas-digitales':
                  return <div className="text-center p-10 text-gray-500 bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700">Comandas digitales (próximamente)</div>;
             default:
@@ -1488,8 +1688,8 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
     };
     
     return (
-        <div>
-            <div className="border-b border-gray-200 dark:border-gray-700">
+        <div className="h-full flex flex-col">
+            <div className="border-b border-gray-200 dark:border-gray-700 shrink-0">
                 <nav className="-mb-px flex space-x-8" aria-label="Tabs">
                     {tabs.map(tab => (
                         <button
@@ -1506,10 +1706,16 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                     ))}
                 </nav>
             </div>
-             <div className="mt-6">
+             <div className="mt-6 flex-1">
                 {renderContent()}
             </div>
             <NewOrderModal isOpen={isNewOrderModalOpen} onClose={() => setIsNewOrderModalOpen(false)} />
+            <OrderDetailModal 
+                order={selectedOrder} 
+                onClose={() => setSelectedOrder(null)} 
+                onUpdateStatus={updateOrderStatus}
+                onUpdatePayment={updatePaymentStatus}
+            />
         </div>
     );
 };

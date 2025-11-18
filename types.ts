@@ -1,3 +1,4 @@
+
 export interface Product {
     id: string;
     name: string;
@@ -37,6 +38,8 @@ export enum OrderType {
     Delivery = 'Domicilio',
 }
 
+export type PaymentStatus = 'paid' | 'pending';
+
 export interface Address {
     colonia: string;
     calle: string;
@@ -56,6 +59,7 @@ export interface Order {
     items: CartItem[];
     customer: Customer;
     status: OrderStatus;
+    paymentStatus?: PaymentStatus; // Added this field
     total: number;
     createdAt: Date;
     branchId: string;
