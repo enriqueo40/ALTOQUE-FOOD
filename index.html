@@ -21,24 +21,25 @@
             font-family: 'Inter', sans-serif;
         }
     </style>
+    <script>
+        // Configure Tailwind CSS to use class-based dark mode
+        tailwind.config = {
+          darkMode: 'class',
+        }
+    </script>
 <script type="importmap">
 {
   "imports": {
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0",
-    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.5",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "recharts": "https://aistudiocdn.com/recharts@^3.4.1",
-    "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.4/+esm"
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "vite": "https://aistudiocdn.com/vite@^7.2.2",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6",
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.83.0",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1"
   }
 }
-</script>
-<script>
-    // Configure Tailwind CSS to use class-based dark mode
-    tailwind.config = {
-      darkMode: 'class',
-    }
 </script>
 </head>
 <body class="bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
