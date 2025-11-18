@@ -1,0 +1,7 @@
+{
+  "name": "ALTOQUE FOOD ",
+  "description": "A full-stack SaaS application for restaurants and cafes, providing a chic, minimalist digital menu, a robust admin dashboard for order management, real-time product control, and AI-powered insights with Gemini. This platform streamlines the entire ordering process from customer selection to payment and delivery.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
