@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker } from '../constants';
+import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
@@ -14,6 +14,8 @@ export default function CustomerView() {
     const [settings, setSettings] = useState<AppSettings | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [tableInfo, setTableInfo] = useState<{ table: string; zone: string } | null>(null);
+    // State for Order Type (Delivery, TakeAway, DineIn)
+    const [orderType, setOrderType] = useState<OrderType>(OrderType.Delivery);
 
     const { cartItems, addToCart, removeFromCart, updateQuantity, clearCart, cartTotal, itemCount } = useCart();
     
@@ -35,6 +37,7 @@ export default function CustomerView() {
         const zone = params.get('zone');
         if (table && zone) {
             setTableInfo({ table, zone });
+            setOrderType(OrderType.DineIn);
         }
 
     }, []);
@@ -51,8 +54,6 @@ export default function CustomerView() {
     const handlePlaceOrder = async (customer: Customer, paymentMethod: PaymentMethod) => {
         if (!settings) return;
 
-        const isTableOrder = !!tableInfo;
-
         const newOrder: Omit<Order, 'id' | 'createdAt'> = {
             customer,
             items: cartItems,
@@ -60,8 +61,8 @@ export default function CustomerView() {
             status: OrderStatus.Pending,
             branchId: 'main-branch',
             generalComments: generalComments,
-            orderType: isTableOrder ? OrderType.DineIn : OrderType.Delivery,
-            tableId: isTableOrder ? `${tableInfo.zone} - ${tableInfo.table}` : undefined,
+            orderType: orderType,
+            tableId: orderType === OrderType.DineIn && tableInfo ? `${tableInfo.zone} - ${tableInfo.table}` : undefined,
         };
 
         try {
@@ -74,11 +75,11 @@ export default function CustomerView() {
 
         let messageParts: string[];
 
-        if (isTableOrder) {
+        if (orderType === OrderType.DineIn) {
             messageParts = [
                 `*🛎️ Nuevo Pedido en Mesa de ${settings.company.name.toUpperCase()}*`,
                 `---------------------------------`,
-                `*MESA:* ${tableInfo.zone} - ${tableInfo.table}`,
+                `*MESA:* ${tableInfo?.zone} - ${tableInfo?.table}`,
                  `*CLIENTE:* ${customer.name}`,
                 `---------------------------------`,
                 `*DETALLES DEL PEDIDO:*`,
@@ -91,9 +92,30 @@ export default function CustomerView() {
                 `*Total:* ${settings.company.currency.code} $${cartTotal.toFixed(2)}`,
                 `*Método de pago:* ${paymentMethod}`,
             ];
+        } else if (orderType === OrderType.TakeAway) {
+             messageParts = [
+                `*🛍️ Nuevo Pedido Para Recoger - ${settings.company.name.toUpperCase()}*`,
+                `---------------------------------`,
+                `*CLIENTE:*`,
+                `*Nombre:* ${customer.name}`,
+                `*Teléfono:* ${customer.phone}`,
+                `---------------------------------`,
+                `*TIPO:* Para llevar (Recoger en tienda)`,
+                `---------------------------------`,
+                `*DETALLES DEL PEDIDO:*`,
+                ...cartItems.map(item => 
+                    `*${item.quantity}x ${item.name}*` + (item.comments ? `\n  - _Comentarios: ${item.comments}_` : '')
+                ),
+                ``,
+                generalComments ? `*Comentarios Generales:*\n_${generalComments}_` : '',
+                `---------------------------------`,
+                `*Total:* ${settings.company.currency.code} $${cartTotal.toFixed(2)}`,
+                `*Método de pago:* ${paymentMethod}`,
+            ];
         } else {
+            // Delivery
             messageParts = [
-                `*⭐ Nuevo Pedido de ${settings.company.name.toUpperCase()}*`,
+                `*⭐ Nuevo Pedido a Domicilio - ${settings.company.name.toUpperCase()}*`,
                 `---------------------------------`,
                 `*CLIENTE:*`,
                 `*Nombre:* ${customer.name}`,
@@ -165,7 +187,12 @@ export default function CustomerView() {
 
                 {view === 'menu' && (
                     <>
-                        <RestaurantHero settings={settings} tableInfo={tableInfo} />
+                        <RestaurantHero 
+                            settings={settings} 
+                            tableInfo={tableInfo} 
+                            orderType={orderType}
+                            setOrderType={setOrderType}
+                        />
                         <MenuList onProductClick={handleProductClick} cartItems={cartItems} currency={settings.company.currency.code} />
                     </>
                 )}
@@ -187,7 +214,7 @@ export default function CustomerView() {
                         cartTotal={cartTotal}
                         onPlaceOrder={handlePlaceOrder}
                         settings={settings}
-                        isTableOrder={!!tableInfo}
+                        orderType={orderType}
                     />
                 )}
 
@@ -229,15 +256,32 @@ const Header: React.FC<{ title: string; onBack?: () => void }> = ({ title, onBac
     </header>
 );
 
-const RestaurantHero: React.FC<{ settings: AppSettings, tableInfo: { table: string, zone: string } | null }> = ({ settings, tableInfo }) => {
-    const [deliveryType, setDeliveryType] = useState<'delivery' | 'pickup'>('delivery');
+const RestaurantHero: React.FC<{ 
+    settings: AppSettings, 
+    tableInfo: { table: string, zone: string } | null,
+    orderType: OrderType,
+    setOrderType: (type: OrderType) => void
+}> = ({ settings, tableInfo, orderType, setOrderType }) => {
     const { branch, company, shipping } = settings;
 
     const getShippingCostText = () => {
+        if (orderType === OrderType.TakeAway) return "Gratis";
+        
         if (shipping.costType === ShippingCostType.ToBeQuoted) return "Por definir";
         if (shipping.costType === ShippingCostType.Free) return "Gratis";
         if (shipping.costType === ShippingCostType.Fixed) return `$${shipping.fixedCost?.toFixed(2)}`;
         return "Por definir";
+    };
+
+    const getTimeLabel = () => {
+        return orderType === OrderType.TakeAway ? "Tiempo recogida" : "Tiempo envío";
+    };
+
+    const getTimeText = () => {
+        if (orderType === OrderType.TakeAway) {
+             return `${shipping.pickupTime.min} min`;
+        }
+        return `${shipping.deliveryTime.min} - ${shipping.deliveryTime.max} min`;
     };
     
     return (
@@ -284,17 +328,17 @@ const RestaurantHero: React.FC<{ settings: AppSettings, tableInfo: { table: stri
                     <>
                     <div className="w-full max-w-xs bg-gray-800 rounded-full p-1 flex relative mb-4 shadow-inner">
                         <div 
-                            className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-gray-700 rounded-full transition-transform duration-300 ease-out shadow-sm ${deliveryType === 'pickup' ? 'translate-x-full left-1' : 'left-1'}`}
+                            className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-gray-700 rounded-full transition-transform duration-300 ease-out shadow-sm ${orderType === OrderType.TakeAway ? 'translate-x-full left-1' : 'left-1'}`}
                         ></div>
                         <button 
-                            onClick={() => setDeliveryType('delivery')} 
-                            className={`flex-1 relative z-10 py-2 text-sm font-medium rounded-full transition-colors duration-200 ${deliveryType === 'delivery' ? 'text-emerald-400' : 'text-gray-400 hover:text-gray-200'}`}
+                            onClick={() => setOrderType(OrderType.Delivery)} 
+                            className={`flex-1 relative z-10 py-2 text-sm font-medium rounded-full transition-colors duration-200 ${orderType === OrderType.Delivery ? 'text-emerald-400' : 'text-gray-400 hover:text-gray-200'}`}
                         >
                             A domicilio
                         </button>
                         <button 
-                            onClick={() => setDeliveryType('pickup')} 
-                            className={`flex-1 relative z-10 py-2 text-sm font-medium rounded-full transition-colors duration-200 ${deliveryType === 'pickup' ? 'text-emerald-400' : 'text-gray-400 hover:text-gray-200'}`}
+                            onClick={() => setOrderType(OrderType.TakeAway)} 
+                            className={`flex-1 relative z-10 py-2 text-sm font-medium rounded-full transition-colors duration-200 ${orderType === OrderType.TakeAway ? 'text-emerald-400' : 'text-gray-400 hover:text-gray-200'}`}
                         >
                             Para recoger
                         </button>
@@ -302,8 +346,8 @@ const RestaurantHero: React.FC<{ settings: AppSettings, tableInfo: { table: stri
 
                     <div className="grid grid-cols-2 divide-x divide-gray-800 w-full max-w-xs">
                         <div className="text-center px-4">
-                            <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">Tiempo envío</p>
-                            <p className="text-white font-medium">{shipping.deliveryTime.min} - {shipping.deliveryTime.max} min</p>
+                            <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">{getTimeLabel()}</p>
+                            <p className="text-white font-medium">{getTimeText()}</p>
                         </div>
                         <div className="text-center px-4">
                             <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">Costo envío</p>
@@ -623,11 +667,26 @@ const CartSummaryView: React.FC<{
     )
 }
 
-const CheckoutView: React.FC<{cartTotal: number, onPlaceOrder: (customer: Customer, paymentMethod: PaymentMethod) => void, settings: AppSettings, isTableOrder: boolean}> = ({ cartTotal, onPlaceOrder, settings, isTableOrder }) => {
+const CheckoutView: React.FC<{
+    cartTotal: number, 
+    onPlaceOrder: (customer: Customer, paymentMethod: PaymentMethod) => void, 
+    settings: AppSettings, 
+    orderType: OrderType 
+}> = ({ cartTotal, onPlaceOrder, settings, orderType }) => {
     const [customer, setCustomer] = useState<Customer>({
         name: '', phone: '', address: { colonia: '', calle: '', numero: '', entreCalles: '', referencias: '' }
     });
-    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>(settings.payment.deliveryMethods[0] || 'Efectivo');
+    
+    const isDelivery = orderType === OrderType.Delivery;
+    const isPickup = orderType === OrderType.TakeAway;
+    const isDineIn = orderType === OrderType.DineIn;
+
+    // Determine available payment methods
+    const availablePaymentMethods = isDelivery 
+        ? settings.payment.deliveryMethods 
+        : settings.payment.pickupMethods; // Pickup and DineIn use pickup methods usually
+
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>(availablePaymentMethods[0] || 'Efectivo');
 
     const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -645,8 +704,8 @@ const CheckoutView: React.FC<{cartTotal: number, onPlaceOrder: (customer: Custom
     const inputClasses = "w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-gray-500 transition-all";
     const labelClasses = "text-sm font-bold text-gray-400 mb-1 block";
 
-    const shippingCost = settings.shipping.costType === ShippingCostType.Fixed ? settings.shipping.fixedCost ?? 0 : 0;
-    const finalTotal = cartTotal + (isTableOrder ? 0 : shippingCost);
+    const shippingCost = (isDelivery && settings.shipping.costType === ShippingCostType.Fixed) ? (settings.shipping.fixedCost ?? 0) : 0;
+    const finalTotal = cartTotal + shippingCost;
     
     return (
         <form onSubmit={handleSubmit} className="p-4 space-y-6 pb-44 animate-fade-in">
@@ -656,7 +715,7 @@ const CheckoutView: React.FC<{cartTotal: number, onPlaceOrder: (customer: Custom
                     <label className={labelClasses}>Nombre</label>
                     <input type="text" value={customer.name} onChange={e => setCustomer(c => ({...c, name: e.target.value}))} className={inputClasses} placeholder="Tu nombre completo" required />
                 </div>
-                 {!isTableOrder && (
+                 {!isDineIn && (
                     <div>
                         <label className={labelClasses}>Número telefónico</label>
                         <input type="tel" value={customer.phone} onChange={e => setCustomer(c => ({...c, phone: e.target.value}))} className={inputClasses} placeholder="WhatsApp o celular" required />
@@ -664,7 +723,7 @@ const CheckoutView: React.FC<{cartTotal: number, onPlaceOrder: (customer: Custom
                 )}
             </div>
 
-            {!isTableOrder && (
+            {isDelivery && (
                 <div className="space-y-4 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
                     <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Entrega</h3>
                     <div className="grid grid-cols-2 gap-4">
@@ -687,11 +746,20 @@ const CheckoutView: React.FC<{cartTotal: number, onPlaceOrder: (customer: Custom
                     </div>
                 </div>
             )}
+            
+            {isPickup && (
+                 <div className="p-5 bg-emerald-900/20 border border-emerald-800/50 rounded-2xl text-center">
+                    <IconStore className="h-10 w-10 text-emerald-500 mx-auto mb-2"/>
+                    <h3 className="font-bold text-white">Recoger en Tienda</h3>
+                    <p className="text-sm text-gray-400 mt-1">No olvides pasar a recoger tu pedido.</p>
+                    <p className="text-sm text-gray-400 mt-1 font-medium">{settings.branch.fullAddress}</p>
+                </div>
+            )}
 
             <div className="space-y-3 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
                  <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Pago</h3>
                  <div className="space-y-2 pt-2">
-                    {settings.payment.deliveryMethods.map(method => (
+                    {availablePaymentMethods.map(method => (
                         <label key={method} className="flex justify-between items-center p-4 border border-gray-700 rounded-xl bg-gray-800 cursor-pointer transition-all hover:border-emerald-500 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-900/20">
                             <span className="font-medium text-white">{method}</span>
                             <input type="radio" name="payment" value={method} checked={selectedPaymentMethod === method} onChange={() => setSelectedPaymentMethod(method)} className="h-5 w-5 accent-emerald-500" />
@@ -706,7 +774,7 @@ const CheckoutView: React.FC<{cartTotal: number, onPlaceOrder: (customer: Custom
                         <span>Subtotal</span>
                         <span>${cartTotal.toFixed(2)}</span>
                     </div>
-                    {!isTableOrder && (
+                    {isDelivery && (
                         <div className="flex justify-between text-gray-400">
                             <span>Envío</span>
                             <span>{shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : "Por cotizar"}</span>
@@ -714,7 +782,7 @@ const CheckoutView: React.FC<{cartTotal: number, onPlaceOrder: (customer: Custom
                     )}
                      <div className="flex justify-between font-bold text-xl text-white pt-2 border-t border-gray-800">
                         <span>Total</span>
-                        <span>${finalTotal.toFixed(2)} {!isTableOrder && shippingCost === 0 && "+ envío"}</span>
+                        <span>${finalTotal.toFixed(2)} {isDelivery && shippingCost === 0 && "+ envío"}</span>
                     </div>
                 </div>
                  <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 px-6 rounded-xl shadow-lg flex items-center justify-center gap-3 transition-all transform active:scale-[0.98]">
