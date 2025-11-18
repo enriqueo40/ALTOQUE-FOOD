@@ -1,13 +1,12 @@
 
 
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { useTheme } from '../hooks/useTheme';
 // Fix: Moved ShippingCostType import from '../constants' to here to resolve export error.
 import { Product, Category, Order, OrderStatus, Conversation, AdminChatMessage, OrderType, Personalization, PersonalizationOption, Promotion, DiscountType, PromotionAppliesTo, Zone, Table, AppSettings, Currency, BranchSettings, PaymentSettings, ShippingSettings, PaymentMethod, DaySchedule, Schedule, ShippingCostType, TimeRange, PrintingMethod } from '../types';
 import { MOCK_ORDERS, MOCK_CONVERSATIONS, INITIAL_SETTINGS, CURRENCIES } from '../constants';
-import { generateProductDescription, getAdvancedInsights, suggestCategories } from '../services/geminiService';
+import { generateProductDescription, getAdvancedInsights } from '../services/geminiService';
 import { getProducts, getCategories, saveProduct, deleteProduct, saveCategory, deleteCategory, getPersonalizations, savePersonalization, deletePersonalization, getPromotions, savePromotion, deletePromotion, updateProductAvailability, updatePersonalizationOptionAvailability, getZones, saveZone, deleteZone, saveZoneLayout, getAppSettings, saveAppSettings, subscribeToNewOrders, unsubscribeFromChannel } from '../services/supabaseService';
 // Fix: Imported IconComponent to resolve usage error.
 import { IconComponent, IconHome, IconMenu, IconAvailability, IconShare, IconTutorials, IconProducts, IconOrders, IconAnalytics, IconChatAdmin, IconLogout, IconSearch, IconBell, IconEdit, IconPlus, IconTrash, IconSparkles, IconSend, IconMoreVertical, IconExternalLink, IconCalendar, IconChevronDown, IconX, IconReceipt, IconSettings, IconStore, IconDelivery, IconPayment, IconClock, IconTableLayout, IconPrinter, IconChevronUp, IconPencil, IconDuplicate, IconGripVertical, IconPercent, IconInfo, IconTag, IconLogoutAlt, IconSun, IconMoon, IconExpand, IconArrowLeft, IconWhatsapp, IconQR, IconPlayCircle, IconLocationMarker, IconUpload, IconCheck, IconBluetooth, IconUSB } from '../constants';
@@ -511,8 +510,6 @@ const ProductsView: React.FC = () => {
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-    const [isGeneratingCategories, setIsGeneratingCategories] = useState(false);
-    const [suggestedCategories, setSuggestedCategories] = useState<string[]>([]);
 
     const fetchData = async () => {
         try {
@@ -622,20 +619,6 @@ const ProductsView: React.FC = () => {
         }
     };
 
-    const handleSuggestCategories = async () => {
-        setIsGeneratingCategories(true);
-        setSuggestedCategories([]);
-        try {
-            const suggestions = await suggestCategories(products);
-            setSuggestedCategories(suggestions);
-        } catch (error) {
-            console.error("Failed to suggest categories:", error);
-            alert("No se pudieron generar las sugerencias.");
-        } finally {
-            setIsGeneratingCategories(false);
-        }
-    };
-
     const CategoryActions: React.FC<{ category: Category }> = ({ category }) => {
         const [isOpen, setIsOpen] = useState(false);
         const menuRef = useRef<HTMLDivElement>(null);
@@ -681,14 +664,6 @@ const ProductsView: React.FC = () => {
     return (
         <div>
             <div className="flex justify-end items-center mb-6 gap-x-4">
-                <button
-                    onClick={handleSuggestCategories}
-                    disabled={isGeneratingCategories}
-                    className="px-4 py-2 border border-emerald-500 text-emerald-600 dark:text-emerald-400 rounded-md text-sm font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-900/50 flex items-center gap-2 disabled:opacity-50"
-                >
-                    <IconSparkles className="h-4 w-4" />
-                    {isGeneratingCategories ? 'Generando...' : 'Sugerir Categorías con IA'}
-                </button>
                 <button onClick={() => handleOpenCategoryModal(null)} className="px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-600">
                     + Nueva categoría
                 </button>
@@ -696,31 +671,6 @@ const ProductsView: React.FC = () => {
                     + Nuevo producto
                 </button>
             </div>
-            
-            {isGeneratingCategories && <div className="text-center p-4">Buscando sugerencias...</div>}
-            
-            {suggestedCategories.length > 0 && (
-                 <div className="mb-6 p-4 bg-emerald-50 dark:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-700 rounded-lg">
-                    <div className="flex justify-between items-center">
-                         <h3 className="font-semibold text-emerald-800 dark:text-emerald-200">Sugerencias de Categorías</h3>
-                         <button onClick={() => setSuggestedCategories([])} className="text-gray-500 hover:text-gray-800"><IconX/></button>
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                        {suggestedCategories.map((name, i) => (
-                            <div key={i} className="flex items-center gap-1 bg-white dark:bg-emerald-900 rounded-full border dark:border-emerald-700 pl-3">
-                                <span className="text-sm font-medium text-emerald-800 dark:text-emerald-200">{name}</span>
-                                <button
-                                    onClick={() => handleSaveCategory({ name })}
-                                    className="p-1.5 text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-800 rounded-full"
-                                    title={`Agregar "${name}"`}
-                                >
-                                    <IconPlus className="h-4 w-4"/>
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                 </div>
-            )}
 
             <div className="space-y-6">
                 {groupedProducts.map(category => (
@@ -3104,4 +3054,147 @@ const ShareView: React.FC<{ onGoToTableSettings: () => void }> = ({ onGoToTableS
             
             {activeTab === 'multi-sucursal' && (
                  <div className="bg-white dark:bg-gray-800 p-10 rounded-lg shadow-sm border dark:border-gray-700 text-center">
-                    <h3 className="font-semibold text-lg mb-2">Pr
+                    <h3 className="font-semibold text-lg mb-2">Próximamente</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Esta funcionalidad estará disponible pronto.</p>
+                </div>
+            )}
+            
+            {isQrModalOpen && <QRModal {...qrModalData} isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} />}
+            {toastMessage && (
+                <div className="fixed top-24 right-8 bg-gray-900 text-white px-6 py-3 rounded-lg shadow-lg z-[100] animate-fade-in-out">
+                    {toastMessage}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const AdminView: React.FC = () => {
+    const [currentPage, setCurrentPage] = usePersistentState<AdminViewPage>('admin-page', 'dashboard');
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+    const [isZoneEditorOpen, setIsZoneEditorOpen] = useState(false);
+    const [editingZone, setEditingZone] = useState<Zone | null>(null);
+    const [toasts, setToasts] = useState<{id: number, message: string}[]>([]);
+    const [settingsInitialPage, setSettingsInitialPage] = useState<SettingsPage>('general');
+
+    const [theme, toggleTheme] = useTheme();
+
+    const addToast = (message: string) => {
+        const id = Date.now();
+        setToasts(prev => [...prev, {id, message}]);
+        setTimeout(() => {
+            setToasts(prev => prev.filter(t => t.id !== id));
+        }, 5000);
+    };
+    
+    const handleOpenSettings = (page: SettingsPage = 'general') => {
+        setSettingsInitialPage(page);
+        setIsSettingsModalOpen(true);
+    };
+
+    useEffect(() => {
+        if (Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+
+        const handleNewOrder = (payload: any) => {
+            addToast(`Nuevo pedido: #${String(payload.id).slice(0, 4)} de ${payload.customer.name}`);
+            
+            if (Notification.permission === 'granted') {
+                new Notification('¡Nuevo Pedido Recibido!', {
+                    body: `Pedido de ${payload.customer.name} por un total de $${Number(payload.total).toFixed(2)}.`,
+                    icon: 'https://cdn-icons-png.flaticon.com/512/1048/1048953.png'
+                });
+            }
+        };
+        
+        subscribeToNewOrders(handleNewOrder);
+        
+        return () => {
+            unsubscribeFromChannel();
+        };
+    }, []);
+
+    const handleOpenZoneEditor = (zone: Zone) => {
+        setIsSettingsModalOpen(false); // Close settings to open editor
+        setEditingZone(zone);
+        setIsZoneEditorOpen(true);
+    };
+
+    const handleSaveZoneLayout = async (zone: Zone) => {
+        try {
+            await saveZoneLayout(zone);
+        } catch (error) {
+            alert("No se pudo guardar la distribución de la zona.");
+        } finally {
+            setIsZoneEditorOpen(false);
+        }
+    };
+    
+    const renderPage = () => {
+        switch(currentPage) {
+            case 'dashboard': return <Dashboard />;
+            case 'products': return <MenuManagement />;
+            case 'orders': return <OrderManagement onSettingsClick={() => handleOpenSettings('zones-tables')}/>;
+            case 'analytics': return <Analytics />;
+            case 'messages': return <Messages />;
+            case 'availability': return <AvailabilityView />;
+            case 'share': return <ShareView onGoToTableSettings={() => handleOpenSettings('zones-tables')} />;
+            case 'tutorials': return <div className="text-center p-10">Tutoriales (próximamente)</div>;
+            default: return <Dashboard />;
+        }
+    }
+    
+    const ToastContainer = () => (
+        <>
+            <div className="fixed top-5 right-5 z-[100] space-y-2">
+                {toasts.map(toast => (
+                    <div key={toast.id} className="bg-emerald-600 text-white px-6 py-3 rounded-lg shadow-lg animate-fade-in-out">
+                        {toast.message}
+                    </div>
+                ))}
+            </div>
+            <style>{`
+                @keyframes fade-in-out {
+                    0% { opacity: 0; transform: translateY(-20px); }
+                    10% { opacity: 1; transform: translateY(0); }
+                    90% { opacity: 1; transform: translateY(0); }
+                    100% { opacity: 0; transform: translateY(-20px); }
+                }
+                .animate-fade-in-out {
+                    animation: fade-in-out 5s ease-in-out forwards;
+                }
+            `}</style>
+        </>
+    );
+
+    return (
+        <div className="flex h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-sans">
+            <ToastContainer />
+            <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
+            <div className="flex-1 flex flex-col overflow-hidden">
+                <Header title={PAGE_TITLES[currentPage]} onSettingsClick={() => handleOpenSettings()} onPreviewClick={() => {}} theme={theme} toggleTheme={toggleTheme} />
+                <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900 p-8">
+                    {renderPage()}
+                </main>
+            </div>
+            {isSettingsModalOpen && 
+                <SettingsModal 
+                    isOpen={isSettingsModalOpen} 
+                    onClose={() => setIsSettingsModalOpen(false)}
+                    onEditZoneLayout={handleOpenZoneEditor}
+                    initialPage={settingsInitialPage}
+                />
+            }
+            {isZoneEditorOpen && editingZone && (
+                <ZoneEditor 
+                    initialZone={editingZone}
+                    onSave={handleSaveZoneLayout}
+                    onExit={() => setIsZoneEditorOpen(false)}
+                />
+            )}
+        </div>
+    );
+};
+
+export default AdminView;

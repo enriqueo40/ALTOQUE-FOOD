@@ -1,6 +1,5 @@
 
-
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { ChatMessage, Order, Product } from '../types';
 
 // IMPORTANT: In a real application, the API key would be handled securely
@@ -99,43 +98,5 @@ export const getAdvancedInsights = async (query: string, orders: Order[]): Promi
     } catch (error) {
         console.error("Error getting advanced insights:", error);
         return `An error occurred while analyzing the data. ${error instanceof Error ? error.message : String(error)}`;
-    }
-};
-
-export const suggestCategories = async (products: Product[]): Promise<string[]> => {
-    if (!API_KEY) return [];
-
-    const productList = products.map(p => `- ${p.name}: ${p.description}`).join('\n');
-    
-    const prompt = `Based on the following list of products from a restaurant menu, suggest 5 new, logical, and appealing category names. Return the answer as a JSON array of strings.
-
-    Product List:
-    ${productList}
-
-    Example Output:
-    ["Para Picar", "Platos Fuertes", "Bebidas Calientes", "Postres", "Especialidades del Chef"]
-    `;
-
-    try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-pro",
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.ARRAY,
-                    items: {
-                        type: Type.STRING
-                    }
-                }
-            }
-        });
-
-        let jsonStr = response.text.trim();
-        const suggested = JSON.parse(jsonStr);
-        return Array.isArray(suggested) ? suggested : [];
-    } catch (error) {
-        console.error("Error suggesting categories:", error);
-        return [];
     }
 };
