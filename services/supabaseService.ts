@@ -415,7 +415,19 @@ export const saveZoneLayout = async (zone: Zone): Promise<void> => {
 
 // --- Orders Functions (Real-time) ---
 export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created_at'>): Promise<void> => {
-    const { error } = await getClient().from('orders').insert(order);
+    // FIX: Map camelCase properties from frontend to snake_case columns in database
+    const dbOrderPayload = {
+        customer: order.customer,
+        items: order.items,
+        status: order.status,
+        total: order.total,
+        branch_id: order.branchId,        // Map branchId -> branch_id
+        order_type: order.orderType,      // Map orderType -> order_type
+        table_id: order.tableId,          // Map tableId -> table_id
+        general_comments: order.generalComments // Map generalComments -> general_comments
+    };
+
+    const { error } = await getClient().from('orders').insert(dbOrderPayload);
 
     if (error) {
         console.error('Error saving order:', error);
