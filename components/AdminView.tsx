@@ -1893,12 +1893,26 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
     const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
     const [storeOpen, setStoreOpen] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
+    
+    // State for Table Panel
+    const [zones, setZones] = useState<Zone[]>([]);
+    const [activeZoneId, setActiveZoneId] = useState<string>('');
+
 
     // Initial Load
     useEffect(() => {
         const load = async () => {
-            const activeOrders = await getActiveOrders();
+            // Fetch orders and zones
+            const [activeOrders, fetchedZones] = await Promise.all([
+                getActiveOrders(),
+                getZones()
+            ]);
+            
             setOrders(activeOrders);
+            setZones(fetchedZones);
+            if(fetchedZones.length > 0) {
+                setActiveZoneId(fetchedZones[0].id);
+            }
             setIsLoading(false);
         };
         load();
@@ -1946,6 +1960,34 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
              alert(`Error updating payment status: ${errorMsg}`);
         }
     }
+    
+    const activeZone = useMemo(() => zones.find(z => z.id === activeZoneId), [zones, activeZoneId]);
+    
+    // Calculate Table Status
+    const getTableStatus = (zoneName: string, tableName: string) => {
+        const tableIdentifier = `${zoneName} - ${tableName}`;
+        const activeOrder = orders.find(o => 
+            o.tableId === tableIdentifier && 
+            o.status !== OrderStatus.Completed && 
+            o.status !== OrderStatus.Cancelled
+        );
+        
+        return activeOrder ? { status: 'occupied', order: activeOrder } : { status: 'free', order: null };
+    };
+    
+    const tableStats = useMemo(() => {
+         // Simple stats calculation based on current orders
+         const activeTables = orders.filter(o => o.tableId && o.status !== OrderStatus.Completed && o.status !== OrderStatus.Cancelled).length;
+         // Mocking specific "Requesting Bill" states since backend doesn't support it yet, using PaymentStatus 'pending' + 'Ready' status as a proxy
+         const requestingBill = orders.filter(o => o.tableId && o.status === OrderStatus.Ready && o.paymentStatus === 'pending').length;
+         
+         return {
+             requestingBill: requestingBill,
+             requestingWaiter: 0, // Feature not yet implemented in backend
+             pendingOrders: orders.filter(o => o.tableId && o.status === OrderStatus.Pending).length,
+             activeTables: activeTables
+         }
+    }, [orders]);
 
     const tabs = [
         { id: 'panel-pedidos', title: 'Panel de pedidos' },
@@ -2003,16 +2045,157 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
 
             case 'panel-mesas':
                 return (
-                    <div className="text-center py-16 px-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                        <div className="mx-auto h-16 w-16 text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-                            <IconTableLayout className="h-10 w-10" />
-                        </div>
-                        <h3 className="mt-4 text-lg font-semibold text-gray-800 dark:text-gray-200">Gestión de Mesas</h3>
-                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">Aquí podrás ver el estado de tus mesas en tiempo real.</p>
-                        <div className="mt-6">
-                            <button onClick={onSettingsClick} className="text-emerald-600 font-semibold text-sm hover:text-emerald-700">
-                                Configurar zonas y mesas &rarr;
+                    <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900 p-4">
+                        {/* Header Actions */}
+                        <div className="flex justify-end gap-3 mb-4">
+                            <button className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+                                Ver uso de suscripción
                             </button>
+                            <button className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
+                                Ver historial <IconClock className="h-4 w-4 text-gray-400"/>
+                            </button>
+                        </div>
+
+                        {/* Stats Bar */}
+                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 mb-6 flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-gray-200 dark:divide-gray-700">
+                            <div className="p-4 flex items-center justify-center md:justify-start md:w-48">
+                                <button className="flex items-center gap-2 text-gray-700 dark:text-gray-200 font-medium px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                                    <IconCalendar className="h-5 w-5 text-gray-500"/>
+                                    Hoy
+                                </button>
+                            </div>
+                            <div className="flex-1 grid grid-cols-2 md:grid-cols-4 divide-x divide-gray-200 dark:divide-gray-700">
+                                <div className="p-4 text-center">
+                                    <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{tableStats.requestingBill}</p>
+                                    <p className="text-xs text-gray-500 uppercase tracking-wide mt-1">mesas solicitando cuenta</p>
+                                </div>
+                                <div className="p-4 text-center">
+                                    <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{tableStats.requestingWaiter}</p>
+                                    <p className="text-xs text-gray-500 uppercase tracking-wide mt-1">mesas solicitando mesero</p>
+                                </div>
+                                <div className="p-4 text-center">
+                                    <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{tableStats.pendingOrders}</p>
+                                    <p className="text-xs text-gray-500 uppercase tracking-wide mt-1">mesas con comandas pendientes</p>
+                                </div>
+                                <div className="p-4 text-center">
+                                    <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{tableStats.activeTables}</p>
+                                    <p className="text-xs text-gray-500 uppercase tracking-wide mt-1">mesas activas</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Zone Selector */}
+                        <div className="mb-6">
+                            <div className="flex gap-2 overflow-x-auto pb-2">
+                                {zones.map(zone => (
+                                    <button
+                                        key={zone.id}
+                                        onClick={() => setActiveZoneId(zone.id)}
+                                        className={`px-6 py-2 rounded-lg border font-medium text-sm transition-all whitespace-nowrap ${
+                                            activeZoneId === zone.id
+                                            ? 'border-green-500 text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-400'
+                                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
+                                        }`}
+                                    >
+                                        {zone.name}
+                                    </button>
+                                ))}
+                                {zones.length === 0 && (
+                                     <div className="text-sm text-gray-500 p-2">No hay zonas configuradas. Ve a Configuración > Zonas y mesas.</div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Tables Grid */}
+                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex-1 p-8 overflow-auto relative min-h-[400px]">
+                            {activeZone ? (
+                                <div 
+                                    className="grid gap-6"
+                                    style={{
+                                        gridTemplateColumns: `repeat(${activeZone.cols}, minmax(80px, 1fr))`,
+                                        gridTemplateRows: `repeat(${activeZone.rows}, minmax(80px, 1fr))`
+                                    }}
+                                >
+                                    {/* Render Tables */}
+                                    {activeZone.tables.map(table => {
+                                        const { status, order } = getTableStatus(activeZone.name, table.name);
+                                        const isOccupied = status === 'occupied';
+                                        
+                                        return (
+                                            <div
+                                                key={table.id}
+                                                onClick={() => isOccupied && order ? setSelectedOrder(order) : null}
+                                                style={{
+                                                    gridRow: `${table.row} / span ${table.height}`,
+                                                    gridColumn: `${table.col} / span ${table.width}`,
+                                                }}
+                                                className={`
+                                                    relative rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer border-2
+                                                    ${table.shape === 'round' ? 'rounded-full aspect-square' : 'rounded-xl'}
+                                                    ${isOccupied 
+                                                        ? 'bg-red-50 border-red-400 dark:bg-red-900/20 dark:border-red-500/50 shadow-md' 
+                                                        : 'bg-gray-50 border-gray-200 dark:bg-gray-700/50 dark:border-gray-600 hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'
+                                                    }
+                                                `}
+                                            >
+                                                <span className={`text-2xl font-bold ${isOccupied ? 'text-red-500 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`}>
+                                                    {table.name}
+                                                </span>
+                                                
+                                                {isOccupied && order && (
+                                                    <div className="absolute -top-2 -right-2">
+                                                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold shadow-sm">
+                                                            {order.items.reduce((acc, i) => acc + i.quantity, 0)}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                
+                                                {isOccupied && (
+                                                    <div className="mt-1 px-2 py-0.5 bg-white dark:bg-gray-800 rounded text-[10px] font-medium text-gray-600 dark:text-gray-300 shadow-sm border border-gray-100 dark:border-gray-700 truncate max-w-[90%]">
+                                                        Ocupada
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                    
+                                    {/* Render Grid Dots for Empty Spaces */}
+                                    {Array.from({ length: activeZone.rows * activeZone.cols }).map((_, index) => {
+                                        const row = Math.floor(index / activeZone.cols) + 1;
+                                        const col = (index % activeZone.cols) + 1;
+                                        
+                                        // Check if cell is occupied by any table
+                                        const isOccupied = activeZone.tables.some(t => 
+                                            row >= t.row && row < t.row + t.height &&
+                                            col >= t.col && col < t.col + t.width
+                                        );
+                                        
+                                        if (isOccupied) return null;
+                                        
+                                        return (
+                                            <div 
+                                                key={`dot-${row}-${col}`}
+                                                style={{ gridRow: row, gridColumn: col }}
+                                                className="flex items-center justify-center pointer-events-none"
+                                            >
+                                                <div className="w-1.5 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700"></div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="flex items-center justify-center h-full text-gray-400">
+                                    Selecciona una zona para ver las mesas
+                                </div>
+                            )}
+                            
+                             {/* Floating Status Badge */}
+                            <div className="absolute bottom-4 right-4">
+                                <div className="bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2 cursor-pointer hover:bg-gray-800">
+                                    Estás en tu periodo de prueba
+                                    <IconChevronUp className="h-4 w-4 text-gray-400"/>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 );
