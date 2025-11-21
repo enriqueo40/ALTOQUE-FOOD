@@ -1,6 +1,4 @@
 
-
-
 import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 import { Product, Category, Personalization, Promotion, PersonalizationOption, Zone, Table, AppSettings, Order } from '../types';
 import { INITIAL_SETTINGS } from '../constants';
@@ -426,18 +424,45 @@ export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created
         branch_id: order.branchId || null,        // Map branchId -> branch_id
         order_type: order.orderType || null,      // Map orderType -> order_type
         table_id: order.tableId || null,          // Map tableId -> table_id
-        general_comments: order.generalComments || null // Map generalComments -> general_comments
+        general_comments: order.generalComments || null, // Map generalComments -> general_comments
+        payment_status: order.paymentStatus || 'pending' // Map paymentStatus -> payment_status
     };
-
-    // Debug logging to confirm payload structure
-    console.log('Saving order with payload:', dbOrderPayload);
 
     const { error } = await getClient().from('orders').insert(dbOrderPayload);
 
     if (error) {
         console.error('Error saving order:', error);
-        throw error;
+        // Fix: Throw new Error object for consistent catching in UI
+        throw new Error(error.message || 'Database error saving order');
     }
+};
+
+export const getActiveOrders = async (): Promise<Order[]> => {
+    const { data, error } = await getClient()
+        .from('orders')
+        .select('*')
+        .neq('status', 'Cancelled') // Optional: Filter out cancelled if you want
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching orders:', error);
+        return [];
+    }
+    
+    // Map snake_case DB columns back to camelCase TS types
+    return data.map((o: any) => ({
+        id: o.id,
+        customer: o.customer,
+        items: o.items,
+        status: o.status,
+        total: o.total,
+        createdAt: new Date(o.created_at),
+        branchId: o.branch_id,
+        orderType: o.order_type,
+        tableId: o.table_id,
+        generalComments: o.general_comments,
+        paymentStatus: o.payment_status
+    })) as Order[];
 };
 
 export const updateOrder = async (orderId: string, updates: Partial<Order>): Promise<void> => {
@@ -448,34 +473,69 @@ export const updateOrder = async (orderId: string, updates: Partial<Order>): Pro
     if (updates.tableId) { dbUpdates.table_id = updates.tableId; delete dbUpdates.tableId; }
     if (updates.generalComments) { dbUpdates.general_comments = updates.generalComments; delete dbUpdates.generalComments; }
     if (updates.paymentStatus) { dbUpdates.payment_status = updates.paymentStatus; delete dbUpdates.paymentStatus; }
-    // NOTE: payment_status column needs to exist in DB, assumed to be added via migration if not present
     
     const { error } = await getClient().from('orders').update(dbUpdates).eq('id', orderId);
     if (error) {
         console.error('Error updating order:', error);
-        throw error;
+        // Throw a proper Error object so the caller can display the message
+        throw new Error(error.message || 'Unknown database error');
     }
 };
 
-
-export const subscribeToNewOrders = (callback: (payload: any) => void) => {
+// Enhanced Real-time Subscription
+export const subscribeToNewOrders = (
+    onInsert: (payload: any) => void, 
+    onUpdate?: (payload: any) => void
+) => {
     const client = getClient();
-    // Ensure we don't create duplicate channels
     if (channel) {
         client.removeChannel(channel).then(() => {
             console.log('Removed existing channel.');
         });
     }
     
-    channel = client.channel('new-orders');
+    channel = client.channel('orders-channel');
     channel
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-            console.log('New order received!', payload);
-            callback(payload.new);
+             // Transform payload to match frontend structure if needed
+             const newOrder = payload.new;
+             const transformed = {
+                id: newOrder.id,
+                customer: newOrder.customer,
+                items: newOrder.items,
+                status: newOrder.status,
+                total: newOrder.total,
+                createdAt: new Date(newOrder.created_at),
+                branchId: newOrder.branch_id,
+                orderType: newOrder.order_type,
+                tableId: newOrder.table_id,
+                generalComments: newOrder.general_comments,
+                paymentStatus: newOrder.payment_status
+             };
+            onInsert(transformed);
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
+            if (onUpdate) {
+                 const updatedOrder = payload.new;
+                 const transformed = {
+                    id: updatedOrder.id,
+                    customer: updatedOrder.customer,
+                    items: updatedOrder.items,
+                    status: updatedOrder.status,
+                    total: updatedOrder.total,
+                    createdAt: new Date(updatedOrder.created_at),
+                    branchId: updatedOrder.branch_id,
+                    orderType: updatedOrder.order_type,
+                    tableId: updatedOrder.table_id,
+                    generalComments: updatedOrder.general_comments,
+                    paymentStatus: updatedOrder.payment_status
+                 };
+                onUpdate(transformed);
+            }
         })
         .subscribe((status) => {
             if (status === 'SUBSCRIBED') {
-                console.log('Successfully subscribed to new orders!');
+                console.log('Realtime subscription active for Orders.');
             }
         });
     
@@ -485,7 +545,6 @@ export const subscribeToNewOrders = (callback: (payload: any) => void) => {
 export const unsubscribeFromChannel = () => {
     if (channel) {
         getClient().removeChannel(channel).then(() => {
-            console.log('Unsubscribed from channel.');
             channel = null;
         });
     }

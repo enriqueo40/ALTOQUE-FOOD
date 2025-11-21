@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { IconCheck, IconDuplicate, IconInfo, IconKey, IconExternalLink } from '../constants';
 
@@ -129,6 +128,7 @@ CREATE TABLE public.orders (
     order_type text NULL,
     table_id text NULL,
     general_comments text NULL,
+    payment_status text NOT NULL DEFAULT 'pending',
     CONSTRAINT orders_pkey PRIMARY KEY (id)
 );
 
@@ -182,6 +182,11 @@ CREATE POLICY "Allow all users to manage orders" ON public.orders FOR ALL USING 
 CREATE POLICY "Allow all users to manage app_settings" ON public.app_settings FOR ALL USING (true) WITH CHECK (true);
 `;
 
+const PATCH_SQL = `-- Parche SQL: Agregar columna de estado de pago
+-- Ejecuta esto si ya tienes datos y no quieres reiniciar la base de datos.
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS payment_status text NOT NULL DEFAULT 'pending';
+`;
+
 const CodeBlock: React.FC<{ title: string; code: string; }> = ({ title, code }) => {
     const [copied, setCopied] = useState(false);
 
@@ -211,121 +216,3 @@ const CodeBlock: React.FC<{ title: string; code: string; }> = ({ title, code }) 
     );
 };
 
-const SecretValueDisplay: React.FC<{ value: string; }> = ({ value }) => {
-    const [copied, setCopied] = useState(false);
-    const handleCopy = () => {
-        navigator.clipboard.writeText(value).then(() => {
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        });
-    };
-    return (
-        <div className="flex items-center gap-2 bg-gray-800 p-2 rounded-md">
-            <p className="font-mono text-gray-300 truncate text-sm flex-1">{value}</p>
-            <button onClick={handleCopy} className="text-gray-400 hover:text-white flex-shrink-0 p-1" title="Copy value to clipboard">
-                {copied ? <IconCheck className="h-4 w-4 text-green-400" /> : <IconDuplicate className="h-4 w-4" />}
-            </button>
-        </div>
-    );
-};
-
-
-const SetupView: React.FC = () => {
-    return (
-        <div className="bg-gray-900 text-gray-200 min-h-screen flex items-center justify-center font-sans p-4">
-            <div className="w-full max-w-4xl mx-auto">
-                <div className="bg-gray-800 shadow-2xl rounded-xl p-6 sm:p-8 border border-gray-700">
-                    <div className="text-center mb-8">
-                        <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">Configuración Requerida</h1>
-                        <p className="text-md sm:text-lg text-gray-400">Conecta tu aplicación a una base de datos Supabase en 3 simples pasos.</p>
-                    </div>
-
-                     <div className="p-4 bg-yellow-900/50 border border-yellow-700 rounded-lg flex items-start gap-x-3 text-sm text-yellow-200 mb-8">
-                        <IconInfo className="h-5 w-5 flex-shrink-0 mt-0.5" />
-                        <div>
-                            <h3 className="font-bold">¿Por qué veo esta pantalla?</h3>
-                            <p>Esta guía aparece porque la aplicación necesita tus credenciales de Supabase. Para que funcione, debes añadirlas en un lugar seguro llamado <strong className="font-semibold text-yellow-300">"Secrets"</strong> en el panel de AI Studio.</p>
-                        </div>
-                    </div>
-
-                    <div className="space-y-8">
-                        <div className="p-6 bg-gray-800/50 rounded-lg border border-gray-700">
-                            <h2 className="text-2xl font-semibold flex items-center"><span className="text-3xl mr-3 text-emerald-400">1.</span> Crea tu Base de Datos</h2>
-                            <p className="mt-2 text-gray-400">
-                                Si aún no tienes una, ve a <a href="https://supabase.com/dashboard/projects" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline font-semibold">Supabase</a> para crear un nuevo proyecto.
-                                Una vez creado, busca tu <strong className="font-semibold text-yellow-400">URL del Proyecto</strong> y tu <strong className="font-semibold text-yellow-400">Clave API anónima (anon key)</strong>. Las necesitarás en el paso 3.
-                            </p>
-                             <a href="https://supabase.com/dashboard/projects" target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-2 text-sm text-emerald-400 hover:text-emerald-300">
-                                Ir a Supabase <IconExternalLink className="h-4 w-4"/>
-                            </a>
-                        </div>
-                        
-                        <div className="p-6 bg-gray-800/50 rounded-lg border border-gray-700">
-                            <h2 className="text-2xl font-semibold flex items-center"><span className="text-3xl mr-3 text-emerald-400">2.</span> Prepara tu Base de Datos</h2>
-                            <p className="mt-2 text-gray-400">En el <strong className="font-semibold text-gray-300">Editor SQL</strong> de tu proyecto de Supabase, copia y ejecuta el siguiente script. Se encargará de todo.</p>
-                            
-                            <CodeBlock title="Script de Configuración Completo" code={COMPLETE_SQL_SETUP} />
-                        </div>
-
-                        <div className="p-6 bg-gray-800/50 rounded-lg border-2 border-emerald-500">
-                            <h2 className="text-2xl font-semibold flex items-center"><span className="text-3xl mr-3 text-emerald-400">3.</span> Configura tus Secrets</h2>
-                            <p className="mt-2 text-gray-400"><strong className="font-bold">Este es el paso crucial.</strong> Sigue esta ruta en el panel de AI Studio:</p>
-                            <div className="my-4 text-center">
-                                <p className="font-mono text-gray-300 bg-gray-900/80 p-3 rounded-lg inline-flex items-center gap-2 flex-wrap justify-center">
-                                    <IconKey className="h-5 w-5 text-yellow-400"/>
-                                    <span className="font-semibold">Secrets</span>
-                                    <span className="text-emerald-400 mx-1">➡️</span>
-                                    <span className="p-2 bg-emerald-600 text-white rounded-md font-bold text-sm">+ Add new secret</span>
-                                </p>
-                            </div>
-                            <p className="text-gray-400 my-4">Crea los siguientes <strong className="font-bold text-white">dos</strong> secrets. Copia el nombre y el valor para cada uno.</p>
-                            
-                            <div className="space-y-6">
-                                {/* Secret 1: URL */}
-                                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
-                                    <p className="text-sm font-semibold text-gray-300 mb-2">Secret #1</p>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-400 mb-1">Nombre del Secret (Cópialo)</label>
-                                            <SecretValueDisplay value="SUPABASE_URL" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-400 mb-1">Valor del Secret (Copia tu URL)</label>
-                                            <SecretValueDisplay value="https://cnbntnnhxlvkvallumdg.supabase.co" />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Secret 2: Key */}
-                                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
-                                    <p className="text-sm font-semibold text-gray-300 mb-2">Secret #2</p>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-400 mb-1">Nombre del Secret (Cópialo)</label>
-                                            <SecretValueDisplay value="SUPABASE_ANON_KEY" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-400 mb-1">Valor del Secret (Copia tu Clave Anónima)</label>
-                                            <SecretValueDisplay value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuYm50bm5oeGx2a3ZhbGx1bWRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwNjQ1MjksImV4cCI6MjA3ODY0MDUyOX0.TuovcK2Ao2tb3GM0I2j5n2BpL5DIVLSl-yjdoCHS9pM" />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="text-center pt-6">
-                             <button
-                                onClick={() => window.location.reload()}
-                                className="bg-emerald-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-emerald-700 transition-transform transform hover:scale-105 shadow-lg"
-                            >
-                                ¡Todo listo! Iniciar la Aplicación
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-export default SetupView;
