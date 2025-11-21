@@ -2101,7 +2101,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                                     </button>
                                 ))}
                                 {zones.length === 0 && (
-                                     <div className="text-sm text-gray-500 p-2">No hay zonas configuradas. Ve a Configuración > Zonas y mesas.</div>
+                                     <div className="text-sm text-gray-500 p-2">No hay zonas configuradas. Ve a Configuración &gt; Zonas y mesas.</div>
                                 )}
                             </div>
                         </div>
