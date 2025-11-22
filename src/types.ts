@@ -21,6 +21,7 @@ export interface CartItem extends Product {
     cartItemId: string;
     quantity: number;
     comments?: string;
+    selectedOptions?: PersonalizationOption[];
 }
 
 export enum OrderStatus {
