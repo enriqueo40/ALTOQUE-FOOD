@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption } from '../types';
+import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck } from '../constants';
+import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck, IconCalendar } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
@@ -281,13 +281,91 @@ const Header: React.FC<{ title: string; onBack?: () => void }> = ({ title, onBac
     </header>
 );
 
+const ScheduleModal: React.FC<{ isOpen: boolean; onClose: () => void; schedule: Schedule }> = ({ isOpen, onClose, schedule }) => {
+    if (!isOpen) return null;
+    
+    const daysOrder = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+    const todayIndex = new Date().getDay(); // 0 is Sunday, 1 is Monday
+    // Adjust to match array (0 = Monday in my array)
+    const adjustedTodayIndex = todayIndex === 0 ? 6 : todayIndex - 1; 
+    const todayName = daysOrder[adjustedTodayIndex];
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+            <div className="bg-gray-900 w-full max-w-sm rounded-2xl shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[80vh] animate-fade-in-up" onClick={e => e.stopPropagation()}>
+                <div className="p-6 border-b border-gray-800 bg-gray-800/50 flex justify-between items-center">
+                    <h3 className="text-xl font-bold text-white">Horarios de Atención</h3>
+                    <button onClick={onClose} className="p-1 text-gray-400 hover:text-white"><IconX className="h-5 w-5"/></button>
+                </div>
+                <div className="p-4 overflow-y-auto">
+                    {schedule.days.map((day, index) => {
+                        const isToday = day.day === todayName;
+                        return (
+                            <div key={day.day} className={`flex justify-between items-center py-3 px-4 rounded-xl mb-2 ${isToday ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-gray-800/50 border border-gray-800'}`}>
+                                <span className={`font-medium ${isToday ? 'text-emerald-400' : 'text-gray-300'}`}>
+                                    {day.day} {isToday && <span className="text-[10px] ml-2 bg-emerald-500 text-white px-1.5 py-0.5 rounded-full align-middle">HOY</span>}
+                                </span>
+                                <div className="text-right">
+                                    {day.isOpen && day.shifts.length > 0 ? (
+                                        day.shifts.map((shift, i) => (
+                                            <div key={i} className="text-sm text-gray-200 font-mono">
+                                                {shift.start} - {shift.end}
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <span className="text-sm text-rose-400 font-medium">Cerrado</span>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+                <div className="p-4 border-t border-gray-800 bg-gray-900">
+                    <button onClick={onClose} className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-bold transition-colors border border-gray-700">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const RestaurantHero: React.FC<{ 
     settings: AppSettings, 
     tableInfo: { table: string, zone: string } | null,
     orderType: OrderType,
     setOrderType: (type: OrderType) => void
 }> = ({ settings, tableInfo, orderType, setOrderType }) => {
-    const { branch, company, shipping } = settings;
+    const { branch, company, shipping, schedules } = settings;
+    const [showSchedule, setShowSchedule] = useState(false);
+    const [isOpenNow, setIsOpenNow] = useState(false);
+
+    // Use the first schedule as default
+    const currentSchedule = schedules[0];
+
+    useEffect(() => {
+        // Determine if open
+        if (!currentSchedule) return;
+        const now = new Date();
+        const daysOrder = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+        const todayName = daysOrder[now.getDay()];
+        const todaySchedule = currentSchedule.days.find(d => d.day === todayName);
+
+        if (todaySchedule && todaySchedule.isOpen && todaySchedule.shifts.length > 0) {
+            const currentTime = now.getHours() * 60 + now.getMinutes();
+            const isOpen = todaySchedule.shifts.some(shift => {
+                const [startH, startM] = shift.start.split(':').map(Number);
+                const [endH, endM] = shift.end.split(':').map(Number);
+                const start = startH * 60 + startM;
+                const end = endH * 60 + endM;
+                return currentTime >= start && currentTime < end;
+            });
+            setIsOpenNow(isOpen);
+        } else {
+            setIsOpenNow(false);
+        }
+    }, [currentSchedule]);
 
     const getShippingCostText = () => {
         if (orderType === OrderType.TakeAway) return "Gratis";
@@ -295,7 +373,6 @@ const RestaurantHero: React.FC<{
         if (shipping.costType === ShippingCostType.ToBeQuoted) return "Por definir";
         if (shipping.costType === ShippingCostType.Free) return "Gratis";
         if (shipping.costType === ShippingCostType.Fixed) {
-             // Handle potentially null fixedCost
              const cost = shipping.fixedCost != null ? shipping.fixedCost : 0;
              return `$${cost.toFixed(2)}`;
         }
@@ -312,6 +389,19 @@ const RestaurantHero: React.FC<{
         }
         return `${shipping.deliveryTime.min} - ${shipping.deliveryTime.max} min`;
     };
+
+    const handleShare = () => {
+        if (navigator.share) {
+            navigator.share({
+                title: company.name,
+                text: `¡Mira el menú de ${company.name}!`,
+                url: window.location.href,
+            }).catch(console.error);
+        } else {
+            navigator.clipboard.writeText(window.location.href);
+            alert("Enlace copiado al portapapeles");
+        }
+    };
     
     return (
         <div className="relative">
@@ -326,8 +416,12 @@ const RestaurantHero: React.FC<{
                 
                 {/* Top Actions */}
                 <div className="absolute top-4 right-4 flex gap-2">
-                    <button className="p-2 bg-black/30 backdrop-blur-md text-white rounded-full hover:bg-black/50 transition-colors"><IconClock className="h-5 w-5"/></button>
-                    <button className="p-2 bg-black/30 backdrop-blur-md text-white rounded-full hover:bg-black/50 transition-colors"><IconShare className="h-5 w-5"/></button>
+                    <button onClick={() => setShowSchedule(true)} className="p-2 bg-black/30 backdrop-blur-md text-white rounded-full hover:bg-black/50 transition-colors shadow-sm">
+                        <IconClock className="h-5 w-5"/>
+                    </button>
+                    <button onClick={handleShare} className="p-2 bg-black/30 backdrop-blur-md text-white rounded-full hover:bg-black/50 transition-colors shadow-sm">
+                        <IconShare className="h-5 w-5"/>
+                    </button>
                 </div>
             </div>
 
@@ -344,9 +438,19 @@ const RestaurantHero: React.FC<{
                 </div>
                 
                 <h1 className="text-2xl font-bold text-white mb-1">{company.name}</h1>
-                <p className="text-sm text-gray-400 flex items-center gap-1 mb-4">
-                     {branch.alias}
-                </p>
+                <div className="flex flex-col items-center gap-1 mb-4">
+                    <p className="text-sm text-gray-400 flex items-center gap-1">
+                        {branch.alias}
+                    </p>
+                    {currentSchedule && (
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className={`w-2 h-2 rounded-full ${isOpenNow ? 'bg-emerald-500' : 'bg-rose-500'} animate-pulse`}></span>
+                            <button onClick={() => setShowSchedule(true)} className={`text-xs font-bold ${isOpenNow ? 'text-emerald-400' : 'text-rose-400'} hover:underline`}>
+                                {isOpenNow ? 'Abierto Ahora' : 'Cerrado'}
+                            </button>
+                        </div>
+                    )}
+                </div>
 
                 {tableInfo ? (
                     <div className="w-full p-3 bg-emerald-900/30 border border-emerald-700/50 rounded-xl flex items-center justify-center gap-3 animate-fade-in">
@@ -386,6 +490,15 @@ const RestaurantHero: React.FC<{
                     </>
                 )}
             </div>
+            
+            {/* Schedule Modal */}
+            {currentSchedule && (
+                <ScheduleModal 
+                    isOpen={showSchedule} 
+                    onClose={() => setShowSchedule(false)} 
+                    schedule={currentSchedule}
+                />
+            )}
         </div>
     );
 };
@@ -793,7 +906,7 @@ const CartSummaryView: React.FC<{
         <div className="p-4 pb-40 animate-fade-in">
             <div className="space-y-4">
                 {cartItems.map(item => {
-                    const optionsTotal = item.selectedOptions ? item.selectedOptions.reduce((acc: number, o: PersonalizationOption) => acc + o.price, 0) : 0;
+                    const optionsTotal = item.selectedOptions?.reduce((acc, o) => acc + o.price, 0) ?? 0;
                     const itemTotal = (item.price + optionsTotal) * item.quantity;
 
                     return (
