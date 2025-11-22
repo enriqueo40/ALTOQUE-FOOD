@@ -1,4 +1,5 @@
 
+
 export interface Product {
     id: string;
     name: string;
@@ -192,12 +193,27 @@ export interface ShippingSettings {
   };
 }
 
-export type PaymentMethod = 'Efectivo' | 'Pago con tarjeta' | 'Transferencia';
+export type PaymentMethod = 'Efectivo' | 'Pago con tarjeta' | 'Transferencia' | 'Pago Móvil' | 'Zelle' | 'Punto de Venta';
+
+export interface PagoMovilDetails {
+    bank: string;
+    phone: string;
+    idNumber: string; // C.I. or RIF
+}
+
+export interface TransferDetails {
+    bank: string;
+    accountNumber: string;
+    accountHolder: string;
+    idNumber: string; // C.I. or RIF
+}
 
 export interface PaymentSettings {
   deliveryMethods: PaymentMethod[];
   pickupMethods: PaymentMethod[];
   showTipField: boolean;
+  pagoMovil?: PagoMovilDetails;
+  transfer?: TransferDetails;
 }
 
 export interface TimeRange {

@@ -1,4 +1,5 @@
 
+
 export interface Product {
     id: string;
     name: string;
@@ -192,7 +193,7 @@ export interface ShippingSettings {
   };
 }
 
-export type PaymentMethod = 'Efectivo' | 'Pago Móvil' | 'Transferencia' | 'Zelle' | 'Punto de Venta';
+export type PaymentMethod = 'Efectivo' | 'Pago Móvil' | 'Transferencia' | 'Zelle' | 'Punto de Venta' | 'Pago con tarjeta';
 
 export interface PagoMovilDetails {
     bank: string;

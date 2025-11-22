@@ -2,17 +2,14 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { useTheme } from '../hooks/useTheme';
-import { useCart } from '../hooks/useCart'; // Added import
-// Fix: Moved ShippingCostType import from '../constants' to here to resolve export error.
+import { useCart } from '../hooks/useCart';
 import { Product, Category, Order, OrderStatus, Conversation, AdminChatMessage, OrderType, Personalization, PersonalizationOption, Promotion, DiscountType, PromotionAppliesTo, Zone, Table, AppSettings, Currency, BranchSettings, PaymentSettings, ShippingSettings, PaymentMethod, DaySchedule, Schedule, ShippingCostType, TimeRange, PrintingMethod, PaymentStatus, Customer } from '../types';
 import { MOCK_ORDERS, MOCK_CONVERSATIONS, INITIAL_SETTINGS, CURRENCIES } from '../constants';
 import { generateProductDescription, getAdvancedInsights } from '../services/geminiService';
 import { getProducts, getCategories, saveProduct, deleteProduct, saveCategory, deleteCategory, getPersonalizations, savePersonalization, deletePersonalization, getPromotions, savePromotion, deletePromotion, updateProductAvailability, updatePersonalizationOptionAvailability, getZones, saveZone, deleteZone, saveZoneLayout, getAppSettings, saveAppSettings, subscribeToNewOrders, unsubscribeFromChannel, updateOrder, getActiveOrders, saveOrder } from '../services/supabaseService';
-// Fix: Imported IconComponent to resolve usage error.
-import { IconComponent, IconHome, IconMenu, IconAvailability, IconShare, IconTutorials, IconProducts, IconOrders, IconAnalytics, IconChatAdmin, IconLogout, IconSearch, IconBell, IconEdit, IconPlus, IconTrash, IconSparkles, IconSend, IconMoreVertical, IconExternalLink, IconCalendar, IconChevronDown, IconX, IconReceipt, IconSettings, IconStore, IconDelivery, IconPayment, IconClock, IconTableLayout, IconPrinter, IconChevronUp, IconPencil, IconDuplicate, IconGripVertical, IconPercent, IconInfo, IconTag, IconLogoutAlt, IconSun, IconMoon, IconExpand, IconArrowLeft, IconWhatsapp, IconQR, IconPlayCircle, IconLocationMarker, IconUpload, IconCheck, IconBluetooth, IconUSB, IconToggleOn, IconToggleOff, IconMinus } from '../constants';
+import { IconComponent, IconHome, IconMenu, IconAvailability, IconShare, IconTutorials, IconProducts, IconOrders, IconAnalytics, IconChatAdmin, IconLogout, IconSearch, IconBell, IconEdit, IconPlus, IconTrash, IconSparkles, IconSend, IconMoreVertical, IconExternalLink, IconCalendar, IconChevronDown, IconX, IconReceipt, IconSettings, IconStore, IconDelivery, IconPayment, IconClock, IconTableLayout, IconPrinter, IconChevronUp, IconPencil, IconDuplicate, IconGripVertical, IconPercent, IconInfo, IconTag, IconLogoutAlt, IconSun, IconMoon, IconExpand, IconArrowLeft, IconWhatsapp, IconQR, IconPlayCircle, IconLocationMarker, IconUpload, IconCheck, IconBluetooth, IconUSB, IconToggleOn, IconToggleOff, IconMinus, IconVolumeUp, IconVolumeOff } from '../constants';
 import CustomerView from './CustomerView';
 
-// FIX: Moved IconEye definition to the top of the file to resolve 'Cannot find name' error in PromotionModal.
 const IconEye: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.432 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" className={className} />;
 
 type AdminViewPage = 'dashboard' | 'products' | 'orders' | 'analytics' | 'messages' | 'availability' | 'share' | 'tutorials';
@@ -43,7 +40,7 @@ const Sidebar: React.FC<{ currentPage: AdminViewPage; setCurrentPage: (page: Adm
         <aside className="w-64 bg-white dark:bg-gray-800 shadow-md flex flex-col">
             <div className="h-20 flex items-center justify-center border-b dark:border-gray-700">
                  <div className="flex items-center space-x-2">
-                    <h2 className="text-xl font-bold dark:text-gray-100">anyvalpark</h2>
+                    <h2 className="text-xl font-bold dark:text-gray-100">ALTOQUE FOOD</h2>
                     <IconChevronDown className="h-4 w-4" />
                 </div>
             </div>
@@ -89,7 +86,6 @@ const Header: React.FC<{ title: string; onSettingsClick: () => void; onPreviewCl
     </header>
 );
 
-// --- Dashboard Components ---
 const FeatureBanner: React.FC = () => {
     const [isVisible, setIsVisible] = useState(true);
     if (!isVisible) return null;
@@ -167,7 +163,6 @@ const Dashboard: React.FC = () => {
     const previousDaySales = totalSales * 0.92; // Mock data
     const previousDayOrders = totalOrders > 3 ? totalOrders - 3 : 0; // Mock data
     
-    // Mock data for new cards
     const totalEnvios = 0;
     const previousDayEnvios = 0;
     const totalPropinas = 0;
@@ -217,8 +212,7 @@ const Dashboard: React.FC = () => {
     );
 };
 
-// ... (Menu Management, ProductsView, etc. code remains unchanged but I'm updating the whole file for context of OrderManagement) ...
-// --- Menu Management ---
+// --- Menu Management, ProductsView, etc. code remains unchanged ---
 const ProductListItem: React.FC<{product: Product, onEdit: () => void, onDuplicate: () => void, onDelete: () => void}> = ({product, onEdit, onDuplicate, onDelete}) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -416,8 +410,6 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
         </div>
     );
 };
-
-// ... (CategoryModal, ProductsView, PersonalizationModal, PersonalizationsView, PromotionModal, PromotionsView, MenuManagement remain unchanged)
 
 const CategoryModal: React.FC<{
     isOpen: boolean;
@@ -722,8 +714,8 @@ const ProductsView: React.FC = () => {
     );
 };
 
+// ... (PersonalizationModal, PersonalizationsView, PromotionModal, PromotionsView, MenuManagement remain unchanged) ...
 const PersonalizationModal: React.FC<{isOpen: boolean, onClose: () => void, onSave: (p: Omit<Personalization, 'id' | 'created_at'> & { id?: string }) => void, personalization: Personalization | null}> = ({isOpen, onClose, onSave, personalization}) => {
-    // ... (PersonalizationModal code same as provided)
     const [name, setName] = useState('');
     const [label, setLabel] = useState('');
     const [allowRepetition, setAllowRepetition] = useState(false);
@@ -878,10 +870,7 @@ const PersonalizationModal: React.FC<{isOpen: boolean, onClose: () => void, onSa
     );
 }
 
-// ... (PersonalizationsView, PromotionModal, PromotionsView remain unchanged) ...
-
 const PersonalizationsView: React.FC = () => {
-    // ... Same as previous provided file
     const [personalizations, setPersonalizations] = useState<Personalization[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -1380,6 +1369,21 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                              {order.generalComments && (
                                  <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/50 rounded-lg text-sm text-yellow-800 dark:text-yellow-200">
                                      <strong className="block mb-1">📝 Nota general del cliente:</strong> {order.generalComments}
+                                 </div>
+                             )}
+                             
+                             {/* Payment Proof Section */}
+                             {order.paymentProof && (
+                                 <div className="mt-4 border dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
+                                     <h4 className="font-bold text-gray-900 dark:text-gray-100 mb-2 flex items-center gap-2">
+                                         <IconCheck className="h-5 w-5 text-green-500"/> Comprobante de pago
+                                     </h4>
+                                     <div className="rounded-lg overflow-hidden border dark:border-gray-600">
+                                         <img src={order.paymentProof} alt="Comprobante" className="w-full h-auto object-contain max-h-64" />
+                                     </div>
+                                     <a href={order.paymentProof} download={`comprobante-${order.id}.png`} className="mt-2 inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                                         <IconUpload className="h-4 w-4 rotate-180"/> Descargar comprobante
+                                     </a>
                                  </div>
                              )}
                         </div>
@@ -2903,7 +2907,7 @@ const ShippingSettingsView: React.FC<{ onSave: () => Promise<void>; settings: Ap
 
 const PaymentSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
     const [originalSettings, setOriginalSettings] = useState(settings.payment);
-    const availableMethods: PaymentMethod[] = ['Efectivo', 'Pago con tarjeta', 'Transferencia'];
+    const availableMethods: PaymentMethod[] = ['Efectivo', 'Pago Móvil', 'Transferencia', 'Zelle', 'Punto de Venta', 'Pago con tarjeta'];
 
     useEffect(() => {
         setOriginalSettings(settings.payment)
@@ -2924,6 +2928,8 @@ const PaymentSettingsView: React.FC<{ onSave: () => Promise<void>; settings: App
         });
     };
     
+    const inputClasses = "mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm text-gray-900 dark:text-white placeholder-gray-400";
+
     return (
         <div className="space-y-6">
             <SettingsCard title="Métodos de pago para los clientes" onSave={onSave} onCancel={handleCancel}>
@@ -2950,6 +2956,46 @@ const PaymentSettingsView: React.FC<{ onSave: () => Promise<void>; settings: App
                                     <span className="ml-2 text-sm">{method}</span>
                                 </label>
                             ))}
+                        </div>
+                    </div>
+                </div>
+            </SettingsCard>
+
+            <SettingsCard title="Configuración de Pago Móvil" description="Datos para que tus clientes realicen el pago." onSave={onSave} onCancel={handleCancel}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Banco</label>
+                        <input type="text" value={settings.payment.pagoMovil?.bank || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, pagoMovil: {...p.payment.pagoMovil, bank: e.target.value} as any}}))} className={inputClasses} placeholder="Ej. Banesco"/>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Teléfono</label>
+                        <input type="text" value={settings.payment.pagoMovil?.phone || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, pagoMovil: {...p.payment.pagoMovil, phone: e.target.value} as any}}))} className={inputClasses} placeholder="Ej. 0414-1234567"/>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Cédula / RIF</label>
+                        <input type="text" value={settings.payment.pagoMovil?.idNumber || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, pagoMovil: {...p.payment.pagoMovil, idNumber: e.target.value} as any}}))} className={inputClasses} placeholder="Ej. V-12345678"/>
+                    </div>
+                </div>
+            </SettingsCard>
+
+            <SettingsCard title="Configuración de Transferencia Bancaria" description="Datos de la cuenta bancaria." onSave={onSave} onCancel={handleCancel}>
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Banco</label>
+                        <input type="text" value={settings.payment.transfer?.bank || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, bank: e.target.value} as any}}))} className={inputClasses} placeholder="Ej. Mercantil"/>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Número de Cuenta</label>
+                        <input type="text" value={settings.payment.transfer?.accountNumber || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, accountNumber: e.target.value} as any}}))} className={inputClasses} placeholder="0105..."/>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Titular</label>
+                            <input type="text" value={settings.payment.transfer?.accountHolder || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, accountHolder: e.target.value} as any}}))} className={inputClasses} placeholder="Nombre del titular"/>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Cédula / RIF</label>
+                            <input type="text" value={settings.payment.transfer?.idNumber || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, idNumber: e.target.value} as any}}))} className={inputClasses} placeholder="V-12345678"/>
                         </div>
                     </div>
                 </div>
