@@ -21,6 +21,7 @@ export interface CartItem extends Product {
     cartItemId: string;
     quantity: number;
     comments?: string;
+    selectedOptions?: PersonalizationOption[];
 }
 
 export enum OrderStatus {
@@ -61,6 +62,7 @@ export interface Order {
     customer: Customer;
     status: OrderStatus;
     paymentStatus?: PaymentStatus; // Added this field
+    paymentProof?: string; // Base64 string of the screenshot
     total: number;
     createdAt: Date;
     branchId: string;

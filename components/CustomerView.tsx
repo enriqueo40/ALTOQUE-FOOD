@@ -1,9 +1,9 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType } from '../types';
+import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore } from '../constants';
-import { getProducts, getCategories, getAppSettings, saveOrder } from '../services/supabaseService';
+import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck, IconCalendar, IconDuplicate } from '../constants';
+import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
 // Main View Manager
@@ -19,19 +19,43 @@ export default function CustomerView() {
 
     const { cartItems, addToCart, removeFromCart, updateQuantity, clearCart, cartTotal, itemCount } = useCart();
     
+    // Global data for the menu
+    const [allPromotions, setAllPromotions] = useState<Promotion[]>([]);
+    const [allPersonalizations, setAllPersonalizations] = useState<Personalization[]>([]);
+    const [allProducts, setAllProducts] = useState<Product[]>([]);
+    const [allCategories, setAllCategories] = useState<Category[]>([]);
+
+    const fetchMenuData = async () => {
+        try {
+            // Parallel data fetching for speed
+            const [appSettings, fetchedPromotions, fetchedPersonalizations, fetchedProducts, fetchedCategories] = await Promise.all([
+                getAppSettings(),
+                getPromotions(),
+                getPersonalizations(),
+                getProducts(),
+                getCategories()
+            ]);
+            setSettings(appSettings);
+            setAllPromotions(fetchedPromotions);
+            setAllPersonalizations(fetchedPersonalizations);
+            setAllProducts(fetchedProducts);
+            setAllCategories(fetchedCategories);
+        } catch (error) {
+            console.error("Failed to fetch data:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchSettings = async () => {
-            try {
-                const appSettings = await getAppSettings();
-                setSettings(appSettings);
-            } catch (error) {
-                console.error("Failed to fetch settings:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchSettings();
+        fetchMenuData();
         
+        // Subscribe to real-time updates for the menu (Admin changes)
+        subscribeToMenuUpdates(() => {
+            console.log("Menu updated from admin, refreshing...");
+            fetchMenuData();
+        });
+
         const params = new URLSearchParams(window.location.hash.split('?')[1]);
         const table = params.get('table');
         const zone = params.get('zone');
@@ -40,27 +64,36 @@ export default function CustomerView() {
             setOrderType(OrderType.DineIn);
         }
 
+        return () => {
+            unsubscribeFromChannel();
+        };
     }, []);
 
     const handleProductClick = (product: Product) => {
         setSelectedProduct(product);
     };
 
-    const handleAddToCart = (product: Product, quantity: number, comments?: string) => {
-        addToCart(product, quantity, comments);
+    const handleAddToCart = (product: Product, quantity: number, comments?: string, options: PersonalizationOption[] = []) => {
+        addToCart(product, quantity, comments, options);
         setSelectedProduct(null);
     };
 
-    const handlePlaceOrder = async (customer: Customer, paymentMethod: PaymentMethod) => {
+    const handlePlaceOrder = async (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number = 0) => {
         if (!settings) return;
+
+        const shippingCost = (orderType === OrderType.Delivery && settings.shipping.costType === ShippingCostType.Fixed) 
+            ? (settings.shipping.fixedCost ?? 0) 
+            : 0;
+
+        const finalTotal = cartTotal + shippingCost + tipAmount;
 
         const newOrder: Omit<Order, 'id' | 'createdAt'> = {
             customer,
             items: cartItems,
-            total: cartTotal,
+            total: finalTotal,
             status: OrderStatus.Pending,
             branchId: 'main-branch',
-            generalComments: generalComments,
+            generalComments: generalComments + (tipAmount > 0 ? ` | Propina: ${settings.company.currency.code} ${tipAmount.toFixed(2)}` : ''),
             orderType: orderType,
             tableId: orderType === OrderType.DineIn && tableInfo ? `${tableInfo.zone} - ${tableInfo.table}` : undefined,
         };
@@ -73,7 +106,23 @@ export default function CustomerView() {
             return; // Stop if saving fails
         }
 
+        // Helper to format options string
+        const formatOptions = (item: CartItem) => {
+            if (!item.selectedOptions || item.selectedOptions.length === 0) return '';
+            return item.selectedOptions.map(opt => `    + ${opt.name}`).join('\n');
+        };
+
         let messageParts: string[];
+
+        const itemDetails = cartItems.map(item => {
+            let detail = `*${item.quantity}x ${item.name}*`;
+            const optionsStr = formatOptions(item);
+            if (optionsStr) detail += `\n${optionsStr}`;
+            if (item.comments) detail += `\n  - _Nota: ${item.comments}_`;
+            return detail;
+        });
+
+        const currency = settings.company.currency.code;
 
         if (orderType === OrderType.DineIn) {
             messageParts = [
@@ -83,13 +132,13 @@ export default function CustomerView() {
                  `*CLIENTE:* ${customer.name}`,
                 `---------------------------------`,
                 `*DETALLES DEL PEDIDO:*`,
-                ...cartItems.map(item =>
-                    `*${item.quantity}x ${item.name}*` + (item.comments ? `\n  - _Comentarios: ${item.comments}_` : '')
-                ),
+                ...itemDetails,
                 ``,
                 generalComments ? `*Comentarios Generales:*\n_${generalComments}_` : '',
                 `---------------------------------`,
-                `*Total:* ${settings.company.currency.code} $${cartTotal.toFixed(2)}`,
+                `*Subtotal:* ${currency} $${cartTotal.toFixed(2)}`,
+                tipAmount > 0 ? `*Propina:* ${currency} $${tipAmount.toFixed(2)}` : '',
+                `*Total a Pagar:* ${currency} $${finalTotal.toFixed(2)}`,
                 `*Método de pago:* ${paymentMethod}`,
             ];
         } else if (orderType === OrderType.TakeAway) {
@@ -103,13 +152,13 @@ export default function CustomerView() {
                 `*TIPO:* Para llevar (Recoger en tienda)`,
                 `---------------------------------`,
                 `*DETALLES DEL PEDIDO:*`,
-                ...cartItems.map(item => 
-                    `*${item.quantity}x ${item.name}*` + (item.comments ? `\n  - _Comentarios: ${item.comments}_` : '')
-                ),
+                ...itemDetails,
                 ``,
                 generalComments ? `*Comentarios Generales:*\n_${generalComments}_` : '',
                 `---------------------------------`,
-                `*Total:* ${settings.company.currency.code} $${cartTotal.toFixed(2)}`,
+                `*Subtotal:* ${currency} $${cartTotal.toFixed(2)}`,
+                tipAmount > 0 ? `*Propina:* ${currency} $${tipAmount.toFixed(2)}` : '',
+                `*Total a Pagar:* ${currency} $${finalTotal.toFixed(2)}`,
                 `*Método de pago:* ${paymentMethod}`,
             ];
         } else {
@@ -129,13 +178,14 @@ export default function CustomerView() {
                 customer.address.referencias ? `*Referencias:* ${customer.address.referencias}` : '',
                 `---------------------------------`,
                 `*DETALLES DEL PEDIDO:*`,
-                ...cartItems.map(item => 
-                    `*${item.quantity}x ${item.name}*` + (item.comments ? `\n  - _Comentarios: ${item.comments}_` : '')
-                ),
+                ...itemDetails,
                 ``,
                 generalComments ? `*Comentarios Generales:*\n_${generalComments}_` : '',
                 `---------------------------------`,
-                `*Total:* ${settings.company.currency.code} $${cartTotal.toFixed(2)} + envío`,
+                `*Subtotal:* ${currency} $${cartTotal.toFixed(2)}`,
+                `*Envío:* ${shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : 'Por cotizar'}`,
+                tipAmount > 0 ? `*Propina:* ${currency} $${tipAmount.toFixed(2)}` : '',
+                `*Total Estimado:* ${currency} $${finalTotal.toFixed(2)}`,
                 `*Método de pago:* ${paymentMethod}`,
             ];
         }
@@ -193,7 +243,14 @@ export default function CustomerView() {
                             orderType={orderType}
                             setOrderType={setOrderType}
                         />
-                        <MenuList onProductClick={handleProductClick} cartItems={cartItems} currency={settings.company.currency.code} />
+                        <MenuList 
+                            products={allProducts}
+                            categories={allCategories}
+                            onProductClick={handleProductClick} 
+                            cartItems={cartItems} 
+                            currency={settings.company.currency.code}
+                            promotions={allPromotions}
+                        />
                     </>
                 )}
 
@@ -227,6 +284,8 @@ export default function CustomerView() {
                         product={selectedProduct} 
                         onAddToCart={handleAddToCart}
                         onClose={() => setSelectedProduct(null)}
+                        personalizations={allPersonalizations}
+                        promotions={allPromotions}
                     />
                 )}
 
@@ -256,20 +315,101 @@ const Header: React.FC<{ title: string; onBack?: () => void }> = ({ title, onBac
     </header>
 );
 
+const ScheduleModal: React.FC<{ isOpen: boolean; onClose: () => void; schedule: Schedule }> = ({ isOpen, onClose, schedule }) => {
+    if (!isOpen) return null;
+    
+    const daysOrder = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+    const todayIndex = new Date().getDay(); // 0 is Sunday, 1 is Monday
+    // Adjust to match array (0 = Monday in my array)
+    const adjustedTodayIndex = todayIndex === 0 ? 6 : todayIndex - 1; 
+    const todayName = daysOrder[adjustedTodayIndex];
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+            <div className="bg-gray-900 w-full max-w-sm rounded-2xl shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[80vh] animate-fade-in-up" onClick={e => e.stopPropagation()}>
+                <div className="p-6 border-b border-gray-800 bg-gray-800/50 flex justify-between items-center">
+                    <h3 className="text-xl font-bold text-white">Horarios de Atención</h3>
+                    <button onClick={onClose} className="p-1 text-gray-400 hover:text-white"><IconX className="h-5 w-5"/></button>
+                </div>
+                <div className="p-4 overflow-y-auto">
+                    {schedule.days.map((day, index) => {
+                        const isToday = day.day === todayName;
+                        return (
+                            <div key={day.day} className={`flex justify-between items-center py-3 px-4 rounded-xl mb-2 ${isToday ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-gray-800/50 border border-gray-800'}`}>
+                                <span className={`font-medium ${isToday ? 'text-emerald-400' : 'text-gray-300'}`}>
+                                    {day.day} {isToday && <span className="text-[10px] ml-2 bg-emerald-500 text-white px-1.5 py-0.5 rounded-full align-middle">HOY</span>}
+                                </span>
+                                <div className="text-right">
+                                    {day.isOpen && day.shifts.length > 0 ? (
+                                        day.shifts.map((shift, i) => (
+                                            <div key={i} className="text-sm text-gray-200 font-mono">
+                                                {shift.start} - {shift.end}
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <span className="text-sm text-rose-400 font-medium">Cerrado</span>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+                <div className="p-4 border-t border-gray-800 bg-gray-900">
+                    <button onClick={onClose} className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-bold transition-colors border border-gray-700">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const RestaurantHero: React.FC<{ 
     settings: AppSettings, 
     tableInfo: { table: string, zone: string } | null,
     orderType: OrderType,
     setOrderType: (type: OrderType) => void
 }> = ({ settings, tableInfo, orderType, setOrderType }) => {
-    const { branch, company, shipping } = settings;
+    const { branch, company, shipping, schedules } = settings;
+    const [showSchedule, setShowSchedule] = useState(false);
+    const [isOpenNow, setIsOpenNow] = useState(false);
+
+    // Use the first schedule as default
+    const currentSchedule = schedules[0];
+
+    useEffect(() => {
+        // Determine if open
+        if (!currentSchedule) return;
+        const now = new Date();
+        const daysOrder = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+        const todayName = daysOrder[now.getDay()];
+        const todaySchedule = currentSchedule.days.find(d => d.day === todayName);
+
+        if (todaySchedule && todaySchedule.isOpen && todaySchedule.shifts.length > 0) {
+            const currentTime = now.getHours() * 60 + now.getMinutes();
+            const isOpen = todaySchedule.shifts.some(shift => {
+                const [startH, startM] = shift.start.split(':').map(Number);
+                const [endH, endM] = shift.end.split(':').map(Number);
+                const start = startH * 60 + startM;
+                const end = endH * 60 + endM;
+                return currentTime >= start && currentTime < end;
+            });
+            setIsOpenNow(isOpen);
+        } else {
+            setIsOpenNow(false);
+        }
+    }, [currentSchedule]);
 
     const getShippingCostText = () => {
         if (orderType === OrderType.TakeAway) return "Gratis";
         
         if (shipping.costType === ShippingCostType.ToBeQuoted) return "Por definir";
         if (shipping.costType === ShippingCostType.Free) return "Gratis";
-        if (shipping.costType === ShippingCostType.Fixed) return `$${shipping.fixedCost?.toFixed(2)}`;
+        if (shipping.costType === ShippingCostType.Fixed) {
+             const cost = shipping.fixedCost != null ? shipping.fixedCost : 0;
+             return `$${cost.toFixed(2)}`;
+        }
         return "Por definir";
     };
 
@@ -282,6 +422,19 @@ const RestaurantHero: React.FC<{
              return `${shipping.pickupTime.min} min`;
         }
         return `${shipping.deliveryTime.min} - ${shipping.deliveryTime.max} min`;
+    };
+
+    const handleShare = () => {
+        if (navigator.share) {
+            navigator.share({
+                title: company.name,
+                text: `¡Mira el menú de ${company.name}!`,
+                url: window.location.href,
+            }).catch(console.error);
+        } else {
+            navigator.clipboard.writeText(window.location.href);
+            alert("Enlace copiado al portapapeles");
+        }
     };
     
     return (
@@ -297,8 +450,12 @@ const RestaurantHero: React.FC<{
                 
                 {/* Top Actions */}
                 <div className="absolute top-4 right-4 flex gap-2">
-                    <button className="p-2 bg-black/30 backdrop-blur-md text-white rounded-full hover:bg-black/50 transition-colors"><IconClock className="h-5 w-5"/></button>
-                    <button className="p-2 bg-black/30 backdrop-blur-md text-white rounded-full hover:bg-black/50 transition-colors"><IconShare className="h-5 w-5"/></button>
+                    <button onClick={() => setShowSchedule(true)} className="p-2 bg-black/30 backdrop-blur-md text-white rounded-full hover:bg-black/50 transition-colors shadow-sm">
+                        <IconClock className="h-5 w-5"/>
+                    </button>
+                    <button onClick={handleShare} className="p-2 bg-black/30 backdrop-blur-md text-white rounded-full hover:bg-black/50 transition-colors shadow-sm">
+                        <IconShare className="h-5 w-5"/>
+                    </button>
                 </div>
             </div>
 
@@ -315,9 +472,19 @@ const RestaurantHero: React.FC<{
                 </div>
                 
                 <h1 className="text-2xl font-bold text-white mb-1">{company.name}</h1>
-                <p className="text-sm text-gray-400 flex items-center gap-1 mb-4">
-                     {branch.alias}
-                </p>
+                <div className="flex flex-col items-center gap-1 mb-4">
+                    <p className="text-sm text-gray-400 flex items-center gap-1">
+                        {branch.alias}
+                    </p>
+                    {currentSchedule && (
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className={`w-2 h-2 rounded-full ${isOpenNow ? 'bg-emerald-500' : 'bg-rose-500'} animate-pulse`}></span>
+                            <button onClick={() => setShowSchedule(true)} className={`text-xs font-bold ${isOpenNow ? 'text-emerald-400' : 'text-rose-400'} hover:underline`}>
+                                {isOpenNow ? 'Abierto Ahora' : 'Cerrado'}
+                            </button>
+                        </div>
+                    )}
+                </div>
 
                 {tableInfo ? (
                     <div className="w-full p-3 bg-emerald-900/30 border border-emerald-700/50 rounded-xl flex items-center justify-center gap-3 animate-fade-in">
@@ -357,38 +524,69 @@ const RestaurantHero: React.FC<{
                     </>
                 )}
             </div>
+            
+            {/* Schedule Modal */}
+            {currentSchedule && (
+                <ScheduleModal 
+                    isOpen={showSchedule} 
+                    onClose={() => setShowSchedule(false)} 
+                    schedule={currentSchedule}
+                />
+            )}
         </div>
     );
 };
 
-const MenuList: React.FC<{onProductClick: (product: Product) => void, cartItems: CartItem[], currency: string}> = ({ onProductClick, cartItems, currency }) => {
-    const [products, setProducts] = useState<Product[]>([]);
-    const [categories, setCategories] = useState<Category[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price: number, promotion?: Promotion } => {
+    const now = new Date();
+    // Filter active promotions
+    const activePromotions = promotions.filter(p => {
+        if (p.startDate && new Date(p.startDate) > now) return false;
+        if (p.endDate && new Date(p.endDate) < now) return false;
+        
+        if (p.appliesTo === PromotionAppliesTo.AllProducts) return true;
+        return p.productIds.includes(product.id);
+    });
+
+    if (activePromotions.length === 0) return { price: product.price };
+
+    // Find the best discount
+    let bestPrice = product.price;
+    let bestPromo: Promotion | undefined;
+
+    activePromotions.forEach(promo => {
+        let currentPrice = product.price;
+        if (promo.discountType === DiscountType.Percentage) {
+            currentPrice = product.price * (1 - promo.discountValue / 100);
+        } else {
+            currentPrice = Math.max(0, product.price - promo.discountValue);
+        }
+
+        if (currentPrice < bestPrice) {
+            bestPrice = currentPrice;
+            bestPromo = promo;
+        }
+    });
+
+    return { price: bestPrice, promotion: bestPromo };
+};
+
+const MenuList: React.FC<{
+    products: Product[],
+    categories: Category[],
+    onProductClick: (product: Product) => void, 
+    cartItems: CartItem[], 
+    currency: string, 
+    promotions: Promotion[]
+}> = ({ products, categories, onProductClick, cartItems, currency, promotions }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState<string>('');
     
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                setIsLoading(true);
-                const [fetchedProducts, fetchedCategories] = await Promise.all([
-                    getProducts(),
-                    getCategories()
-                ]);
-                setProducts(fetchedProducts);
-                setCategories(fetchedCategories);
-                if (fetchedCategories.length > 0) {
-                    setActiveCategory(fetchedCategories[0].id);
-                }
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchData();
-    }, []);
+        if (categories.length > 0 && !activeCategory) {
+            setActiveCategory(categories[0].id);
+        }
+    }, [categories, activeCategory]);
 
     const productQuantities = useMemo(() => {
         const quantities: { [productId: string]: number } = {};
@@ -423,10 +621,6 @@ const MenuList: React.FC<{onProductClick: (product: Product) => void, cartItems:
             window.scrollTo({ top: y, behavior: 'smooth' });
         }
     };
-
-    if (isLoading) {
-        return <div className="text-center p-10 text-gray-500 animate-pulse">Cargando menú...</div>
-    }
 
     return (
         <div className="pb-24">
@@ -478,6 +672,7 @@ const MenuList: React.FC<{onProductClick: (product: Product) => void, cartItems:
                                     quantityInCart={productQuantities[product.id] || 0} 
                                     onClick={() => onProductClick(product)} 
                                     currency={currency}
+                                    promotions={promotions}
                                 />
                             ))}
                         </div>
@@ -501,43 +696,104 @@ const MenuList: React.FC<{onProductClick: (product: Product) => void, cartItems:
     );
 };
 
-const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: () => void; currency: string }> = ({ product, quantityInCart, onClick, currency }) => (
-    <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group">
-         <div className="relative h-24 w-24 flex-shrink-0">
-            <img src={product.imageUrl} alt={product.name} className="w-full h-full rounded-lg object-cover" />
-            {quantityInCart > 0 && (
-                <div className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg ring-2 ring-gray-900">
-                    {quantityInCart}
+const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: () => void; currency: string; promotions: Promotion[] }> = ({ product, quantityInCart, onClick, currency, promotions }) => {
+    const { price: discountedPrice, promotion } = getDiscountedPrice(product, promotions);
+    const hasDiscount = promotion !== undefined;
+
+    return (
+        <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group relative overflow-hidden">
+            {hasDiscount && (
+                <div className="absolute top-0 left-0 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-br-lg z-10">
+                    -{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}
                 </div>
             )}
-        </div>
-        <div className="flex-1 flex flex-col justify-between py-1">
-            <div>
-                <h3 className="font-bold text-gray-100 leading-tight group-hover:text-emerald-400 transition-colors">{product.name}</h3>
-                <p className="text-sm text-gray-400 line-clamp-2 mt-1 leading-snug">{product.description}</p>
+            <div className="relative h-24 w-24 flex-shrink-0">
+                <img src={product.imageUrl} alt={product.name} className="w-full h-full rounded-lg object-cover" />
+                {quantityInCart > 0 && (
+                    <div className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg ring-2 ring-gray-900">
+                        {quantityInCart}
+                    </div>
+                )}
             </div>
-            <div className="flex justify-between items-end mt-2">
-                <p className="font-bold text-white">{currency} ${product.price.toFixed(2)}</p>
-                <div className="bg-gray-700 p-1.5 rounded-full text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
-                    <IconPlus className="h-4 w-4" />
+            <div className="flex-1 flex flex-col justify-between py-1">
+                <div>
+                    <h3 className="font-bold text-gray-100 leading-tight group-hover:text-emerald-400 transition-colors">{product.name}</h3>
+                    <p className="text-sm text-gray-400 line-clamp-2 mt-1 leading-snug">{product.description}</p>
+                </div>
+                <div className="flex justify-between items-end mt-2">
+                    <div className="flex flex-col">
+                        {hasDiscount && (
+                            <span className="text-xs text-gray-500 line-through">{currency} ${product.price.toFixed(2)}</span>
+                        )}
+                        <p className={`font-bold ${hasDiscount ? 'text-rose-400' : 'text-white'}`}>{currency} ${discountedPrice.toFixed(2)}</p>
+                    </div>
+                    <div className="bg-gray-700 p-1.5 rounded-full text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                        <IconPlus className="h-4 w-4" />
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-);
+    );
+};
 
-const ProductDetailModal: React.FC<{product: Product, onAddToCart: (product: Product, quantity: number, comments?: string) => void, onClose: () => void}> = ({product, onAddToCart, onClose}) => {
+const ProductDetailModal: React.FC<{
+    product: Product, 
+    onAddToCart: (product: Product, quantity: number, comments?: string, options?: PersonalizationOption[]) => void, 
+    onClose: () => void,
+    personalizations: Personalization[],
+    promotions: Promotion[]
+}> = ({product, onAddToCart, onClose, personalizations, promotions}) => {
     const [quantity, setQuantity] = useState(1);
     const [comments, setComments] = useState('');
     const [isClosing, setIsClosing] = useState(false);
+    const [selectedOptions, setSelectedOptions] = useState<{ [personalizationId: string]: PersonalizationOption[] }>({});
 
     const handleClose = () => {
         setIsClosing(true);
         setTimeout(onClose, 300); // Wait for animation
     };
 
+    const { price: basePrice, promotion } = getDiscountedPrice(product, promotions);
+
+    const handleOptionToggle = (personalization: Personalization, option: PersonalizationOption) => {
+        setSelectedOptions(prev => {
+            const currentSelection = prev[personalization.id] || [];
+            const isSelected = currentSelection.some(opt => opt.id === option.id);
+            
+            // If single selection (Radio behavior)
+            if (personalization.maxSelection === 1) {
+                return { ...prev, [personalization.id]: [option] };
+            }
+
+            // Multi selection (Checkbox behavior)
+            if (isSelected) {
+                return { ...prev, [personalization.id]: currentSelection.filter(opt => opt.id !== option.id) };
+            } else {
+                if (personalization.maxSelection && currentSelection.length >= personalization.maxSelection) {
+                    return prev; // Max reached
+                }
+                return { ...prev, [personalization.id]: [...currentSelection, option] };
+            }
+        });
+    };
+
+    const isOptionSelected = (pid: string, oid: string) => {
+        return selectedOptions[pid]?.some(o => o.id === oid);
+    };
+
+    // Validation for required options
+    const isValid = personalizations.every(p => {
+        const count = selectedOptions[p.id]?.length || 0;
+        return count >= (p.minSelection || 0);
+    });
+
+    const totalOptionsPrice = Object.values(selectedOptions).flat().reduce((acc, opt) => acc + opt.price, 0);
+    const totalPrice = (basePrice + totalOptionsPrice) * quantity;
+
     const handleAdd = () => {
-        onAddToCart(product, quantity, comments);
+        if (!isValid) return;
+        const flatOptions = Object.values(selectedOptions).flat();
+        onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptions);
     }
 
     return (
@@ -551,15 +807,61 @@ const ProductDetailModal: React.FC<{product: Product, onAddToCart: (product: Pro
                 </button>
 
                 {/* Image */}
-                <div className="h-64 w-full flex-shrink-0">
+                <div className="h-64 w-full flex-shrink-0 relative">
                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover rounded-t-3xl sm:rounded-t-2xl" />
                      <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent h-full w-full pointer-events-none"></div>
+                     {promotion && (
+                        <div className="absolute bottom-12 left-6 bg-rose-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg">
+                            ¡Oferta Especial!
+                        </div>
+                     )}
                 </div>
 
                 <div className="p-6 flex-grow overflow-y-auto -mt-12 relative z-10">
                     <h2 className="text-3xl font-bold text-white mb-2">{product.name}</h2>
-                    <p className="text-gray-300 leading-relaxed">{product.description}</p>
+                    <p className="text-gray-300 leading-relaxed mb-6">{product.description}</p>
                     
+                    {/* Personalizations */}
+                    <div className="space-y-6">
+                        {personalizations.map(p => (
+                            <div key={p.id} className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
+                                <div className="flex justify-between items-center mb-3">
+                                    <div>
+                                        <h4 className="font-bold text-white">{p.name}</h4>
+                                        {p.minSelection && p.minSelection > 0 && (
+                                            <span className="text-xs text-rose-400 font-medium uppercase tracking-wider">Obligatorio</span>
+                                        )}
+                                    </div>
+                                    <span className="text-xs text-gray-400">
+                                        {p.maxSelection === 1 ? 'Elige 1' : `Máx ${p.maxSelection || 'ilimitado'}`}
+                                    </span>
+                                </div>
+                                <div className="space-y-2">
+                                    {p.options.filter(o => o.available).map(opt => {
+                                        const isSelected = isOptionSelected(p.id, opt.id);
+                                        return (
+                                            <div 
+                                                key={opt.id} 
+                                                onClick={() => handleOptionToggle(p, opt)}
+                                                className={`flex justify-between items-center p-3 rounded-lg cursor-pointer border transition-all ${isSelected ? 'bg-emerald-500/20 border-emerald-500 ring-1 ring-emerald-500 shadow-lg shadow-emerald-900/20' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${isSelected ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-gray-500'}`}>
+                                                        {isSelected && <IconCheck className="h-3 w-3" />}
+                                                    </div>
+                                                    <span className={`text-sm ${isSelected ? 'text-white font-medium' : 'text-gray-300'}`}>{opt.name}</span>
+                                                </div>
+                                                {opt.price > 0 && (
+                                                    <span className="text-sm text-emerald-400">+${opt.price.toFixed(2)}</span>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
                     <div className="mt-6">
                         <label className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Instrucciones especiales</label>
                         <textarea 
@@ -583,10 +885,11 @@ const ProductDetailModal: React.FC<{product: Product, onAddToCart: (product: Pro
                     </div>
                     <button 
                         onClick={handleAdd}
-                        className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 px-6 rounded-xl transition-all transform active:scale-[0.98] shadow-lg shadow-emerald-900/20 flex justify-between items-center"
+                        disabled={!isValid}
+                        className={`w-full font-bold py-4 px-6 rounded-xl transition-all transform active:scale-[0.98] shadow-lg flex justify-between items-center ${isValid ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-900/20' : 'bg-gray-700 text-gray-400 cursor-not-allowed'}`}
                     >
-                        <span>Agregar al pedido</span>
-                        <span>${(product.price * quantity).toFixed(2)}</span>
+                        <span>{isValid ? 'Agregar al pedido' : 'Selecciona opciones'}</span>
+                        <span>${totalPrice.toFixed(2)}</span>
                     </button>
                 </div>
             </div>
@@ -620,27 +923,41 @@ const CartSummaryView: React.FC<{
     return (
         <div className="p-4 pb-40 animate-fade-in">
             <div className="space-y-4">
-                {cartItems.map(item => (
-                    <div key={item.cartItemId} className="flex gap-4 bg-gray-800/50 p-3 rounded-xl border border-gray-800">
-                        <img src={item.imageUrl} alt={item.name} className="w-20 h-20 rounded-lg object-cover"/>
-                        <div className="flex-grow flex flex-col justify-between">
-                            <div className="flex justify-between items-start">
-                                <h3 className="font-bold text-gray-100">{item.name}</h3>
-                                <p className="font-bold text-emerald-400">${(item.price * item.quantity).toFixed(2)}</p>
-                            </div>
-                            {item.comments && <p className="text-xs text-gray-400 italic line-clamp-1">"{item.comments}"</p>}
-                             
-                             <div className="flex items-center justify-between mt-2">
-                                <div className="flex items-center gap-3 bg-gray-800 rounded-lg px-1 border border-gray-700">
-                                    <button onClick={() => item.quantity > 1 ? onUpdateQuantity(item.cartItemId, item.quantity - 1) : onRemoveItem(item.cartItemId)} className="p-1.5 text-gray-300 hover:text-white"><IconMinus className="h-4 w-4"/></button>
-                                    <span className="font-bold w-4 text-center text-sm text-white">{item.quantity}</span>
-                                    <button onClick={() => onUpdateQuantity(item.cartItemId, item.quantity + 1)} className="p-1.5 text-gray-300 hover:text-white"><IconPlus className="h-4 w-4"/></button>
+                {cartItems.map(item => {
+                    const optionsTotal = (item.selectedOptions || []).reduce((acc, o: PersonalizationOption) => acc + o.price, 0);
+                    const itemTotal = (item.price + optionsTotal) * item.quantity;
+
+                    return (
+                        <div key={item.cartItemId} className="flex gap-4 bg-gray-800/50 p-3 rounded-xl border border-gray-800">
+                            <img src={item.imageUrl} alt={item.name} className="w-20 h-20 rounded-lg object-cover"/>
+                            <div className="flex-grow flex flex-col justify-between">
+                                <div className="flex justify-between items-start">
+                                    <h3 className="font-bold text-gray-100">{item.name}</h3>
+                                    <p className="font-bold text-emerald-400">${itemTotal.toFixed(2)}</p>
                                 </div>
-                                <button onClick={() => onRemoveItem(item.cartItemId)} className="text-gray-500 hover:text-red-400 p-2"><IconTrash className="h-5 w-5"/></button>
+                                {item.selectedOptions && item.selectedOptions.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1 mb-1">
+                                        {item.selectedOptions.map((opt, idx) => (
+                                            <span key={idx} className="text-xs text-gray-400 bg-gray-700/50 px-2 py-0.5 rounded-md border border-gray-700">
+                                                {opt.name}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                                {item.comments && <p className="text-xs text-gray-400 italic line-clamp-1">"{item.comments}"</p>}
+                                
+                                <div className="flex items-center justify-between mt-2">
+                                    <div className="flex items-center gap-3 bg-gray-800 rounded-lg px-1 border border-gray-700">
+                                        <button onClick={() => item.quantity > 1 ? onUpdateQuantity(item.cartItemId, item.quantity - 1) : onRemoveItem(item.cartItemId)} className="p-1.5 text-gray-300 hover:text-white"><IconMinus className="h-4 w-4"/></button>
+                                        <span className="font-bold w-4 text-center text-sm text-white">{item.quantity}</span>
+                                        <button onClick={() => onUpdateQuantity(item.cartItemId, item.quantity + 1)} className="p-1.5 text-gray-300 hover:text-white"><IconPlus className="h-4 w-4"/></button>
+                                    </div>
+                                    <button onClick={() => onRemoveItem(item.cartItemId)} className="text-gray-500 hover:text-red-400 p-2"><IconTrash className="h-5 w-5"/></button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    )
+                })}
             </div>
             
              <div className="mt-8">
@@ -669,13 +986,14 @@ const CartSummaryView: React.FC<{
 
 const CheckoutView: React.FC<{
     cartTotal: number, 
-    onPlaceOrder: (customer: Customer, paymentMethod: PaymentMethod) => void, 
+    onPlaceOrder: (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number) => void, 
     settings: AppSettings, 
     orderType: OrderType 
 }> = ({ cartTotal, onPlaceOrder, settings, orderType }) => {
     const [customer, setCustomer] = useState<Customer>({
         name: '', phone: '', address: { colonia: '', calle: '', numero: '', entreCalles: '', referencias: '' }
     });
+    const [tipAmount, setTipAmount] = useState(0);
     
     const isDelivery = orderType === OrderType.Delivery;
     const isPickup = orderType === OrderType.TakeAway;
@@ -684,7 +1002,7 @@ const CheckoutView: React.FC<{
     // Determine available payment methods
     const availablePaymentMethods = isDelivery 
         ? settings.payment.deliveryMethods 
-        : settings.payment.pickupMethods; // Pickup and DineIn use pickup methods usually
+        : settings.payment.pickupMethods;
 
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>(availablePaymentMethods[0] || 'Efectivo');
 
@@ -696,16 +1014,20 @@ const CheckoutView: React.FC<{
         }));
     };
 
+    const handleTipSelection = (percentage: number) => {
+        setTipAmount(cartTotal * (percentage / 100));
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onPlaceOrder(customer, selectedPaymentMethod);
+        onPlaceOrder(customer, selectedPaymentMethod, tipAmount);
     };
 
     const inputClasses = "w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-gray-500 transition-all";
     const labelClasses = "text-sm font-bold text-gray-400 mb-1 block";
 
     const shippingCost = (isDelivery && settings.shipping.costType === ShippingCostType.Fixed) ? (settings.shipping.fixedCost ?? 0) : 0;
-    const finalTotal = cartTotal + shippingCost;
+    const finalTotal = cartTotal + shippingCost + tipAmount;
     
     return (
         <form onSubmit={handleSubmit} className="p-4 space-y-6 pb-44 animate-fade-in">
@@ -756,14 +1078,82 @@ const CheckoutView: React.FC<{
                 </div>
             )}
 
+            {settings.payment.showTipField && (
+                <div className="space-y-3 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
+                    <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Propina para el equipo</h3>
+                    <div className="flex gap-2">
+                        {[10, 15, 20].map(pct => (
+                            <button 
+                                key={pct}
+                                type="button" 
+                                onClick={() => handleTipSelection(pct)}
+                                className={`flex-1 py-2 rounded-lg font-bold text-sm border transition-all ${Math.abs(tipAmount - (cartTotal * pct / 100)) < 0.1 ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-gray-800 border-gray-600 text-gray-300 hover:border-gray-500'}`}
+                            >
+                                {pct}%
+                            </button>
+                        ))}
+                        <div className="flex-1 relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                            <input 
+                                type="number" 
+                                placeholder="Otro" 
+                                value={tipAmount || ''}
+                                onChange={(e) => setTipAmount(parseFloat(e.target.value) || 0)}
+                                className="w-full py-2 pl-6 pr-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:border-emerald-500 outline-none"
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="space-y-3 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
                  <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Pago</h3>
                  <div className="space-y-2 pt-2">
                     {availablePaymentMethods.map(method => (
-                        <label key={method} className="flex justify-between items-center p-4 border border-gray-700 rounded-xl bg-gray-800 cursor-pointer transition-all hover:border-emerald-500 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-900/20">
-                            <span className="font-medium text-white">{method}</span>
-                            <input type="radio" name="payment" value={method} checked={selectedPaymentMethod === method} onChange={() => setSelectedPaymentMethod(method)} className="h-5 w-5 accent-emerald-500" />
-                        </label>
+                        <div key={method}>
+                            <label className={`flex justify-between items-center p-4 rounded-xl cursor-pointer transition-all border ${selectedPaymentMethod === method ? 'bg-emerald-900/20 border-emerald-500 ring-1 ring-emerald-500 shadow-lg shadow-emerald-900/10' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}>
+                                <span className={`font-medium ${selectedPaymentMethod === method ? 'text-emerald-400' : 'text-white'}`}>{method}</span>
+                                <input type="radio" name="payment" value={method} checked={selectedPaymentMethod === method} onChange={() => setSelectedPaymentMethod(method)} className="h-5 w-5 accent-emerald-500" />
+                            </label>
+                            
+                            {/* Detailed Payment Info Display */}
+                            {selectedPaymentMethod === method && method === 'Pago Móvil' && settings.payment.pagoMovil && (
+                                <div className="mt-2 p-4 bg-gray-700/50 rounded-xl border border-gray-600 animate-fade-in">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h4 className="text-emerald-400 font-bold text-sm uppercase">Datos Pago Móvil</h4>
+                                        <button type="button" onClick={() => {
+                                            const text = `Banco: ${settings.payment.pagoMovil?.bank}\nTel: ${settings.payment.pagoMovil?.phone}\nCI/RIF: ${settings.payment.pagoMovil?.idNumber}`;
+                                            navigator.clipboard.writeText(text);
+                                            alert('Datos copiados');
+                                        }} className="text-xs text-gray-400 hover:text-white flex items-center gap-1"><IconDuplicate className="h-3 w-3"/> Copiar</button>
+                                    </div>
+                                    <div className="text-sm text-gray-200 space-y-1 font-mono">
+                                        <p><span className="text-gray-500">Banco:</span> {settings.payment.pagoMovil.bank}</p>
+                                        <p><span className="text-gray-500">Teléfono:</span> {settings.payment.pagoMovil.phone}</p>
+                                        <p><span className="text-gray-500">Cédula/RIF:</span> {settings.payment.pagoMovil.idNumber}</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedPaymentMethod === method && method === 'Transferencia' && settings.payment.transfer && (
+                                <div className="mt-2 p-4 bg-gray-700/50 rounded-xl border border-gray-600 animate-fade-in">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h4 className="text-emerald-400 font-bold text-sm uppercase">Datos Transferencia</h4>
+                                        <button type="button" onClick={() => {
+                                            const text = `Banco: ${settings.payment.transfer?.bank}\nCuenta: ${settings.payment.transfer?.accountNumber}\nTitular: ${settings.payment.transfer?.accountHolder}\nCI/RIF: ${settings.payment.transfer?.idNumber}`;
+                                            navigator.clipboard.writeText(text);
+                                            alert('Datos copiados');
+                                        }} className="text-xs text-gray-400 hover:text-white flex items-center gap-1"><IconDuplicate className="h-3 w-3"/> Copiar</button>
+                                    </div>
+                                    <div className="text-sm text-gray-200 space-y-1 font-mono">
+                                        <p><span className="text-gray-500">Banco:</span> {settings.payment.transfer.bank}</p>
+                                        <p><span className="text-gray-500">Cuenta:</span> {settings.payment.transfer.accountNumber}</p>
+                                        <p><span className="text-gray-500">Titular:</span> {settings.payment.transfer.accountHolder}</p>
+                                        <p><span className="text-gray-500">CI/RIF:</span> {settings.payment.transfer.idNumber}</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     ))}
                  </div>
             </div>
@@ -778,6 +1168,12 @@ const CheckoutView: React.FC<{
                         <div className="flex justify-between text-gray-400">
                             <span>Envío</span>
                             <span>{shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : "Por cotizar"}</span>
+                        </div>
+                    )}
+                    {tipAmount > 0 && (
+                        <div className="flex justify-between text-emerald-400">
+                            <span>Propina</span>
+                            <span>${tipAmount.toFixed(2)}</span>
                         </div>
                     )}
                      <div className="flex justify-between font-bold text-xl text-white pt-2 border-t border-gray-800">

@@ -1,15 +1,16 @@
 import { useState, useMemo } from 'react';
-import { CartItem, Product } from '../types';
+import { CartItem, Product, PersonalizationOption } from '../types';
 
 export const useCart = () => {
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
-    const addToCart = (product: Product, quantity: number = 1, comments?: string) => {
+    const addToCart = (product: Product, quantity: number = 1, comments?: string, options: PersonalizationOption[] = []) => {
         setCartItems(prevItems => {
             const newItem: CartItem = {
                 ...product,
                 quantity,
                 comments,
+                selectedOptions: options,
                 cartItemId: `${product.id}-${Date.now()}` // Create a unique ID for this specific cart instance
             };
             return [...prevItems, newItem];
@@ -45,7 +46,10 @@ export const useCart = () => {
     };
 
     const cartTotal = useMemo(() => {
-        return cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
+        return cartItems.reduce((total, item) => {
+            const optionsPrice = item.selectedOptions ? item.selectedOptions.reduce((sum, opt) => sum + opt.price, 0) : 0;
+            return total + (item.price + optionsPrice) * item.quantity;
+        }, 0);
     }, [cartItems]);
 
     return {
