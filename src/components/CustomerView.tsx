@@ -921,7 +921,7 @@ const CartSummaryView: React.FC<{
         <div className="p-4 pb-40 animate-fade-in">
             <div className="space-y-4">
                 {cartItems.map(item => {
-                    const optionsTotal = (item.selectedOptions || []).reduce((acc, o) => acc + o.price, 0);
+                    const optionsTotal = (item.selectedOptions || []).reduce((acc, o: PersonalizationOption) => acc + o.price, 0);
                     const itemTotal = (item.price + optionsTotal) * item.quantity;
 
                     return (
@@ -1108,8 +1108,8 @@ const CheckoutView: React.FC<{
                  <div className="space-y-2 pt-2">
                     {availablePaymentMethods.map(method => (
                         <div key={method}>
-                            <label className="flex justify-between items-center p-4 border border-gray-700 rounded-xl bg-gray-800 cursor-pointer transition-all hover:border-emerald-500 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-900/20">
-                                <span className="font-medium text-white">{method}</span>
+                            <label className={`flex justify-between items-center p-4 rounded-xl cursor-pointer transition-all border ${selectedPaymentMethod === method ? 'bg-emerald-900/20 border-emerald-500 ring-1 ring-emerald-500 shadow-lg shadow-emerald-900/10' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}>
+                                <span className={`font-medium ${selectedPaymentMethod === method ? 'text-emerald-400' : 'text-white'}`}>{method}</span>
                                 <input type="radio" name="payment" value={method} checked={selectedPaymentMethod === method} onChange={() => setSelectedPaymentMethod(method)} className="h-5 w-5 accent-emerald-500" />
                             </label>
                             
