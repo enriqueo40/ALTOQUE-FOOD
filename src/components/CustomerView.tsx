@@ -840,7 +840,7 @@ const ProductDetailModal: React.FC<{
                                             <div 
                                                 key={opt.id} 
                                                 onClick={() => handleOptionToggle(p, opt)}
-                                                className={`flex justify-between items-center p-3 rounded-lg cursor-pointer border transition-all ${isSelected ? 'bg-emerald-900/30 border-emerald-500' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}
+                                                className={`flex justify-between items-center p-3 rounded-lg cursor-pointer border transition-all ${isSelected ? 'bg-emerald-500/20 border-emerald-500 ring-1 ring-emerald-500 shadow-lg shadow-emerald-900/20' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}
                                             >
                                                 <div className="flex items-center gap-3">
                                                     <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${isSelected ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-gray-500'}`}>
@@ -921,7 +921,7 @@ const CartSummaryView: React.FC<{
         <div className="p-4 pb-40 animate-fade-in">
             <div className="space-y-4">
                 {cartItems.map(item => {
-                    const optionsTotal = item.selectedOptions?.reduce((acc: number, o: PersonalizationOption) => acc + o.price, 0) ?? 0;
+                    const optionsTotal = (item.selectedOptions || []).reduce((acc, o) => acc + o.price, 0);
                     const itemTotal = (item.price + optionsTotal) * item.quantity;
 
                     return (
