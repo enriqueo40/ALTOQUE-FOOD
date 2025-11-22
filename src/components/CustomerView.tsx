@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck, IconCalendar } from '../constants';
+import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck, IconCalendar, IconDuplicate } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
@@ -61,16 +61,22 @@ export default function CustomerView() {
         setSelectedProduct(null);
     };
 
-    const handlePlaceOrder = async (customer: Customer, paymentMethod: PaymentMethod) => {
+    const handlePlaceOrder = async (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number = 0) => {
         if (!settings) return;
+
+        const shippingCost = (orderType === OrderType.Delivery && settings.shipping.costType === ShippingCostType.Fixed) 
+            ? (settings.shipping.fixedCost ?? 0) 
+            : 0;
+
+        const finalTotal = cartTotal + shippingCost + tipAmount;
 
         const newOrder: Omit<Order, 'id' | 'createdAt'> = {
             customer,
             items: cartItems,
-            total: cartTotal,
+            total: finalTotal,
             status: OrderStatus.Pending,
             branchId: 'main-branch',
-            generalComments: generalComments,
+            generalComments: generalComments + (tipAmount > 0 ? ` | Propina: ${settings.company.currency.code} ${tipAmount.toFixed(2)}` : ''),
             orderType: orderType,
             tableId: orderType === OrderType.DineIn && tableInfo ? `${tableInfo.zone} - ${tableInfo.table}` : undefined,
         };
@@ -99,6 +105,8 @@ export default function CustomerView() {
             return detail;
         });
 
+        const currency = settings.company.currency.code;
+
         if (orderType === OrderType.DineIn) {
             messageParts = [
                 `*🛎️ Nuevo Pedido en Mesa de ${settings.company.name.toUpperCase()}*`,
@@ -111,7 +119,9 @@ export default function CustomerView() {
                 ``,
                 generalComments ? `*Comentarios Generales:*\n_${generalComments}_` : '',
                 `---------------------------------`,
-                `*Total:* ${settings.company.currency.code} $${cartTotal.toFixed(2)}`,
+                `*Subtotal:* ${currency} $${cartTotal.toFixed(2)}`,
+                tipAmount > 0 ? `*Propina:* ${currency} $${tipAmount.toFixed(2)}` : '',
+                `*Total a Pagar:* ${currency} $${finalTotal.toFixed(2)}`,
                 `*Método de pago:* ${paymentMethod}`,
             ];
         } else if (orderType === OrderType.TakeAway) {
@@ -129,7 +139,9 @@ export default function CustomerView() {
                 ``,
                 generalComments ? `*Comentarios Generales:*\n_${generalComments}_` : '',
                 `---------------------------------`,
-                `*Total:* ${settings.company.currency.code} $${cartTotal.toFixed(2)}`,
+                `*Subtotal:* ${currency} $${cartTotal.toFixed(2)}`,
+                tipAmount > 0 ? `*Propina:* ${currency} $${tipAmount.toFixed(2)}` : '',
+                `*Total a Pagar:* ${currency} $${finalTotal.toFixed(2)}`,
                 `*Método de pago:* ${paymentMethod}`,
             ];
         } else {
@@ -153,7 +165,10 @@ export default function CustomerView() {
                 ``,
                 generalComments ? `*Comentarios Generales:*\n_${generalComments}_` : '',
                 `---------------------------------`,
-                `*Total:* ${settings.company.currency.code} $${cartTotal.toFixed(2)} + envío`,
+                `*Subtotal:* ${currency} $${cartTotal.toFixed(2)}`,
+                `*Envío:* ${shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : 'Por cotizar'}`,
+                tipAmount > 0 ? `*Propina:* ${currency} $${tipAmount.toFixed(2)}` : '',
+                `*Total Estimado:* ${currency} $${finalTotal.toFixed(2)}`,
                 `*Método de pago:* ${paymentMethod}`,
             ];
         }
@@ -906,7 +921,7 @@ const CartSummaryView: React.FC<{
         <div className="p-4 pb-40 animate-fade-in">
             <div className="space-y-4">
                 {cartItems.map(item => {
-                    const optionsTotal = item.selectedOptions?.reduce((acc, o) => acc + o.price, 0) ?? 0;
+                    const optionsTotal = item.selectedOptions?.reduce((acc: number, o: PersonalizationOption) => acc + o.price, 0) ?? 0;
                     const itemTotal = (item.price + optionsTotal) * item.quantity;
 
                     return (
@@ -968,13 +983,14 @@ const CartSummaryView: React.FC<{
 
 const CheckoutView: React.FC<{
     cartTotal: number, 
-    onPlaceOrder: (customer: Customer, paymentMethod: PaymentMethod) => void, 
+    onPlaceOrder: (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number) => void, 
     settings: AppSettings, 
     orderType: OrderType 
 }> = ({ cartTotal, onPlaceOrder, settings, orderType }) => {
     const [customer, setCustomer] = useState<Customer>({
         name: '', phone: '', address: { colonia: '', calle: '', numero: '', entreCalles: '', referencias: '' }
     });
+    const [tipAmount, setTipAmount] = useState(0);
     
     const isDelivery = orderType === OrderType.Delivery;
     const isPickup = orderType === OrderType.TakeAway;
@@ -983,7 +999,7 @@ const CheckoutView: React.FC<{
     // Determine available payment methods
     const availablePaymentMethods = isDelivery 
         ? settings.payment.deliveryMethods 
-        : settings.payment.pickupMethods; // Pickup and DineIn use pickup methods usually
+        : settings.payment.pickupMethods;
 
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>(availablePaymentMethods[0] || 'Efectivo');
 
@@ -995,16 +1011,20 @@ const CheckoutView: React.FC<{
         }));
     };
 
+    const handleTipSelection = (percentage: number) => {
+        setTipAmount(cartTotal * (percentage / 100));
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onPlaceOrder(customer, selectedPaymentMethod);
+        onPlaceOrder(customer, selectedPaymentMethod, tipAmount);
     };
 
     const inputClasses = "w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-gray-500 transition-all";
     const labelClasses = "text-sm font-bold text-gray-400 mb-1 block";
 
     const shippingCost = (isDelivery && settings.shipping.costType === ShippingCostType.Fixed) ? (settings.shipping.fixedCost ?? 0) : 0;
-    const finalTotal = cartTotal + shippingCost;
+    const finalTotal = cartTotal + shippingCost + tipAmount;
     
     return (
         <form onSubmit={handleSubmit} className="p-4 space-y-6 pb-44 animate-fade-in">
@@ -1055,14 +1075,82 @@ const CheckoutView: React.FC<{
                 </div>
             )}
 
+            {settings.payment.showTipField && (
+                <div className="space-y-3 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
+                    <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Propina para el equipo</h3>
+                    <div className="flex gap-2">
+                        {[10, 15, 20].map(pct => (
+                            <button 
+                                key={pct}
+                                type="button" 
+                                onClick={() => handleTipSelection(pct)}
+                                className={`flex-1 py-2 rounded-lg font-bold text-sm border transition-all ${Math.abs(tipAmount - (cartTotal * pct / 100)) < 0.1 ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-gray-800 border-gray-600 text-gray-300 hover:border-gray-500'}`}
+                            >
+                                {pct}%
+                            </button>
+                        ))}
+                        <div className="flex-1 relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                            <input 
+                                type="number" 
+                                placeholder="Otro" 
+                                value={tipAmount || ''}
+                                onChange={(e) => setTipAmount(parseFloat(e.target.value) || 0)}
+                                className="w-full py-2 pl-6 pr-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:border-emerald-500 outline-none"
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="space-y-3 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
                  <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Pago</h3>
                  <div className="space-y-2 pt-2">
                     {availablePaymentMethods.map(method => (
-                        <label key={method} className="flex justify-between items-center p-4 border border-gray-700 rounded-xl bg-gray-800 cursor-pointer transition-all hover:border-emerald-500 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-900/20">
-                            <span className="font-medium text-white">{method}</span>
-                            <input type="radio" name="payment" value={method} checked={selectedPaymentMethod === method} onChange={() => setSelectedPaymentMethod(method)} className="h-5 w-5 accent-emerald-500" />
-                        </label>
+                        <div key={method}>
+                            <label className="flex justify-between items-center p-4 border border-gray-700 rounded-xl bg-gray-800 cursor-pointer transition-all hover:border-emerald-500 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-900/20">
+                                <span className="font-medium text-white">{method}</span>
+                                <input type="radio" name="payment" value={method} checked={selectedPaymentMethod === method} onChange={() => setSelectedPaymentMethod(method)} className="h-5 w-5 accent-emerald-500" />
+                            </label>
+                            
+                            {/* Detailed Payment Info Display */}
+                            {selectedPaymentMethod === method && method === 'Pago Móvil' && settings.payment.pagoMovil && (
+                                <div className="mt-2 p-4 bg-gray-700/50 rounded-xl border border-gray-600 animate-fade-in">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h4 className="text-emerald-400 font-bold text-sm uppercase">Datos Pago Móvil</h4>
+                                        <button type="button" onClick={() => {
+                                            const text = `Banco: ${settings.payment.pagoMovil?.bank}\nTel: ${settings.payment.pagoMovil?.phone}\nCI/RIF: ${settings.payment.pagoMovil?.idNumber}`;
+                                            navigator.clipboard.writeText(text);
+                                            alert('Datos copiados');
+                                        }} className="text-xs text-gray-400 hover:text-white flex items-center gap-1"><IconDuplicate className="h-3 w-3"/> Copiar</button>
+                                    </div>
+                                    <div className="text-sm text-gray-200 space-y-1 font-mono">
+                                        <p><span className="text-gray-500">Banco:</span> {settings.payment.pagoMovil.bank}</p>
+                                        <p><span className="text-gray-500">Teléfono:</span> {settings.payment.pagoMovil.phone}</p>
+                                        <p><span className="text-gray-500">Cédula/RIF:</span> {settings.payment.pagoMovil.idNumber}</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedPaymentMethod === method && method === 'Transferencia' && settings.payment.transfer && (
+                                <div className="mt-2 p-4 bg-gray-700/50 rounded-xl border border-gray-600 animate-fade-in">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h4 className="text-emerald-400 font-bold text-sm uppercase">Datos Transferencia</h4>
+                                        <button type="button" onClick={() => {
+                                            const text = `Banco: ${settings.payment.transfer?.bank}\nCuenta: ${settings.payment.transfer?.accountNumber}\nTitular: ${settings.payment.transfer?.accountHolder}\nCI/RIF: ${settings.payment.transfer?.idNumber}`;
+                                            navigator.clipboard.writeText(text);
+                                            alert('Datos copiados');
+                                        }} className="text-xs text-gray-400 hover:text-white flex items-center gap-1"><IconDuplicate className="h-3 w-3"/> Copiar</button>
+                                    </div>
+                                    <div className="text-sm text-gray-200 space-y-1 font-mono">
+                                        <p><span className="text-gray-500">Banco:</span> {settings.payment.transfer.bank}</p>
+                                        <p><span className="text-gray-500">Cuenta:</span> {settings.payment.transfer.accountNumber}</p>
+                                        <p><span className="text-gray-500">Titular:</span> {settings.payment.transfer.accountHolder}</p>
+                                        <p><span className="text-gray-500">CI/RIF:</span> {settings.payment.transfer.idNumber}</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     ))}
                  </div>
             </div>
@@ -1077,6 +1165,12 @@ const CheckoutView: React.FC<{
                         <div className="flex justify-between text-gray-400">
                             <span>Envío</span>
                             <span>{shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : "Por cotizar"}</span>
+                        </div>
+                    )}
+                    {tipAmount > 0 && (
+                        <div className="flex justify-between text-emerald-400">
+                            <span>Propina</span>
+                            <span>${tipAmount.toFixed(2)}</span>
                         </div>
                     )}
                      <div className="flex justify-between font-bold text-xl text-white pt-2 border-t border-gray-800">
