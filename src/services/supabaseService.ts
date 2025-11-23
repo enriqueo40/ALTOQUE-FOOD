@@ -14,7 +14,8 @@ const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 
 
 let supabase: SupabaseClient | null = null;
-let channel: RealtimeChannel | null = null;
+let ordersChannel: RealtimeChannel | null = null;
+let menuChannel: RealtimeChannel | null = null;
 
 // Helper function to get the client or throw an error.
 // This uses a singleton pattern to create the client only once.
@@ -33,17 +34,9 @@ const getClient = (): SupabaseClient => {
 };
 
 // --- Connection Check ---
-// NOTE: This function is no longer used by App.tsx to verify the connection
-// before rendering, as the setup flow has been removed. It remains here
-// in case it's needed for other diagnostic purposes.
 export const checkDbConnection = async (): Promise<void> => {
-    // This function performs a lightweight query to check if a core table exists.
-    // If it fails, the app knows the database schema has not been set up.
-    // We use `{ head: true }` to only check for existence without returning data.
     const { error } = await getClient().from('categories').select('id', { count: 'exact', head: true });
-
     if (error) {
-        // This error will be caught by the App component, which will then show the SetupView.
         throw error;
     }
 };
@@ -56,29 +49,23 @@ export const getAppSettings = async (): Promise<AppSettings> => {
         .eq('id', 1)
         .single();
 
-    // Check if valid settings were returned
     if (!error && data && data.settings && Object.keys(data.settings).length > 0) {
-        // Settings exist and are valid. Merge with defaults to ensure all keys are present.
         const mergedSettings = { ...JSON.parse(JSON.stringify(INITIAL_SETTINGS)), ...data.settings };
         return mergedSettings;
     }
 
-    // If we reach here, settings are missing, empty, or there was an error.
-    // We will initialize the database with the default settings.
-    if (error && error.code !== 'PGRST116') { // Log unexpected errors
+    if (error && error.code !== 'PGRST116') { 
          console.error("An unexpected error occurred while fetching app settings:", error);
     }
     
-    console.warn("App settings are missing or empty in the database. Initializing with default settings.");
+    console.warn("App settings are missing or empty. Initializing defaults.");
 
     try {
-        // Create a deep copy to avoid mutating the constant
         const settingsToSave = JSON.parse(JSON.stringify(INITIAL_SETTINGS));
         await saveAppSettings(settingsToSave);
         return settingsToSave;
     } catch (saveError) {
-        console.error("Fatal: Could not initialize app settings in the database.", saveError);
-        // If saving fails, return the in-memory defaults as a last resort.
+        console.error("Fatal: Could not initialize app settings.", saveError);
         return JSON.parse(JSON.stringify(INITIAL_SETTINGS));
     }
 };
@@ -108,7 +95,6 @@ export const getCategories = async (): Promise<Category[]> => {
 
 export const saveCategory = async (category: Omit<Category, 'id' | 'created_at'> & { id?: string }): Promise<Category> => {
     const { id, ...categoryData } = category;
-    
     const { data, error } = await getClient()
         .from('categories')
         .upsert({ id, ...categoryData })
@@ -145,7 +131,6 @@ export const getProducts = async (): Promise<Product[]> => {
 
 export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & { id?: string }): Promise<Product> => {
     const { id, ...productData } = product;
-
     const { data, error } = await getClient()
         .from('products')
         .upsert({ id, ...productData })
@@ -340,14 +325,11 @@ export const getZones = async (): Promise<Zone[]> => {
         console.error("Error fetching zones:", error);
         throw error;
     }
-
-    // Supabase returns tables as a nested array. We just need to ensure the type matches.
     return (data as Zone[]) || [];
 };
 
 export const saveZone = async (zone: Pick<Zone, 'name' | 'rows' | 'cols'> & { id?: string }): Promise<Zone> => {
     const { id, ...zoneData } = zone;
-
     const { data, error } = await getClient()
         .from('zones')
         .upsert({ id, ...zoneData })
@@ -373,82 +355,52 @@ export const deleteZone = async (zoneId: string): Promise<void> => {
 export const saveZoneLayout = async (zone: Zone): Promise<void> => {
     const { tables, ...zoneData } = zone;
     
-    // 1. Update the zone's properties (name, rows, cols)
     const { error: zoneError } = await getClient().from('zones').update({ name: zoneData.name, rows: zoneData.rows, cols: zoneData.cols }).eq('id', zoneData.id);
-    if (zoneError) {
-        console.error("Error updating zone properties:", zoneError);
-        throw zoneError;
-    }
+    if (zoneError) throw zoneError;
     
-    // 2. Get existing tables for this zone from the DB
     const { data: existingTables, error: fetchError } = await getClient().from('tables').select('id').eq('zone_id', zone.id);
     if (fetchError) throw fetchError;
     
     const existingTableIds = existingTables.map(t => t.id);
     const newTableIds = tables.map(t => t.id);
 
-    // 3. Determine which tables to delete
     const tablesToDelete = existingTableIds.filter(id => !newTableIds.includes(id));
     if (tablesToDelete.length > 0) {
         const { error: deleteError } = await getClient().from('tables').delete().in('id', tablesToDelete);
-        if (deleteError) {
-            console.error("Error deleting old tables:", deleteError);
-            throw deleteError;
-        }
+        if (deleteError) throw deleteError;
     }
 
-    // 4. Upsert the current set of tables
     if (tables.length > 0) {
          const tablesToSave = tables.map(({ created_at, zoneId, ...rest }) => ({
             ...rest,
-            zone_id: zone.id // Ensure zone_id is set and the original zoneId is removed
+            zone_id: zone.id 
         }));
         const { error: upsertError } = await getClient().from('tables').upsert(tablesToSave);
-        if (upsertError) {
-            console.error("Error upserting tables:", upsertError);
-            console.error("Data sent:", JSON.stringify(tablesToSave, null, 2));
-            throw upsertError;
-        }
+        if (upsertError) throw upsertError;
     }
 };
 
 // --- Orders Functions (Real-time) ---
 export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created_at'>): Promise<void> => {
-    // FIX: Strictly map camelCase properties from frontend to snake_case columns in database
-    // We use || null to ensure no undefined values are passed.
-    // We assume 'items' column in DB is JSONB, so we can add extra properties like paymentProof freely if we wanted,
-    // but ideally, paymentProof should be its own column or part of a payment_info JSONB structure.
-    // For now, we will assume the 'orders' table schema allows a 'payment_proof' or we stuff it into customer metadata
-    // BUT since we cannot change DB schema easily via code here without SQL access, 
-    // we will leverage the 'general_comments' or 'items' JSONB flexibility if needed, 
-    // OR assume the user runs the PATCH_SQL provided in previous context which isn't automated.
-    // To be safe and follow "don't break existing", I will map it to a property that exists or append to general_comments
-    // if I couldn't change schema. HOWEVER, for a proper implementation, I'll try to insert it into the customer JSONB or similar.
-    // WAIT: The prompt allows me to modify files. I updated types.ts. 
-    // I will map paymentProof to a new column `payment_proof` BUT since I can't guarantee the column exists in the live DB
-    // without running migration, it might fail.
-    // SAFEST BET: Store it inside the `customer` JSONB object which is unstructured.
-    
     const dbOrderPayload = {
         customer: {
             ...order.customer,
-            paymentProof: order.paymentProof // Store proof inside customer JSON to avoid schema migration issues on live DB
+            paymentProof: order.paymentProof 
         },
         items: order.items,
         status: order.status,
         total: order.total,
-        branch_id: order.branchId || null,        // Map branchId -> branch_id
-        order_type: order.orderType || null,      // Map orderType -> order_type
-        table_id: order.tableId || null,          // Map tableId -> table_id
-        general_comments: order.generalComments || null, // Map generalComments -> general_comments
-        payment_status: order.paymentStatus || 'pending' // Map paymentStatus -> payment_status
+        branch_id: order.branchId || null,       
+        order_type: order.orderType || null,      
+        table_id: order.tableId || null,          
+        general_comments: order.generalComments || null, 
+        payment_status: order.paymentStatus || 'pending' 
     };
 
     const { error } = await getClient().from('orders').insert(dbOrderPayload);
 
     if (error) {
         console.error('Error saving order:', error);
-        // Fix: Throw new Error object for consistent catching in UI
         throw new Error(error.message || 'Database error saving order');
     }
 };
@@ -457,7 +409,7 @@ export const getActiveOrders = async (): Promise<Order[]> => {
     const { data, error } = await getClient()
         .from('orders')
         .select('*')
-        .neq('status', 'Cancelled') // Optional: Filter out cancelled if you want
+        .neq('status', 'Cancelled') 
         .order('created_at', { ascending: false });
 
     if (error) {
@@ -465,10 +417,9 @@ export const getActiveOrders = async (): Promise<Order[]> => {
         return [];
     }
     
-    // Map snake_case DB columns back to camelCase TS types
     return data.map((o: any) => ({
         id: o.id,
-        customer: o.customer, // customer JSONB now contains paymentProof
+        customer: o.customer, 
         items: o.items,
         status: o.status,
         total: o.total,
@@ -478,44 +429,39 @@ export const getActiveOrders = async (): Promise<Order[]> => {
         tableId: o.table_id,
         generalComments: o.general_comments,
         paymentStatus: o.payment_status,
-        paymentProof: o.customer?.paymentProof // Extract back to top level
+        paymentProof: o.customer?.paymentProof 
     })) as Order[];
 };
 
 export const updateOrder = async (orderId: string, updates: Partial<Order>): Promise<void> => {
-    // Map camelCase to snake_case for DB updates if necessary
     const dbUpdates: any = { ...updates };
     if (updates.branchId) { dbUpdates.branch_id = updates.branchId; delete dbUpdates.branchId; }
     if (updates.orderType) { dbUpdates.order_type = updates.orderType; delete dbUpdates.orderType; }
     if (updates.tableId) { dbUpdates.table_id = updates.tableId; delete dbUpdates.tableId; }
     if (updates.generalComments) { dbUpdates.general_comments = updates.generalComments; delete dbUpdates.generalComments; }
     if (updates.paymentStatus) { dbUpdates.payment_status = updates.paymentStatus; delete dbUpdates.paymentStatus; }
-    if (updates.paymentProof) { delete dbUpdates.paymentProof; } // Read-only/inside customer blob usually
+    if (updates.paymentProof) { delete dbUpdates.paymentProof; } 
     
     const { error } = await getClient().from('orders').update(dbUpdates).eq('id', orderId);
     if (error) {
         console.error('Error updating order:', error);
-        // Throw a proper Error object so the caller can display the message
         throw new Error(error.message || 'Unknown database error');
     }
 };
 
-// Enhanced Real-time Subscription
+// Real-time Subscription for Admin (Orders)
 export const subscribeToNewOrders = (
     onInsert: (payload: any) => void, 
     onUpdate?: (payload: any) => void
 ) => {
     const client = getClient();
-    if (channel) {
-        client.removeChannel(channel).then(() => {
-            console.log('Removed existing channel.');
-        });
+    if (ordersChannel) {
+        client.removeChannel(ordersChannel).then(() => { ordersChannel = null; });
     }
     
-    channel = client.channel('orders-channel');
-    channel
+    ordersChannel = client.channel('orders-channel');
+    ordersChannel
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-             // Transform payload to match frontend structure if needed
              const newOrder = payload.new;
              const transformed = {
                 id: newOrder.id,
@@ -553,19 +499,40 @@ export const subscribeToNewOrders = (
                 onUpdate(transformed);
             }
         })
+        .subscribe();
+    
+    return ordersChannel;
+}
+
+// Real-time Subscription for Menu (Customers)
+export const subscribeToMenuUpdates = (onUpdate: () => void) => {
+    const client = getClient();
+    if (menuChannel) {
+        client.removeChannel(menuChannel).then(() => { menuChannel = null; });
+    }
+
+    menuChannel = client.channel('menu-updates')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, onUpdate)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, onUpdate)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'promotions' }, onUpdate)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'personalizations' }, onUpdate)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'personalization_options' }, onUpdate)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, onUpdate)
         .subscribe((status) => {
             if (status === 'SUBSCRIBED') {
-                console.log('Realtime subscription active for Orders.');
+                console.log('Realtime subscription active for Menu Updates.');
             }
         });
     
-    return channel;
-}
+    return menuChannel;
+};
 
 export const unsubscribeFromChannel = () => {
-    if (channel) {
-        getClient().removeChannel(channel).then(() => {
-            channel = null;
-        });
+    const client = getClient();
+    if (ordersChannel) {
+        client.removeChannel(ordersChannel).then(() => { ordersChannel = null; });
+    }
+    if (menuChannel) {
+        client.removeChannel(menuChannel).then(() => { menuChannel = null; });
     }
 }

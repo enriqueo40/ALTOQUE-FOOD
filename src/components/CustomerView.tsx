@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
 import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck, IconCalendar, IconDuplicate } from '../constants';
-import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions } from '../services/supabaseService';
+import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
 // Main View Manager
@@ -22,26 +22,40 @@ export default function CustomerView() {
     // Global data for the menu
     const [allPromotions, setAllPromotions] = useState<Promotion[]>([]);
     const [allPersonalizations, setAllPersonalizations] = useState<Personalization[]>([]);
+    const [allProducts, setAllProducts] = useState<Product[]>([]);
+    const [allCategories, setAllCategories] = useState<Category[]>([]);
+
+    const fetchMenuData = async () => {
+        try {
+            // Parallel data fetching for speed
+            const [appSettings, fetchedPromotions, fetchedPersonalizations, fetchedProducts, fetchedCategories] = await Promise.all([
+                getAppSettings(),
+                getPromotions(),
+                getPersonalizations(),
+                getProducts(),
+                getCategories()
+            ]);
+            setSettings(appSettings);
+            setAllPromotions(fetchedPromotions);
+            setAllPersonalizations(fetchedPersonalizations);
+            setAllProducts(fetchedProducts);
+            setAllCategories(fetchedCategories);
+        } catch (error) {
+            console.error("Failed to fetch data:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [appSettings, fetchedPromotions, fetchedPersonalizations] = await Promise.all([
-                    getAppSettings(),
-                    getPromotions(),
-                    getPersonalizations()
-                ]);
-                setSettings(appSettings);
-                setAllPromotions(fetchedPromotions);
-                setAllPersonalizations(fetchedPersonalizations);
-            } catch (error) {
-                console.error("Failed to fetch data:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchData();
+        fetchMenuData();
         
+        // Subscribe to real-time updates for the menu (Admin changes)
+        subscribeToMenuUpdates(() => {
+            console.log("Menu updated from admin, refreshing...");
+            fetchMenuData();
+        });
+
         const params = new URLSearchParams(window.location.hash.split('?')[1]);
         const table = params.get('table');
         const zone = params.get('zone');
@@ -50,6 +64,9 @@ export default function CustomerView() {
             setOrderType(OrderType.DineIn);
         }
 
+        return () => {
+            unsubscribeFromChannel();
+        };
     }, []);
 
     const handleProductClick = (product: Product) => {
@@ -227,6 +244,8 @@ export default function CustomerView() {
                             setOrderType={setOrderType}
                         />
                         <MenuList 
+                            products={allProducts}
+                            categories={allCategories}
                             onProductClick={handleProductClick} 
                             cartItems={cartItems} 
                             currency={settings.company.currency.code}
@@ -552,34 +571,22 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
     return { price: bestPrice, promotion: bestPromo };
 };
 
-const MenuList: React.FC<{onProductClick: (product: Product) => void, cartItems: CartItem[], currency: string, promotions: Promotion[]}> = ({ onProductClick, cartItems, currency, promotions }) => {
-    const [products, setProducts] = useState<Product[]>([]);
-    const [categories, setCategories] = useState<Category[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+const MenuList: React.FC<{
+    products: Product[],
+    categories: Category[],
+    onProductClick: (product: Product) => void, 
+    cartItems: CartItem[], 
+    currency: string, 
+    promotions: Promotion[]
+}> = ({ products, categories, onProductClick, cartItems, currency, promotions }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState<string>('');
     
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                setIsLoading(true);
-                const [fetchedProducts, fetchedCategories] = await Promise.all([
-                    getProducts(),
-                    getCategories()
-                ]);
-                setProducts(fetchedProducts);
-                setCategories(fetchedCategories);
-                if (fetchedCategories.length > 0) {
-                    setActiveCategory(fetchedCategories[0].id);
-                }
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchData();
-    }, []);
+        if (categories.length > 0 && !activeCategory) {
+            setActiveCategory(categories[0].id);
+        }
+    }, [categories, activeCategory]);
 
     const productQuantities = useMemo(() => {
         const quantities: { [productId: string]: number } = {};
@@ -614,10 +621,6 @@ const MenuList: React.FC<{onProductClick: (product: Product) => void, cartItems:
             window.scrollTo({ top: y, behavior: 'smooth' });
         }
     };
-
-    if (isLoading) {
-        return <div className="text-center p-10 text-gray-500 animate-pulse">Cargando menú...</div>
-    }
 
     return (
         <div className="pb-24">
@@ -921,7 +924,7 @@ const CartSummaryView: React.FC<{
         <div className="p-4 pb-40 animate-fade-in">
             <div className="space-y-4">
                 {cartItems.map(item => {
-                    const optionsTotal = (item.selectedOptions || []).reduce((acc, o: PersonalizationOption) => acc + o.price, 0);
+                    const optionsTotal = (item.selectedOptions || []).reduce((acc: number, o: PersonalizationOption) => acc + o.price, 0);
                     const itemTotal = (item.price + optionsTotal) * item.quantity;
 
                     return (
