@@ -172,6 +172,7 @@ export interface BranchSettings {
   whatsappNumber: string;
   logoUrl: string;
   coverImageUrl: string;
+  isOpen: boolean; // Global override for store status
 }
 
 export enum ShippingCostType {
