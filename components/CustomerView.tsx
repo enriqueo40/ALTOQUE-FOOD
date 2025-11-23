@@ -52,9 +52,15 @@ export default function CustomerView() {
         
         // Subscribe to real-time updates for the menu (Admin changes)
         subscribeToMenuUpdates(() => {
-            console.log("Menu updated from admin, refreshing...");
+            console.log("Menu updated from admin (Realtime), refreshing...");
             fetchMenuData();
         });
+
+        // Polling fallback: Check for updates every 30 seconds to ensure sync
+        const intervalId = setInterval(() => {
+            console.log("Auto-refreshing menu data (Polling)...");
+            fetchMenuData();
+        }, 30000);
 
         const params = new URLSearchParams(window.location.hash.split('?')[1]);
         const table = params.get('table');
@@ -66,6 +72,7 @@ export default function CustomerView() {
 
         return () => {
             unsubscribeFromChannel();
+            clearInterval(intervalId);
         };
     }, []);
 
@@ -224,7 +231,7 @@ export default function CustomerView() {
         return (
             <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-gray-300">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500 mb-4"></div>
-                <p className="animate-pulse">Cargando experiencia...</p>
+                <p className="animate-pulse">Sincronizando menú...</p>
             </div>
         );
     }
@@ -348,7 +355,12 @@ const ScheduleModal: React.FC<{ isOpen: boolean; onClose: () => void; schedule: 
                                             </div>
                                         ))
                                     ) : (
-                                        <span className="text-sm text-rose-400 font-medium">Cerrado</span>
+                                        // If it's open but no shifts, it implies 24h, otherwise closed
+                                        day.isOpen && day.shifts.length === 0 ? (
+                                            <span className="text-sm text-emerald-400 font-medium">Abierto 24h</span>
+                                        ) : (
+                                            <span className="text-sm text-rose-400 font-medium">Cerrado</span>
+                                        )
                                     )}
                                 </div>
                             </div>
@@ -386,16 +398,21 @@ const RestaurantHero: React.FC<{
         const todayName = daysOrder[now.getDay()];
         const todaySchedule = currentSchedule.days.find(d => d.day === todayName);
 
-        if (todaySchedule && todaySchedule.isOpen && todaySchedule.shifts.length > 0) {
-            const currentTime = now.getHours() * 60 + now.getMinutes();
-            const isOpen = todaySchedule.shifts.some(shift => {
-                const [startH, startM] = shift.start.split(':').map(Number);
-                const [endH, endM] = shift.end.split(':').map(Number);
-                const start = startH * 60 + startM;
-                const end = endH * 60 + endM;
-                return currentTime >= start && currentTime < end;
-            });
-            setIsOpenNow(isOpen);
+        if (todaySchedule && todaySchedule.isOpen) {
+            // If shifts exist, check time. If empty, it means 24h open (syncs with admin logic)
+            if (todaySchedule.shifts.length === 0) {
+                setIsOpenNow(true);
+            } else {
+                const currentTime = now.getHours() * 60 + now.getMinutes();
+                const isOpen = todaySchedule.shifts.some(shift => {
+                    const [startH, startM] = shift.start.split(':').map(Number);
+                    const [endH, endM] = shift.end.split(':').map(Number);
+                    const start = startH * 60 + startM;
+                    const end = endH * 60 + endM;
+                    return currentTime >= start && currentTime < end;
+                });
+                setIsOpenNow(isOpen);
+            }
         } else {
             setIsOpenNow(false);
         }
@@ -448,15 +465,7 @@ const RestaurantHero: React.FC<{
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent"></div>
                 
-                {/* Top Actions */}
-                <div className="absolute top-4 right-4 flex gap-2">
-                    <button onClick={() => setShowSchedule(true)} className="p-2 bg-black/30 backdrop-blur-md text-white rounded-full hover:bg-black/50 transition-colors shadow-sm">
-                        <IconClock className="h-5 w-5"/>
-                    </button>
-                    <button onClick={handleShare} className="p-2 bg-black/30 backdrop-blur-md text-white rounded-full hover:bg-black/50 transition-colors shadow-sm">
-                        <IconShare className="h-5 w-5"/>
-                    </button>
-                </div>
+                {/* Top Actions - Removed non-functional icons as requested */}
             </div>
 
             <div className="px-6 relative -mt-16 flex flex-col items-center text-center pb-6 border-b border-gray-800">
@@ -582,6 +591,7 @@ const MenuList: React.FC<{
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState<string>('');
     
+    // Initialize active category on load
     useEffect(() => {
         if (categories.length > 0 && !activeCategory) {
             setActiveCategory(categories[0].id);
@@ -604,12 +614,28 @@ const MenuList: React.FC<{
     }, [products, searchTerm]);
 
     const groupedProducts = useMemo(() => {
-        return categories
+        // 1. Map existing categories to their products
+        const standardGroups = categories
             .map(category => ({
                 ...category,
                 products: filteredProducts.filter(p => p.categoryId === category.id)
             }))
             .filter(category => category.products.length > 0);
+
+        // 2. Find products that do NOT belong to any valid category (orphans)
+        const categoryIds = new Set(categories.map(c => c.id));
+        const orphanedProducts = filteredProducts.filter(p => !categoryIds.has(p.categoryId));
+
+        // 3. Append orphans to an "Others" category if any exist
+        if (orphanedProducts.length > 0) {
+            standardGroups.push({
+                id: 'uncategorized',
+                name: 'Otros',
+                products: orphanedProducts
+            });
+        }
+
+        return standardGroups;
     }, [filteredProducts, categories]);
 
     const handleCategoryClick = (categoryId: string) => {
@@ -639,8 +665,9 @@ const MenuList: React.FC<{
                     </div>
                 </div>
                 
+                {/* Updated Category Nav to include 'Otros' if synthesized */}
                 <div className="flex overflow-x-auto pb-3 pt-1 px-4 gap-2 hide-scrollbar scroll-smooth">
-                    {categories.map(category => (
+                    {groupedProducts.map(category => (
                          <button 
                             key={category.id}
                             onClick={() => handleCategoryClick(category.id)}
@@ -781,17 +808,14 @@ const ProductDetailModal: React.FC<{
         return selectedOptions[pid]?.some(o => o.id === oid);
     };
 
-    // Validation for required options
-    const isValid = personalizations.every(p => {
-        const count = selectedOptions[p.id]?.length || 0;
-        return count >= (p.minSelection || 0);
-    });
+    // Validation is now optional as requested by user
+    const isValid = true; 
 
     const totalOptionsPrice = Object.values(selectedOptions).flat().reduce((acc, opt) => acc + opt.price, 0);
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
 
     const handleAdd = () => {
-        if (!isValid) return;
+        // Removed check: if (!isValid) return;
         const flatOptions = Object.values(selectedOptions).flat();
         onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptions);
     }
@@ -828,9 +852,7 @@ const ProductDetailModal: React.FC<{
                                 <div className="flex justify-between items-center mb-3">
                                     <div>
                                         <h4 className="font-bold text-white">{p.name}</h4>
-                                        {p.minSelection && p.minSelection > 0 && (
-                                            <span className="text-xs text-rose-400 font-medium uppercase tracking-wider">Obligatorio</span>
-                                        )}
+                                        {/* 'Obligatorio' label removed as requested */}
                                     </div>
                                     <span className="text-xs text-gray-400">
                                         {p.maxSelection === 1 ? 'Elige 1' : `Máx ${p.maxSelection || 'ilimitado'}`}
@@ -885,10 +907,9 @@ const ProductDetailModal: React.FC<{
                     </div>
                     <button 
                         onClick={handleAdd}
-                        disabled={!isValid}
-                        className={`w-full font-bold py-4 px-6 rounded-xl transition-all transform active:scale-[0.98] shadow-lg flex justify-between items-center ${isValid ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-900/20' : 'bg-gray-700 text-gray-400 cursor-not-allowed'}`}
+                        className="w-full font-bold py-4 px-6 rounded-xl transition-all transform active:scale-[0.98] shadow-lg flex justify-between items-center bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-900/20"
                     >
-                        <span>{isValid ? 'Agregar al pedido' : 'Selecciona opciones'}</span>
+                        <span>Agregar al pedido</span>
                         <span>${totalPrice.toFixed(2)}</span>
                     </button>
                 </div>
@@ -925,7 +946,7 @@ const CartSummaryView: React.FC<{
             <div className="space-y-4">
                 {cartItems.map(item => {
                     const options: PersonalizationOption[] = item.selectedOptions || [];
-                    const optionsTotal = options.reduce((acc, o) => acc + o.price, 0);
+                    const optionsTotal = options.reduce((acc, o: PersonalizationOption) => acc + o.price, 0);
                     const itemTotal = (item.price + optionsTotal) * item.quantity;
 
                     return (
