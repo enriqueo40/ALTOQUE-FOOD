@@ -946,7 +946,7 @@ const CartSummaryView: React.FC<{
             <div className="space-y-4">
                 {cartItems.map(item => {
                     const options: PersonalizationOption[] = item.selectedOptions || [];
-                    const optionsTotal = options.reduce((acc, o: PersonalizationOption) => acc + o.price, 0);
+                    const optionsTotal = options.reduce((acc: number, o: PersonalizationOption) => acc + o.price, 0);
                     const itemTotal = (item.price + optionsTotal) * item.quantity;
 
                     return (
