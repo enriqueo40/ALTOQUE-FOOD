@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
@@ -974,7 +973,7 @@ const CartSummaryView: React.FC<{
             <div className="space-y-4">
                 {cartItems.map(item => {
                     const options: PersonalizationOption[] = item.selectedOptions || [];
-                    const optionsTotal = options.reduce((acc: number, o: PersonalizationOption) => acc + o.price, 0);
+                    const optionsTotal = options.reduce((acc: number, o: any) => acc + o.price, 0);
                     const itemTotal = (item.price + optionsTotal) * item.quantity;
 
                     return (
@@ -1036,7 +1035,7 @@ const CartSummaryView: React.FC<{
 
 const CheckoutView: React.FC<{
     cartTotal: number, 
-    onPlaceOrder: (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number, gpsLocation?: string) => void, 
+    onPlaceOrder: (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number) => void, 
     settings: AppSettings, 
     orderType: OrderType 
 }> = ({ cartTotal, onPlaceOrder, settings, orderType }) => {
@@ -1044,8 +1043,6 @@ const CheckoutView: React.FC<{
         name: '', phone: '', address: { colonia: '', calle: '', numero: '', entreCalles: '', referencias: '' }
     });
     const [tipAmount, setTipAmount] = useState(0);
-    const [isGettingLocation, setIsGettingLocation] = useState(false);
-    const [gpsLocation, setGpsLocation] = useState<{lat: number, lng: number, link: string} | null>(null);
     
     const isDelivery = orderType === OrderType.Delivery;
     const isPickup = orderType === OrderType.TakeAway;
@@ -1072,30 +1069,7 @@ const CheckoutView: React.FC<{
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onPlaceOrder(customer, selectedPaymentMethod, tipAmount, gpsLocation?.link);
-    };
-
-    const handleGetLocation = () => {
-        if (!navigator.geolocation) {
-            alert("Tu navegador no soporta la geolocalización.");
-            return;
-        }
-
-        setIsGettingLocation(true);
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
-                const link = `https://www.google.com/maps?q=${latitude},${longitude}`;
-                setGpsLocation({ lat: latitude, lng: longitude, link });
-                setIsGettingLocation(false);
-            },
-            (error) => {
-                console.error(error);
-                alert("No se pudo obtener tu ubicación. Por favor, ingrésala manualmente.");
-                setIsGettingLocation(false);
-            },
-            { enableHighAccuracy: true }
-        );
+        onPlaceOrder(customer, selectedPaymentMethod, tipAmount);
     };
 
     const inputClasses = "w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-gray-500 transition-all";
@@ -1123,58 +1097,23 @@ const CheckoutView: React.FC<{
             {isDelivery && (
                 <div className="space-y-4 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
                     <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Entrega</h3>
-                    
-                    {gpsLocation ? (
-                        <div className="bg-emerald-900/20 border border-emerald-500/50 p-4 rounded-xl flex items-center gap-3 mb-4">
-                            <div className="bg-emerald-500 p-2 rounded-full text-white">
-                                <IconCheck className="h-5 w-5" />
-                            </div>
-                            <div className="flex-1">
-                                <p className="font-bold text-emerald-400 text-sm">Ubicación adjunta con precisión GPS</p>
-                                <a href={gpsLocation.link} target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-300/80 hover:underline truncate block max-w-[200px]">Ver en mapa</a>
-                            </div>
-                            <button type="button" onClick={() => setGpsLocation(null)} className="text-gray-400 hover:text-white p-2">
-                                <IconX className="h-5 w-5"/>
-                            </button>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="col-span-2">
+                            <label className={labelClasses}>Calle</label>
+                            <input type="text" name="calle" value={customer.address.calle} onChange={handleAddressChange} className={inputClasses} required />
                         </div>
-                    ) : (
-                        <button 
-                            type="button" 
-                            onClick={handleGetLocation} 
-                            disabled={isGettingLocation}
-                            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-colors mb-4"
-                        >
-                            {isGettingLocation ? (
-                                <span className="animate-pulse">Obteniendo ubicación...</span>
-                            ) : (
-                                <>
-                                    <IconMap className="h-5 w-5" />
-                                    📍 Usar mi ubicación actual
-                                </>
-                            )}
-                        </button>
-                    )}
-
-                    {!gpsLocation && (
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="col-span-2">
-                                <label className={labelClasses}>Calle</label>
-                                <input type="text" name="calle" value={customer.address.calle} onChange={handleAddressChange} className={inputClasses} required={!gpsLocation} />
-                            </div>
-                            <div>
-                                <label className={labelClasses}>Número Ext.</label>
-                                <input type="text" name="numero" value={customer.address.numero} onChange={handleAddressChange} className={inputClasses} required={!gpsLocation} />
-                            </div>
-                            <div>
-                                <label className={labelClasses}>Colonia</label>
-                                <input type="text" name="colonia" value={customer.address.colonia} onChange={handleAddressChange} className={inputClasses} required={!gpsLocation} />
-                            </div>
+                        <div>
+                            <label className={labelClasses}>Número Ext.</label>
+                            <input type="text" name="numero" value={customer.address.numero} onChange={handleAddressChange} className={inputClasses} required />
                         </div>
-                    )}
-                    
+                         <div>
+                            <label className={labelClasses}>Colonia</label>
+                            <input type="text" name="colonia" value={customer.address.colonia} onChange={handleAddressChange} className={inputClasses} required />
+                        </div>
+                    </div>
                     <div>
-                        <label className={labelClasses}>Referencias <span className="font-normal text-gray-500 text-xs">(Color de casa, portón, etc.)</span></label>
-                        <input type="text" name="referencias" value={customer.address.referencias} onChange={handleAddressChange} className={inputClasses} placeholder="Ej. Casa azul, portón negro" />
+                        <label className={labelClasses}>Referencias <span className="font-normal text-gray-500 text-xs">(Opcional)</span></label>
+                        <input type="text" name="referencias" value={customer.address.referencias} onChange={handleAddressChange} className={inputClasses} placeholder="Color de casa, portón, etc." />
                     </div>
                 </div>
             )}
