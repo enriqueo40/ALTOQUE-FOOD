@@ -52,9 +52,15 @@ export default function CustomerView() {
         
         // Subscribe to real-time updates for the menu (Admin changes)
         subscribeToMenuUpdates(() => {
-            console.log("Menu updated from admin, refreshing...");
+            console.log("Menu updated from admin (Realtime), refreshing...");
             fetchMenuData();
         });
+
+        // Polling fallback: Check for updates every 30 seconds to ensure sync
+        const intervalId = setInterval(() => {
+            console.log("Auto-refreshing menu data (Polling)...");
+            fetchMenuData();
+        }, 30000);
 
         const params = new URLSearchParams(window.location.hash.split('?')[1]);
         const table = params.get('table');
@@ -66,6 +72,7 @@ export default function CustomerView() {
 
         return () => {
             unsubscribeFromChannel();
+            clearInterval(intervalId);
         };
     }, []);
 
@@ -224,7 +231,7 @@ export default function CustomerView() {
         return (
             <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-gray-300">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500 mb-4"></div>
-                <p className="animate-pulse">Cargando experiencia...</p>
+                <p className="animate-pulse">Sincronizando menú...</p>
             </div>
         );
     }
@@ -582,6 +589,7 @@ const MenuList: React.FC<{
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState<string>('');
     
+    // Initialize active category on load
     useEffect(() => {
         if (categories.length > 0 && !activeCategory) {
             setActiveCategory(categories[0].id);
@@ -604,12 +612,28 @@ const MenuList: React.FC<{
     }, [products, searchTerm]);
 
     const groupedProducts = useMemo(() => {
-        return categories
+        // 1. Map existing categories to their products
+        const standardGroups = categories
             .map(category => ({
                 ...category,
                 products: filteredProducts.filter(p => p.categoryId === category.id)
             }))
             .filter(category => category.products.length > 0);
+
+        // 2. Find products that do NOT belong to any valid category (orphans)
+        const categoryIds = new Set(categories.map(c => c.id));
+        const orphanedProducts = filteredProducts.filter(p => !categoryIds.has(p.categoryId));
+
+        // 3. Append orphans to an "Others" category if any exist
+        if (orphanedProducts.length > 0) {
+            standardGroups.push({
+                id: 'uncategorized',
+                name: 'Otros',
+                products: orphanedProducts
+            });
+        }
+
+        return standardGroups;
     }, [filteredProducts, categories]);
 
     const handleCategoryClick = (categoryId: string) => {
@@ -639,8 +663,9 @@ const MenuList: React.FC<{
                     </div>
                 </div>
                 
+                {/* Updated Category Nav to include 'Otros' if synthesized */}
                 <div className="flex overflow-x-auto pb-3 pt-1 px-4 gap-2 hide-scrollbar scroll-smooth">
-                    {categories.map(category => (
+                    {groupedProducts.map(category => (
                          <button 
                             key={category.id}
                             onClick={() => handleCategoryClick(category.id)}
@@ -924,7 +949,8 @@ const CartSummaryView: React.FC<{
         <div className="p-4 pb-40 animate-fade-in">
             <div className="space-y-4">
                 {cartItems.map(item => {
-                    const optionsTotal = (item.selectedOptions || []).reduce((acc: number, o: PersonalizationOption) => acc + o.price, 0);
+                    const options: PersonalizationOption[] = item.selectedOptions || [];
+                    const optionsTotal = options.reduce((acc, o) => acc + o.price, 0);
                     const itemTotal = (item.price + optionsTotal) * item.quantity;
 
                     return (

@@ -924,7 +924,8 @@ const CartSummaryView: React.FC<{
         <div className="p-4 pb-40 animate-fade-in">
             <div className="space-y-4">
                 {cartItems.map(item => {
-                    const optionsTotal = (item.selectedOptions || []).reduce((acc: number, o: PersonalizationOption) => acc + o.price, 0);
+                    const options: PersonalizationOption[] = item.selectedOptions || [];
+                    const optionsTotal = options.reduce((acc, o) => acc + o.price, 0);
                     const itemTotal = (item.price + optionsTotal) * item.quantity;
 
                     return (
