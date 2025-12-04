@@ -810,7 +810,7 @@ const ProductDetailModal: React.FC<{
     // Validation is now optional as requested by user
     const isValid = true; 
 
-    const totalOptionsPrice = Object.values(selectedOptions).reduce((acc, opts) => acc + opts.reduce((sum, opt) => sum + opt.price, 0), 0);
+    const totalOptionsPrice = Object.values(selectedOptions).flat().reduce((acc, opt) => acc + opt.price, 0);
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
 
     const handleAdd = () => {
@@ -945,7 +945,7 @@ const CartSummaryView: React.FC<{
             <div className="space-y-4">
                 {cartItems.map(item => {
                     const options: PersonalizationOption[] = item.selectedOptions || [];
-                    const optionsTotal = options.reduce((acc: number, o: PersonalizationOption) => acc + o.price, 0);
+                    const optionsTotal = options.reduce((acc: number, o: any) => acc + o.price, 0);
                     const itemTotal = (item.price + optionsTotal) * item.quantity;
 
                     return (

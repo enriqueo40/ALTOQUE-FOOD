@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
@@ -578,12 +579,7 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
     // Filter active promotions
     const activePromotions = promotions.filter(p => {
         if (p.startDate && new Date(p.startDate) > now) return false;
-        if (p.endDate) {
-            // Ensure end date includes the full day
-            const end = new Date(p.endDate);
-            end.setHours(23, 59, 59, 999);
-            if (end < now) return false;
-        }
+        if (p.endDate && new Date(p.endDate) < now) return false;
         
         if (p.appliesTo === PromotionAppliesTo.AllProducts) return true;
         return p.productIds.includes(product.id);
@@ -762,7 +758,7 @@ const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: 
     return (
         <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group relative overflow-hidden">
             {hasDiscount && (
-                <div className="absolute top-0 left-0 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-br-lg z-10 shadow-md">
+                <div className="absolute top-0 left-0 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-br-lg z-10">
                     -{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}
                 </div>
             )}
@@ -843,8 +839,7 @@ const ProductDetailModal: React.FC<{
     // Validation is now optional as requested by user
     const isValid = true; 
 
-    // Fix: Avoid .flat() if potentially problematic with typing and prefer nested reduce for clarity.
-    const totalOptionsPrice = Object.values(selectedOptions).reduce((acc, opts) => acc + opts.reduce((sum, opt) => sum + opt.price, 0), 0);
+    const totalOptionsPrice = Object.values(selectedOptions).flat().reduce((acc: number, opt: PersonalizationOption) => acc + opt.price, 0);
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
 
     const handleAdd = () => {
@@ -868,21 +863,14 @@ const ProductDetailModal: React.FC<{
                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover rounded-t-3xl sm:rounded-t-2xl" />
                      <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent h-full w-full pointer-events-none"></div>
                      {promotion && (
-                        <div className="absolute bottom-4 left-6 flex flex-col items-start">
-                            <div className="bg-rose-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg mb-1 animate-pulse">
-                                ¡Oferta Especial!
-                            </div>
-                            <div className="text-white text-xs font-medium bg-black/50 px-2 py-0.5 rounded backdrop-blur-sm">
-                                Ahorras ${((product.price + totalOptionsPrice) * quantity - totalPrice).toFixed(2)} / total
-                            </div>
+                        <div className="absolute bottom-12 left-6 bg-rose-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg">
+                            ¡Oferta Especial!
                         </div>
                      )}
                 </div>
 
-                <div className="p-6 flex-grow overflow-y-auto relative z-10">
-                    <div className="flex justify-between items-start mb-2">
-                        <h2 className="text-3xl font-bold text-white">{product.name}</h2>
-                    </div>
+                <div className="p-6 flex-grow overflow-y-auto -mt-12 relative z-10">
+                    <h2 className="text-3xl font-bold text-white mb-2">{product.name}</h2>
                     <p className="text-gray-300 leading-relaxed mb-6">{product.description}</p>
                     
                     {/* Personalizations */}
@@ -892,6 +880,7 @@ const ProductDetailModal: React.FC<{
                                 <div className="flex justify-between items-center mb-3">
                                     <div>
                                         <h4 className="font-bold text-white">{p.name}</h4>
+                                        {/* 'Obligatorio' label removed as requested */}
                                     </div>
                                     <span className="text-xs text-gray-400">
                                         {p.maxSelection === 1 ? 'Elige 1' : `Máx ${p.maxSelection || 'ilimitado'}`}
@@ -939,417 +928,4 @@ const ProductDetailModal: React.FC<{
                     <div className="flex items-center justify-between gap-4 mb-4">
                          <span className="text-gray-400 font-medium">Cantidad</span>
                          <div className="flex items-center gap-6 bg-gray-800 rounded-full px-2 py-1 border border-gray-700">
-                            <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="p-2 rounded-full hover:bg-gray-700 text-white transition-colors"><IconMinus className="h-5 w-5"/></button>
-                            <span className="font-bold text-xl text-white w-6 text-center">{quantity}</span>
-                            <button onClick={() => setQuantity(q => q + 1)} className="p-2 rounded-full hover:bg-gray-700 text-white transition-colors"><IconPlus className="h-5 w-5"/></button>
-                        </div>
-                    </div>
-                    <button 
-                        onClick={handleAdd}
-                        className="w-full font-bold py-4 px-6 rounded-xl transition-all transform active:scale-[0.98] shadow-lg flex justify-between items-center bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-900/20"
-                    >
-                        <span>Agregar al pedido</span>
-                        <div className="flex flex-col items-end leading-none">
-                            <span>${totalPrice.toFixed(2)}</span>
-                        </div>
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-const CartSummaryView: React.FC<{
-    cartItems: CartItem[], 
-    cartTotal: number,
-    onUpdateQuantity: (id: string, q: number) => void, 
-    onRemoveItem: (id: string) => void,
-    generalComments: string,
-    onGeneralCommentsChange: (c: string) => void,
-    onProceedToCheckout: () => void
-}> = ({ cartItems, cartTotal, onUpdateQuantity, onRemoveItem, generalComments, onGeneralCommentsChange, onProceedToCheckout }) => {
-    
-    if (cartItems.length === 0) {
-        return (
-            <div className="p-8 text-center h-[calc(100vh-80px)] flex flex-col items-center justify-center text-gray-400">
-                 <div className="w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center mb-6">
-                    <IconClock className="h-10 w-10 opacity-50" />
-                 </div>
-                 <h2 className="text-2xl font-bold mb-2 text-white">Tu carrito está vacío</h2>
-                 <p className="mb-8">¿Hambre? Explora nuestro menú y encuentra algo delicioso.</p>
-                 <button onClick={() => window.history.back()} className="px-6 py-3 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-colors">Ir al Menú</button>
-            </div>
-        )
-    }
-
-    return (
-        <div className="p-4 pb-40 animate-fade-in">
-            <div className="space-y-4">
-                {cartItems.map(item => {
-                    const options: PersonalizationOption[] = item.selectedOptions || [];
-                    // Fix: Explicitly type 'o' as PersonalizationOption to avoid 'any'/'unknown' issues.
-                    const optionsTotal = options.reduce((acc: number, o: PersonalizationOption) => acc + o.price, 0);
-                    const itemTotal = (item.price + optionsTotal) * item.quantity;
-
-                    return (
-                        <div key={item.cartItemId} className="flex gap-4 bg-gray-800/50 p-3 rounded-xl border border-gray-800">
-                            <img src={item.imageUrl} alt={item.name} className="w-20 h-20 rounded-lg object-cover"/>
-                            <div className="flex-grow flex flex-col justify-between">
-                                <div className="flex justify-between items-start">
-                                    <h3 className="font-bold text-gray-100">{item.name}</h3>
-                                    <p className="font-bold text-emerald-400">${itemTotal.toFixed(2)}</p>
-                                </div>
-                                {item.selectedOptions && item.selectedOptions.length > 0 && (
-                                    <div className="flex flex-wrap gap-1 mt-1 mb-1">
-                                        {item.selectedOptions.map((opt, idx) => (
-                                            <span key={idx} className="text-xs text-gray-400 bg-gray-700/50 px-2 py-0.5 rounded-md border border-gray-700">
-                                                {opt.name}
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
-                                {item.comments && <p className="text-xs text-gray-400 italic line-clamp-1">"{item.comments}"</p>}
-                                
-                                <div className="flex items-center justify-between mt-2">
-                                    <div className="flex items-center gap-3 bg-gray-800 rounded-lg px-1 border border-gray-700">
-                                        <button onClick={() => item.quantity > 1 ? onUpdateQuantity(item.cartItemId, item.quantity - 1) : onRemoveItem(item.cartItemId)} className="p-1.5 text-gray-300 hover:text-white"><IconMinus className="h-4 w-4"/></button>
-                                        <span className="font-bold w-4 text-center text-sm text-white">{item.quantity}</span>
-                                        <button onClick={() => onUpdateQuantity(item.cartItemId, item.quantity + 1)} className="p-1.5 text-gray-300 hover:text-white"><IconPlus className="h-4 w-4"/></button>
-                                    </div>
-                                    <button onClick={() => onRemoveItem(item.cartItemId)} className="text-gray-500 hover:text-red-400 p-2"><IconTrash className="h-5 w-5"/></button>
-                                </div>
-                            </div>
-                        </div>
-                    )
-                })}
-            </div>
-            
-             <div className="mt-8">
-                <label className="font-bold text-gray-300 block mb-2">Comentarios generales</label>
-                <textarea 
-                    value={generalComments}
-                    onChange={(e) => onGeneralCommentsChange(e.target.value)}
-                    rows={2}
-                    className="w-full p-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    placeholder="¿Algo más que debamos saber?"
-                />
-            </div>
-
-             <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-gray-900 border-t border-gray-800 shadow-2xl p-4 safe-bottom z-30">
-                <div className="flex justify-between items-center mb-4 px-2">
-                    <span className="text-gray-400">Total estimado</span>
-                    <span className="font-bold text-2xl text-white">${cartTotal.toFixed(2)}</span>
-                </div>
-                 <button onClick={onProceedToCheckout} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 px-6 rounded-xl shadow-lg shadow-emerald-900/20 transition-all transform active:scale-[0.98]">
-                    Continuar
-                </button>
-            </div>
-        </div>
-    )
-}
-
-const CheckoutView: React.FC<{
-    cartTotal: number, 
-    onPlaceOrder: (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number, gpsLocation?: string) => void, 
-    settings: AppSettings, 
-    orderType: OrderType 
-}> = ({ cartTotal, onPlaceOrder, settings, orderType }) => {
-    const [customer, setCustomer] = useState<Customer>({
-        name: '', phone: '', address: { colonia: '', calle: '', numero: '', entreCalles: '', referencias: '' }
-    });
-    const [tipAmount, setTipAmount] = useState(0);
-    const [gpsLocation, setGpsLocation] = useState<string | null>(null);
-    const [isGettingLocation, setIsGettingLocation] = useState(false);
-    
-    const isDelivery = orderType === OrderType.Delivery;
-    const isPickup = orderType === OrderType.TakeAway;
-    const isDineIn = orderType === OrderType.DineIn;
-
-    // Determine available payment methods
-    const availablePaymentMethods = isDelivery 
-        ? settings.payment.deliveryMethods 
-        : settings.payment.pickupMethods;
-
-    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>(availablePaymentMethods[0] || 'Efectivo');
-
-    const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        setCustomer(prev => ({
-            ...prev,
-            address: { ...prev.address, [name]: value }
-        }));
-    };
-
-    const handleGetLocation = () => {
-        if (!navigator.geolocation) {
-            alert("La geolocalización no es compatible con este navegador.");
-            return;
-        }
-        setIsGettingLocation(true);
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
-                const mapLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
-                setGpsLocation(mapLink);
-                setIsGettingLocation(false);
-            },
-            (error) => {
-                console.error("Error getting location:", error);
-                alert("No se pudo obtener la ubicación. Por favor ingrésala manualmente.");
-                setIsGettingLocation(false);
-            },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
-    };
-
-    const handleTipSelection = (percentage: number) => {
-        setTipAmount(cartTotal * (percentage / 100));
-    };
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        // If delivery and no GPS and no manual address (validation check)
-        if (isDelivery && !gpsLocation && (!customer.address.calle || !customer.address.colonia)) {
-             // If standard validation passes, this might be redundant, but serves as extra check
-        }
-        onPlaceOrder(customer, selectedPaymentMethod, tipAmount, gpsLocation || undefined);
-    };
-
-    const inputClasses = "w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-gray-500 transition-all";
-    const labelClasses = "text-sm font-bold text-gray-400 mb-1 block";
-
-    const shippingCost = (isDelivery && settings.shipping.costType === ShippingCostType.Fixed) ? (settings.shipping.fixedCost ?? 0) : 0;
-    const finalTotal = cartTotal + shippingCost + tipAmount;
-    
-    return (
-        <form onSubmit={handleSubmit} className="p-4 space-y-6 pb-44 animate-fade-in">
-            <div className="space-y-4 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
-                <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Tus datos</h3>
-                <div>
-                    <label className={labelClasses}>Nombre</label>
-                    <input type="text" value={customer.name} onChange={e => setCustomer(c => ({...c, name: e.target.value}))} className={inputClasses} placeholder="Tu nombre completo" required />
-                </div>
-                 {!isDineIn && (
-                    <div>
-                        <label className={labelClasses}>Número telefónico</label>
-                        <input type="tel" value={customer.phone} onChange={e => setCustomer(c => ({...c, phone: e.target.value}))} className={inputClasses} placeholder="WhatsApp o celular" required />
-                    </div>
-                )}
-            </div>
-
-            {isDelivery && (
-                <div className="space-y-4 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
-                    <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Entrega</h3>
-                    
-                    {/* GPS Location Option */}
-                    <div className="mb-4">
-                        {!gpsLocation ? (
-                            <button 
-                                type="button"
-                                onClick={handleGetLocation}
-                                disabled={isGettingLocation}
-                                className="w-full py-3 bg-blue-600/20 border border-blue-500/50 text-blue-400 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-600/30 transition-colors"
-                            >
-                                {isGettingLocation ? (
-                                    <span className="animate-pulse">Obteniendo ubicación...</span>
-                                ) : (
-                                    <>
-                                        <IconLocationMarker className="h-5 w-5" /> 
-                                        📍 Usar ubicación actual (GPS)
-                                    </>
-                                )}
-                            </button>
-                        ) : (
-                            <div className="p-4 bg-green-900/20 border border-green-500/50 rounded-xl flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-green-500 p-2 rounded-full text-white">
-                                        <IconCheck className="h-4 w-4" />
-                                    </div>
-                                    <div>
-                                        <p className="font-bold text-green-400 text-sm">Ubicación GPS adjunta</p>
-                                        <p className="text-xs text-green-300/70">Precisión mejorada para repartidores</p>
-                                    </div>
-                                </div>
-                                <button 
-                                    type="button" 
-                                    onClick={() => setGpsLocation(null)}
-                                    className="text-xs text-gray-400 hover:text-white underline"
-                                >
-                                    Cambiar
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Manual Fields - Optional if GPS is set? Let's keep them but maybe simplify or label differently */}
-                    {!gpsLocation && (
-                        <div className="grid grid-cols-2 gap-4 animate-fade-in">
-                            <div className="col-span-2">
-                                <label className={labelClasses}>Calle</label>
-                                <input type="text" name="calle" value={customer.address.calle} onChange={handleAddressChange} className={inputClasses} required={!gpsLocation} />
-                            </div>
-                            <div>
-                                <label className={labelClasses}>Número Ext.</label>
-                                <input type="text" name="numero" value={customer.address.numero} onChange={handleAddressChange} className={inputClasses} required={!gpsLocation} />
-                            </div>
-                            <div>
-                                <label className={labelClasses}>Colonia</label>
-                                <input type="text" name="colonia" value={customer.address.colonia} onChange={handleAddressChange} className={inputClasses} required={!gpsLocation} />
-                            </div>
-                        </div>
-                    )}
-
-                    <div>
-                        <label className={labelClasses}>Referencias <span className="font-normal text-gray-500 text-xs">(Color de casa, portón, etc)</span></label>
-                        <input type="text" name="referencias" value={customer.address.referencias} onChange={handleAddressChange} className={inputClasses} placeholder="Ej. Portón negro, frente al parque..." />
-                    </div>
-                </div>
-            )}
-            
-            {isPickup && (
-                 <div className="p-5 bg-emerald-900/20 border border-emerald-800/50 rounded-2xl text-center">
-                    <IconStore className="h-10 w-10 text-emerald-500 mx-auto mb-2"/>
-                    <h3 className="font-bold text-white">Recoger en Tienda</h3>
-                    <p className="text-sm text-gray-400 mt-1">No olvides pasar a recoger tu pedido.</p>
-                    <p className="text-sm text-gray-400 mt-1 font-medium">{settings.branch.fullAddress}</p>
-                </div>
-            )}
-
-            {settings.payment.showTipField && (
-                <div className="space-y-3 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
-                    <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Propina para el equipo</h3>
-                    <div className="flex gap-2">
-                        {[10, 15, 20].map(pct => (
-                            <button 
-                                key={pct}
-                                type="button" 
-                                onClick={() => handleTipSelection(pct)}
-                                className={`flex-1 py-2 rounded-lg font-bold text-sm border transition-all ${Math.abs(tipAmount - (cartTotal * pct / 100)) < 0.1 ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-gray-800 border-gray-600 text-gray-300 hover:border-gray-500'}`}
-                            >
-                                {pct}%
-                            </button>
-                        ))}
-                        <div className="flex-1 relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
-                            <input 
-                                type="number" 
-                                placeholder="Otro" 
-                                value={tipAmount || ''}
-                                onChange={(e) => setTipAmount(parseFloat(e.target.value) || 0)}
-                                className="w-full py-2 pl-6 pr-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:border-emerald-500 outline-none"
-                            />
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <div className="space-y-3 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
-                 <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Pago</h3>
-                 <div className="space-y-2 pt-2">
-                    {availablePaymentMethods.map(method => (
-                        <div key={method}>
-                            <label className={`flex justify-between items-center p-4 rounded-xl cursor-pointer transition-all border ${selectedPaymentMethod === method ? 'bg-emerald-900/20 border-emerald-500 ring-1 ring-emerald-500 shadow-lg shadow-emerald-900/10' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}>
-                                <span className={`font-medium ${selectedPaymentMethod === method ? 'text-emerald-400' : 'text-white'}`}>{method}</span>
-                                <input type="radio" name="payment" value={method} checked={selectedPaymentMethod === method} onChange={() => setSelectedPaymentMethod(method)} className="h-5 w-5 accent-emerald-500" />
-                            </label>
-                            
-                            {/* Detailed Payment Info Display */}
-                            {selectedPaymentMethod === method && method === 'Pago Móvil' && settings.payment.pagoMovil && (
-                                <div className="mt-2 p-4 bg-gray-700/50 rounded-xl border border-gray-600 animate-fade-in">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <h4 className="text-emerald-400 font-bold text-sm uppercase">Datos Pago Móvil</h4>
-                                        <button type="button" onClick={() => {
-                                            const text = `Banco: ${settings.payment.pagoMovil?.bank}\nTel: ${settings.payment.pagoMovil?.phone}\nCI/RIF: ${settings.payment.pagoMovil?.idNumber}`;
-                                            navigator.clipboard.writeText(text);
-                                            alert('Datos copiados');
-                                        }} className="text-xs text-gray-400 hover:text-white flex items-center gap-1"><IconDuplicate className="h-3 w-3"/> Copiar</button>
-                                    </div>
-                                    <div className="text-sm text-gray-200 space-y-1 font-mono">
-                                        <p><span className="text-gray-500">Banco:</span> {settings.payment.pagoMovil.bank}</p>
-                                        <p><span className="text-gray-500">Teléfono:</span> {settings.payment.pagoMovil.phone}</p>
-                                        <p><span className="text-gray-500">Cédula/RIF:</span> {settings.payment.pagoMovil.idNumber}</p>
-                                    </div>
-                                </div>
-                            )}
-
-                            {selectedPaymentMethod === method && method === 'Transferencia' && settings.payment.transfer && (
-                                <div className="mt-2 p-4 bg-gray-700/50 rounded-xl border border-gray-600 animate-fade-in">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <h4 className="text-emerald-400 font-bold text-sm uppercase">Datos Transferencia</h4>
-                                        <button type="button" onClick={() => {
-                                            const text = `Banco: ${settings.payment.transfer?.bank}\nCuenta: ${settings.payment.transfer?.accountNumber}\nTitular: ${settings.payment.transfer?.accountHolder}\nCI/RIF: ${settings.payment.transfer?.idNumber}`;
-                                            navigator.clipboard.writeText(text);
-                                            alert('Datos copiados');
-                                        }} className="text-xs text-gray-400 hover:text-white flex items-center gap-1"><IconDuplicate className="h-3 w-3"/> Copiar</button>
-                                    </div>
-                                    <div className="text-sm text-gray-200 space-y-1 font-mono">
-                                        <p><span className="text-gray-500">Banco:</span> {settings.payment.transfer.bank}</p>
-                                        <p><span className="text-gray-500">Cuenta:</span> {settings.payment.transfer.accountNumber}</p>
-                                        <p><span className="text-gray-500">Titular:</span> {settings.payment.transfer.accountHolder}</p>
-                                        <p><span className="text-gray-500">CI/RIF:</span> {settings.payment.transfer.idNumber}</p>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                 </div>
-            </div>
-            
-            <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-gray-900 border-t border-gray-800 shadow-2xl p-4 safe-bottom z-30">
-                <div className="space-y-2 mb-4 text-sm px-2">
-                     <div className="flex justify-between text-gray-400">
-                        <span>Subtotal</span>
-                        <span>${cartTotal.toFixed(2)}</span>
-                    </div>
-                    {isDelivery && (
-                        <div className="flex justify-between text-gray-400">
-                            <span>Envío</span>
-                            <span>{shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : "Por cotizar"}</span>
-                        </div>
-                    )}
-                    {tipAmount > 0 && (
-                        <div className="flex justify-between text-emerald-400">
-                            <span>Propina</span>
-                            <span>${tipAmount.toFixed(2)}</span>
-                        </div>
-                    )}
-                     <div className="flex justify-between font-bold text-xl text-white pt-2 border-t border-gray-800">
-                        <span>Total</span>
-                        <span>${finalTotal.toFixed(2)} {isDelivery && shippingCost === 0 && "+ envío"}</span>
-                    </div>
-                </div>
-                 <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 px-6 rounded-xl shadow-lg flex items-center justify-center gap-3 transition-all transform active:scale-[0.98]">
-                    <IconWhatsapp className="h-6 w-6" />
-                    Realizar Pedido
-                </button>
-            </div>
-        </form>
-    )
-}
-
-const OrderConfirmation: React.FC<{ onNewOrder: () => void, settings: AppSettings }> = ({ onNewOrder, settings }) => (
-    <div className="p-6 text-center flex flex-col items-center justify-center h-[80vh] animate-fade-in">
-        <div className="w-24 h-24 bg-emerald-500/20 rounded-full flex items-center justify-center mb-6">
-            <svg className="w-12 h-12 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-        </div>
-        <h3 className="text-3xl font-bold mb-3 text-white">¡Pedido Enviado!</h3>
-        <p className="text-gray-400 mb-8 text-lg leading-relaxed">Te redirigimos a WhatsApp con los detalles de tu orden. El equipo de {settings.company.name} confirmará tu pedido en breve.</p>
-        <button onClick={onNewOrder} className="w-full max-w-xs bg-gray-800 text-white py-4 rounded-xl font-bold hover:bg-gray-700 transition-colors border border-gray-700">
-            Volver al Inicio
-        </button>
-    </div>
-);
-
-const FooterBar: React.FC<{ itemCount: number, cartTotal: number, onViewCart: () => void }> = ({ itemCount, cartTotal, onViewCart }) => {
-    return (
-         <footer className="fixed bottom-4 left-4 right-4 max-w-md mx-auto z-20 animate-slide-up">
-            <button onClick={onViewCart} className="w-full bg-emerald-500 text-white font-bold py-4 px-6 rounded-2xl flex justify-between items-center shadow-2xl shadow-emerald-900/50 hover:bg-emerald-400 transition-transform hover:-translate-y-1 active:translate-y-0">
-                <div className="flex items-center gap-3">
-                    <div className="bg-emerald-700/50 px-3 py-1 rounded-lg text-sm font-extrabold border border-emerald-400/30">{itemCount}</div>
-                    <span>Ver Pedido</span>
-                </div>
-                <span className="text-lg">${cartTotal.toFixed(2)}</span>
-            </button>
-        </footer>
-    );
-};
+                            <button onClick={() => setQuantity(q => Math.max(1, q

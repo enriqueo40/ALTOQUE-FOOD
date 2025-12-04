@@ -48,7 +48,6 @@ export interface Address {
     numero: string;
     entreCalles?: string;
     referencias?: string;
-    googleMapsLink?: string; // New field for GPS location
 }
 
 export interface Customer {
