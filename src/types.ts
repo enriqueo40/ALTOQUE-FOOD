@@ -1,5 +1,3 @@
-
-
 export interface Product {
     id: string;
     name: string;
@@ -48,6 +46,7 @@ export interface Address {
     numero: string;
     entreCalles?: string;
     referencias?: string;
+    googleMapsLink?: string;
 }
 
 export interface Customer {
@@ -61,8 +60,8 @@ export interface Order {
     items: CartItem[];
     customer: Customer;
     status: OrderStatus;
-    paymentStatus?: PaymentStatus; 
-    paymentProof?: string; // Base64 string of the screenshot
+    paymentStatus?: PaymentStatus;
+    paymentProof?: string;
     total: number;
     createdAt: Date;
     branchId: string;
@@ -134,12 +133,12 @@ export interface Promotion {
 
 export interface Table {
     id: string;
-    name: string; 
+    name: string;
     zoneId: string;
-    row: number; 
-    col: number; 
-    width: number; 
-    height: number; 
+    row: number;
+    col: number;
+    width: number;
+    height: number;
     shape: 'square' | 'round';
     status: 'available' | 'occupied';
     created_at?: string;
@@ -172,7 +171,6 @@ export interface BranchSettings {
   whatsappNumber: string;
   logoUrl: string;
   coverImageUrl: string;
-  isOpen: boolean; // Global override for store status
 }
 
 export enum ShippingCostType {
@@ -195,7 +193,7 @@ export interface ShippingSettings {
   };
 }
 
-export type PaymentMethod = 'Efectivo' | 'Pago Móvil' | 'Transferencia' | 'Zelle' | 'Punto de Venta' | 'Pago con tarjeta';
+export type PaymentMethod = 'Efectivo' | 'Pago con tarjeta' | 'Transferencia' | 'Pago Móvil' | 'Zelle' | 'Punto de Venta';
 
 export interface PagoMovilDetails {
     bank: string;
