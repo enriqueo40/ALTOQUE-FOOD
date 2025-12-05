@@ -578,7 +578,11 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
     // Filter active promotions
     const activePromotions = promotions.filter(p => {
         if (p.startDate && new Date(p.startDate) > now) return false;
-        if (p.endDate && new Date(p.endDate) < now) return false;
+        if (p.endDate) {
+            const endDate = new Date(p.endDate);
+            endDate.setHours(23, 59, 59, 999); // End of the day
+            if (endDate < now) return false;
+        }
         
         if (p.appliesTo === PromotionAppliesTo.AllProducts) return true;
         return p.productIds.includes(product.id);
@@ -835,14 +839,10 @@ const ProductDetailModal: React.FC<{
         return selectedOptions[pid]?.some(o => o.id === oid);
     };
 
-    // Validation is now optional as requested by user
-    const isValid = true; 
-
-    const totalOptionsPrice = Object.values(selectedOptions).flat().reduce((acc, opt) => acc + opt.price, 0);
+    const totalOptionsPrice = Object.values(selectedOptions).flat().reduce((acc: number, opt: PersonalizationOption) => acc + (opt.price || 0), 0);
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
 
     const handleAdd = () => {
-        // Removed check: if (!isValid) return;
         const flatOptions = Object.values(selectedOptions).flat();
         onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptions);
     }
@@ -862,13 +862,18 @@ const ProductDetailModal: React.FC<{
                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover rounded-t-3xl sm:rounded-t-2xl" />
                      <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent h-full w-full pointer-events-none"></div>
                      {promotion && (
-                        <div className="absolute bottom-12 left-6 bg-rose-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg">
-                            ¡Oferta Especial!
+                        <div className="absolute bottom-4 left-6 flex flex-col items-start gap-1">
+                            <div className="bg-rose-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg">
+                                ¡Oferta Especial!
+                            </div>
+                            <div className="bg-emerald-600 text-white px-3 py-0.5 rounded-full text-xs font-bold shadow-lg">
+                                Ahorras ${(product.price - basePrice).toFixed(2)}
+                            </div>
                         </div>
                      )}
                 </div>
 
-                <div className="p-6 flex-grow overflow-y-auto -mt-12 relative z-10">
+                <div className="p-6 flex-grow overflow-y-auto relative z-10 bg-gray-900 -mt-4 rounded-t-3xl">
                     <h2 className="text-3xl font-bold text-white mb-2">{product.name}</h2>
                     <p className="text-gray-300 leading-relaxed mb-6">{product.description}</p>
                     
@@ -973,7 +978,7 @@ const CartSummaryView: React.FC<{
             <div className="space-y-4">
                 {cartItems.map(item => {
                     const options: PersonalizationOption[] = item.selectedOptions || [];
-                    const optionsTotal = options.reduce((acc: number, o: PersonalizationOption) => acc + o.price, 0);
+                    const optionsTotal = options.reduce((acc: number, o: PersonalizationOption) => acc + (o.price || 0), 0);
                     const itemTotal = (item.price + optionsTotal) * item.quantity;
 
                     return (
@@ -1131,7 +1136,7 @@ const CheckoutView: React.FC<{
                                 type="button" 
                                 onClick={handleGetLocation}
                                 disabled={isLocating}
-                                className="w-full py-3 bg-blue-600/20 border border-blue-500/50 hover:bg-blue-600/30 text-blue-400 rounded-xl flex items-center justify-center gap-2 font-bold transition-all active:scale-95"
+                                className="w-full py-3 bg-emerald-600 text-white hover:bg-emerald-700 rounded-xl flex items-center justify-center gap-2 font-bold transition-all active:scale-95 shadow-lg shadow-emerald-900/20"
                             >
                                 {isLocating ? (
                                     <span className="animate-pulse">Obteniendo ubicación...</span>
@@ -1161,15 +1166,15 @@ const CheckoutView: React.FC<{
                     <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-2">
                             <label className={labelClasses}>Calle</label>
-                            <input type="text" name="calle" value={customer.address.calle} onChange={handleAddressChange} className={inputClasses} required />
+                            <input type="text" name="calle" value={customer.address.calle} onChange={handleAddressChange} className={inputClasses} required={!customer.address.googleMapsLink} />
                         </div>
                         <div>
                             <label className={labelClasses}>Número Ext.</label>
-                            <input type="text" name="numero" value={customer.address.numero} onChange={handleAddressChange} className={inputClasses} required />
+                            <input type="text" name="numero" value={customer.address.numero} onChange={handleAddressChange} className={inputClasses} required={!customer.address.googleMapsLink} />
                         </div>
                          <div>
                             <label className={labelClasses}>Colonia</label>
-                            <input type="text" name="colonia" value={customer.address.colonia} onChange={handleAddressChange} className={inputClasses} required />
+                            <input type="text" name="colonia" value={customer.address.colonia} onChange={handleAddressChange} className={inputClasses} required={!customer.address.googleMapsLink} />
                         </div>
                     </div>
                     <div>
