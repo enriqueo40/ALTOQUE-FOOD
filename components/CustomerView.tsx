@@ -94,11 +94,11 @@ export default function CustomerView() {
     const handlePlaceOrder = async (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number = 0) => {
         if (!settings) return;
 
-        const shippingCost: number = (orderType === OrderType.Delivery && settings.shipping.costType === ShippingCostType.Fixed) 
-            ? (Number(settings.shipping.fixedCost) || 0)
+        const shippingCost = (orderType === OrderType.Delivery && settings.shipping.costType === ShippingCostType.Fixed) 
+            ? (settings.shipping.fixedCost ?? 0) 
             : 0;
 
-        const finalTotal = Number(cartTotal) + shippingCost + Number(tipAmount);
+        const finalTotal = cartTotal + shippingCost + tipAmount;
 
         const newOrder: Omit<Order, 'id' | 'createdAt'> = {
             customer,
@@ -841,11 +841,11 @@ const ProductDetailModal: React.FC<{
         return selectedOptions[pid]?.some(o => o.id === oid);
     };
 
-    const totalOptionsPrice = (Object.values(selectedOptions).flat() as PersonalizationOption[]).reduce((acc: number, opt: PersonalizationOption) => acc + (opt.price || 0), 0);
+    const totalOptionsPrice = Object.values(selectedOptions).flat().reduce((acc: number, opt: PersonalizationOption) => acc + (opt.price || 0), 0);
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
 
     const handleAdd = () => {
-        const flatOptions = Object.values(selectedOptions).flat() as PersonalizationOption[];
+        const flatOptions = Object.values(selectedOptions).flat();
         onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptions);
     }
 
@@ -1125,8 +1125,8 @@ const CheckoutView: React.FC<{
     const inputClasses = "w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-gray-500 transition-all";
     const labelClasses = "text-sm font-bold text-gray-400 mb-1 block";
 
-    const shippingCost: number = (isDelivery && settings.shipping.costType === ShippingCostType.Fixed) ? (Number(settings.shipping.fixedCost) || 0) : 0;
-    const finalTotal = Number(cartTotal) + shippingCost + Number(tipAmount);
+    const shippingCost: number = (isDelivery && settings.shipping.costType === ShippingCostType.Fixed) ? (settings.shipping.fixedCost ?? 0) : 0;
+    const finalTotal = cartTotal + shippingCost + tipAmount;
     
     return (
         <form onSubmit={handleSubmit} className="p-4 space-y-6 pb-44 animate-fade-in">
