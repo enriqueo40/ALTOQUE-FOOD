@@ -1,3 +1,5 @@
+
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
@@ -86,7 +88,7 @@ export default function CustomerView() {
 
     const gpsLocation = (link?: string) => {
         if(!link) return '';
-        return `🌐 *Ubicación GPS:* ${link}`;
+        return `🌐 *UBICACIÓN EN TIEMPO REAL:*\n${link}`;
     }
 
     const handlePlaceOrder = async (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number = 0) => {
@@ -203,7 +205,7 @@ export default function CustomerView() {
                 `Tel: ${customer.phone}`,
                 lineSeparator,
                 `📍 *DIRECCIÓN DE ENTREGA*`,
-                gpsLocation(gpsLink),
+                gpsLink ? gpsLocation(gpsLink) : '⚠️ *Sin ubicación GPS*',
                 customer.address.calle ? `🏠 ${customer.address.calle} #${customer.address.numero}` : '',
                 customer.address.colonia ? `🏙️ Col. ${customer.address.colonia}` : '',
                 customer.address.referencias ? `👀 Ref: ${customer.address.referencias}` : '',
@@ -978,7 +980,7 @@ const CartSummaryView: React.FC<{
             <div className="space-y-4">
                 {cartItems.map(item => {
                     const options: PersonalizationOption[] = item.selectedOptions || [];
-                    const optionsTotal = options.reduce((acc: number, o: PersonalizationOption) => acc + (o.price || 0), 0);
+                    const optionsTotal = options.reduce<number>((acc, o) => acc + (o.price || 0), 0);
                     const itemTotal = (item.price + optionsTotal) * item.quantity;
 
                     return (
@@ -1078,19 +1080,36 @@ const CheckoutView: React.FC<{
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 const { latitude, longitude } = position.coords;
+                // Add accuracy and timestamp parameter to URL to indicate real-time capture
                 const link = `https://www.google.com/maps?q=${latitude},${longitude}`;
+                
                 setCustomer(prev => ({
                     ...prev,
-                    address: { ...prev.address, googleMapsLink: link }
+                    address: { 
+                        ...prev.address, 
+                        googleMapsLink: link,
+                        // Auto-fill informational fields to indicate GPS usage
+                        colonia: prev.address.colonia || 'Ubicación GPS adjunta',
+                        entreCalles: prev.address.entreCalles || 'Coordenadas Satelitales'
+                    }
                 }));
                 setIsLocating(false);
             },
             (error) => {
                 console.error(error);
-                alert("No se pudo obtener la ubicación. Por favor verifica tus permisos.");
+                let errorMsg = "No se pudo obtener la ubicación.";
+                if (error.code === 1) errorMsg = "Permiso de ubicación denegado. Por favor activa la ubicación en tu navegador.";
+                else if (error.code === 2) errorMsg = "Ubicación no disponible. Intenta de nuevo.";
+                else if (error.code === 3) errorMsg = "Se agotó el tiempo de espera. Intenta de nuevo.";
+                
+                alert(errorMsg);
                 setIsLocating(false);
             },
-            { enableHighAccuracy: true }
+            { 
+                enableHighAccuracy: true, // Use GPS if available for real-time precision
+                timeout: 10000,
+                maximumAge: 0 // Do not use cached position
+            }
         );
     };
 
@@ -1129,48 +1148,64 @@ const CheckoutView: React.FC<{
                 <div className="space-y-4 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
                     <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Entrega</h3>
                     
-                    {/* GPS Location Button */}
-                    <div className="mb-4">
+                    {/* Enhanced Real-Time GPS Location Button */}
+                    <div className="mb-6">
                         {!customer.address.googleMapsLink ? (
                             <button 
                                 type="button" 
                                 onClick={handleGetLocation}
                                 disabled={isLocating}
-                                className="w-full py-3 bg-emerald-600 text-white hover:bg-emerald-700 rounded-xl flex items-center justify-center gap-2 font-bold transition-all active:scale-95 shadow-lg shadow-emerald-900/20"
+                                className="w-full relative group overflow-hidden py-4 rounded-xl font-bold text-white shadow-lg transition-all active:scale-95 bg-gradient-to-br from-emerald-500 to-emerald-700 hover:from-emerald-400 hover:to-emerald-600"
                             >
-                                {isLocating ? (
-                                    <span className="animate-pulse">Obteniendo ubicación...</span>
-                                ) : (
-                                    <>
-                                        <IconMap className="h-5 w-5"/> 
-                                        📍 Usar mi ubicación actual
-                                    </>
-                                )}
+                                <div className="relative z-10 flex items-center justify-center gap-3">
+                                    {isLocating ? (
+                                        <>
+                                            <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
+                                            <span>Localizando satélites...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <IconLocationMarker className="h-6 w-6 animate-bounce" /> 
+                                            <span>Enviar mi ubicación actual</span>
+                                        </>
+                                    )}
+                                </div>
+                                {/* Glossy effect */}
+                                <div className="absolute top-0 left-0 w-full h-full bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"/>
                             </button>
                         ) : (
-                             <div className="w-full py-3 bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 rounded-xl flex items-center justify-center gap-2 font-bold animate-fade-in">
-                                <IconCheck className="h-5 w-5"/>
-                                Ubicación GPS adjunta
-                                <button 
-                                    type="button" 
-                                    onClick={() => setCustomer(c => ({...c, address: {...c.address, googleMapsLink: ''}}))}
-                                    className="ml-2 text-xs text-gray-400 underline hover:text-white"
-                                >
-                                    (Quitar)
-                                </button>
+                             <div className="w-full p-4 bg-emerald-900/30 border border-emerald-500/50 rounded-xl flex flex-col items-center gap-3 animate-fade-in">
+                                 <div className="flex items-center gap-2 text-emerald-400">
+                                    <IconCheck className="h-5 w-5"/>
+                                    <span className="font-bold">Ubicación guardada</span>
+                                </div>
+                                <div className="flex gap-4 text-sm">
+                                    <a href={customer.address.googleMapsLink} target="_blank" rel="noreferrer" className="text-white underline flex items-center gap-1">
+                                        <IconMap className="h-4 w-4"/> Ver en mapa
+                                    </a>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setCustomer(c => ({...c, address: {...c.address, googleMapsLink: ''}}))} 
+                                        className="text-rose-400 flex items-center gap-1 hover:text-rose-300"
+                                    >
+                                        <IconTrash className="h-4 w-4"/> Quitar
+                                    </button>
+                                </div>
                             </div>
                         )}
-                        <p className="text-xs text-gray-500 mt-2 text-center">Al usar GPS, enviaremos tu ubicación exacta para una entrega más rápida.</p>
+                        <p className="text-[10px] text-gray-500 mt-2 text-center uppercase tracking-wide">
+                            {isLocating ? "Usando GPS de alta precisión..." : "Recomendado para entregas más rápidas"}
+                        </p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-2">
-                            <label className={labelClasses}>Calle</label>
-                            <input type="text" name="calle" value={customer.address.calle} onChange={handleAddressChange} className={inputClasses} required={!customer.address.googleMapsLink} />
+                            <label className={labelClasses}>Calle <span className="text-gray-600 font-normal ml-1 text-xs">(Opcional si usas GPS)</span></label>
+                            <input type="text" name="calle" value={customer.address.calle} onChange={handleAddressChange} className={inputClasses} placeholder="Nombre de la calle" required={!customer.address.googleMapsLink} />
                         </div>
                         <div>
-                            <label className={labelClasses}>Número Ext.</label>
-                            <input type="text" name="numero" value={customer.address.numero} onChange={handleAddressChange} className={inputClasses} required={!customer.address.googleMapsLink} />
+                            <label className={labelClasses}>N° Ext / Int</label>
+                            <input type="text" name="numero" value={customer.address.numero} onChange={handleAddressChange} className={inputClasses} placeholder="123 / 4B" required={!customer.address.googleMapsLink} />
                         </div>
                          <div>
                             <label className={labelClasses}>Colonia</label>
@@ -1178,8 +1213,8 @@ const CheckoutView: React.FC<{
                         </div>
                     </div>
                     <div>
-                        <label className={labelClasses}>Referencias <span className="font-normal text-gray-500 text-xs">(Opcional)</span></label>
-                        <input type="text" name="referencias" value={customer.address.referencias} onChange={handleAddressChange} className={inputClasses} placeholder="Color de casa, portón, etc." />
+                        <label className={labelClasses}>Referencias <span className="font-normal text-gray-500 text-xs">(Fachada, portón, etc.)</span></label>
+                        <input type="text" name="referencias" value={customer.address.referencias} onChange={handleAddressChange} className={inputClasses} placeholder="Ej. Casa azul, portón negro..." />
                     </div>
                 </div>
             )}
@@ -1289,46 +1324,3 @@ const CheckoutView: React.FC<{
                     {tipAmount > 0 && (
                         <div className="flex justify-between text-emerald-400">
                             <span>Propina</span>
-                            <span>${tipAmount.toFixed(2)}</span>
-                        </div>
-                    )}
-                     <div className="flex justify-between font-bold text-xl text-white pt-2 border-t border-gray-800">
-                        <span>Total</span>
-                        <span>${finalTotal.toFixed(2)} {isDelivery && shippingCost === 0 && "+ envío"}</span>
-                    </div>
-                </div>
-                 <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 px-6 rounded-xl shadow-lg flex items-center justify-center gap-3 transition-all transform active:scale-[0.98]">
-                    <IconWhatsapp className="h-6 w-6" />
-                    Realizar Pedido
-                </button>
-            </div>
-        </form>
-    )
-}
-
-const OrderConfirmation: React.FC<{ onNewOrder: () => void, settings: AppSettings }> = ({ onNewOrder, settings }) => (
-    <div className="p-6 text-center flex flex-col items-center justify-center h-[80vh] animate-fade-in">
-        <div className="w-24 h-24 bg-emerald-500/20 rounded-full flex items-center justify-center mb-6">
-            <svg className="w-12 h-12 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-        </div>
-        <h3 className="text-3xl font-bold mb-3 text-white">¡Pedido Enviado!</h3>
-        <p className="text-gray-400 mb-8 text-lg leading-relaxed">Te redirigimos a WhatsApp con los detalles de tu orden. El equipo de {settings.company.name} confirmará tu pedido en breve.</p>
-        <button onClick={onNewOrder} className="w-full max-w-xs bg-gray-800 text-white py-4 rounded-xl font-bold hover:bg-gray-700 transition-colors border border-gray-700">
-            Volver al Inicio
-        </button>
-    </div>
-);
-
-const FooterBar: React.FC<{ itemCount: number, cartTotal: number, onViewCart: () => void }> = ({ itemCount, cartTotal, onViewCart }) => {
-    return (
-         <footer className="fixed bottom-4 left-4 right-4 max-w-md mx-auto z-20 animate-slide-up">
-            <button onClick={onViewCart} className="w-full bg-emerald-500 text-white font-bold py-4 px-6 rounded-2xl flex justify-between items-center shadow-2xl shadow-emerald-900/50 hover:bg-emerald-400 transition-transform hover:-translate-y-1 active:translate-y-0">
-                <div className="flex items-center gap-3">
-                    <div className="bg-emerald-700/50 px-3 py-1 rounded-lg text-sm font-extrabold border border-emerald-400/30">{itemCount}</div>
-                    <span>Ver Pedido</span>
-                </div>
-                <span className="text-lg">${cartTotal.toFixed(2)}</span>
-            </button>
-        </footer>
-    );
-};

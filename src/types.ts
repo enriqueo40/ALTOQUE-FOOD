@@ -1,3 +1,5 @@
+
+
 export interface Product {
     id: string;
     name: string;
@@ -60,8 +62,8 @@ export interface Order {
     items: CartItem[];
     customer: Customer;
     status: OrderStatus;
-    paymentStatus?: PaymentStatus;
-    paymentProof?: string;
+    paymentStatus?: PaymentStatus; // Added this field
+    paymentProof?: string; // Base64 string of the screenshot
     total: number;
     createdAt: Date;
     branchId: string;
@@ -133,14 +135,15 @@ export interface Promotion {
 
 export interface Table {
     id: string;
-    name: string;
+    name: string; // The identifier shown on the table, e.g., "1", "2", "A1"
     zoneId: string;
-    row: number;
-    col: number;
-    width: number;
-    height: number;
+    row: number; // Top-left starting row
+    col: number; // Top-left starting column
+    width: number; // How many columns it spans
+    height: number; // How many rows it spans
     shape: 'square' | 'round';
     status: 'available' | 'occupied';
+    // Fix: Add created_at property to match the database schema and fix destructuring error.
     created_at?: string;
 }
 

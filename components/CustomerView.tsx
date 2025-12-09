@@ -1,7 +1,9 @@
+
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck, IconCalendar, IconDuplicate } from '../constants';
+import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck, IconCalendar, IconDuplicate, IconMap } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
@@ -84,6 +86,11 @@ export default function CustomerView() {
         setSelectedProduct(null);
     };
 
+    const gpsLocation = (link?: string) => {
+        if(!link) return '';
+        return `🌐 *UBICACIÓN EN TIEMPO REAL:*\n${link}`;
+    }
+
     const handlePlaceOrder = async (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number = 0) => {
         if (!settings) return;
 
@@ -115,84 +122,107 @@ export default function CustomerView() {
         // Helper to format options string
         const formatOptions = (item: CartItem) => {
             if (!item.selectedOptions || item.selectedOptions.length === 0) return '';
-            return item.selectedOptions.map(opt => `    + ${opt.name}`).join('\n');
+            return item.selectedOptions.map(opt => `   + ${opt.name}`).join('\n');
         };
 
         let messageParts: string[];
 
         const itemDetails = cartItems.map(item => {
-            let detail = `*${item.quantity}x ${item.name}*`;
+            let detail = `▪️ ${item.quantity}x ${item.name}`;
             const optionsStr = formatOptions(item);
             if (optionsStr) detail += `\n${optionsStr}`;
-            if (item.comments) detail += `\n  - _Nota: ${item.comments}_`;
+            if (item.comments) detail += `\n   _Nota: ${item.comments}_`;
             return detail;
         });
 
         const currency = settings.company.currency.code;
+        const lineSeparator = "━━━━━━━━━━━━━━━━━━━━";
+        const gpsLink = customer.address.googleMapsLink;
 
         if (orderType === OrderType.DineIn) {
             messageParts = [
-                `*🛎️ Nuevo Pedido en Mesa de ${settings.company.name.toUpperCase()}*`,
-                `---------------------------------`,
-                `*MESA:* ${tableInfo?.zone} - ${tableInfo?.table}`,
-                 `*CLIENTE:* ${customer.name}`,
-                `---------------------------------`,
-                `*DETALLES DEL PEDIDO:*`,
+                `🧾 *TICKET DE PEDIDO - MESA*`,
+                `📍 *${settings.company.name.toUpperCase()}*`,
+                lineSeparator,
+                `🗓️ Fecha: ${new Date().toLocaleDateString()}`,
+                `⏰ Hora: ${new Date().toLocaleTimeString()}`,
+                lineSeparator,
+                `🪑 *UBICACIÓN*`,
+                `Zona: ${tableInfo?.zone}`,
+                `Mesa: ${tableInfo?.table}`,
+                `👤 Cliente: ${customer.name}`,
+                lineSeparator,
+                `🛒 *DETALLE DEL CONSUMO*`,
                 ...itemDetails,
                 ``,
-                generalComments ? `*Comentarios Generales:*\n_${generalComments}_` : '',
-                `---------------------------------`,
-                `*Subtotal:* ${currency} $${cartTotal.toFixed(2)}`,
-                tipAmount > 0 ? `*Propina:* ${currency} $${tipAmount.toFixed(2)}` : '',
-                `*Total a Pagar:* ${currency} $${finalTotal.toFixed(2)}`,
-                `*Método de pago:* ${paymentMethod}`,
+                generalComments ? `📝 *NOTAS:* ${generalComments}` : '',
+                lineSeparator,
+                `💰 *RESUMEN*`,
+                `Subtotal: ${currency} $${cartTotal.toFixed(2)}`,
+                tipAmount > 0 ? `Propina: ${currency} $${tipAmount.toFixed(2)}` : '',
+                `*TOTAL A PAGAR: ${currency} $${finalTotal.toFixed(2)}*`,
+                lineSeparator,
+                `💳 Método: ${paymentMethod}`,
+                `✅ Estado: PENDIENTE DE CONFIRMACIÓN`
             ];
         } else if (orderType === OrderType.TakeAway) {
              messageParts = [
-                `*🛍️ Nuevo Pedido Para Recoger - ${settings.company.name.toUpperCase()}*`,
-                `---------------------------------`,
-                `*CLIENTE:*`,
-                `*Nombre:* ${customer.name}`,
-                `*Teléfono:* ${customer.phone}`,
-                `---------------------------------`,
-                `*TIPO:* Para llevar (Recoger en tienda)`,
-                `---------------------------------`,
-                `*DETALLES DEL PEDIDO:*`,
+                `🧾 *TICKET PARA RECOGER*`,
+                `📍 *${settings.company.name.toUpperCase()}*`,
+                lineSeparator,
+                `🗓️ Fecha: ${new Date().toLocaleDateString()}`,
+                `⏰ Hora: ${new Date().toLocaleTimeString()}`,
+                lineSeparator,
+                `👤 *CLIENTE*`,
+                `Nombre: ${customer.name}`,
+                `Tel: ${customer.phone}`,
+                `🏷️ Tipo: Para llevar (Pick-up)`,
+                lineSeparator,
+                `🛒 *DETALLE DEL PEDIDO*`,
                 ...itemDetails,
                 ``,
-                generalComments ? `*Comentarios Generales:*\n_${generalComments}_` : '',
-                `---------------------------------`,
-                `*Subtotal:* ${currency} $${cartTotal.toFixed(2)}`,
-                tipAmount > 0 ? `*Propina:* ${currency} $${tipAmount.toFixed(2)}` : '',
-                `*Total a Pagar:* ${currency} $${finalTotal.toFixed(2)}`,
-                `*Método de pago:* ${paymentMethod}`,
+                generalComments ? `📝 *NOTAS:* ${generalComments}` : '',
+                lineSeparator,
+                `💰 *RESUMEN*`,
+                `Subtotal: ${currency} $${cartTotal.toFixed(2)}`,
+                tipAmount > 0 ? `Propina: ${currency} $${tipAmount.toFixed(2)}` : '',
+                `*TOTAL A PAGAR: ${currency} $${finalTotal.toFixed(2)}*`,
+                lineSeparator,
+                `💳 Método: ${paymentMethod}`,
+                `✅ Estado: PENDIENTE DE CONFIRMACIÓN`
             ];
         } else {
             // Delivery
             messageParts = [
-                `*⭐ Nuevo Pedido a Domicilio - ${settings.company.name.toUpperCase()}*`,
-                `---------------------------------`,
-                `*CLIENTE:*`,
-                `*Nombre:* ${customer.name}`,
-                `*Teléfono:* ${customer.phone}`,
-                `---------------------------------`,
-                `*DIRECCIÓN DE ENTREGA:*`,
-                `*Colonia:* ${customer.address.colonia}`,
-                `*Calle:* ${customer.address.calle}`,
-                `*Número:* ${customer.address.numero}`,
-                customer.address.entreCalles ? `*Entre Calles:* ${customer.address.entreCalles}` : '',
-                customer.address.referencias ? `*Referencias:* ${customer.address.referencias}` : '',
-                `---------------------------------`,
-                `*DETALLES DEL PEDIDO:*`,
+                `🧾 *TICKET DE ENTREGA*`,
+                `📍 *${settings.company.name.toUpperCase()}*`,
+                lineSeparator,
+                `🗓️ Fecha: ${new Date().toLocaleDateString()}`,
+                `⏰ Hora: ${new Date().toLocaleTimeString()}`,
+                lineSeparator,
+                `👤 *CLIENTE*`,
+                `Nombre: ${customer.name}`,
+                `Tel: ${customer.phone}`,
+                lineSeparator,
+                `📍 *DIRECCIÓN DE ENTREGA*`,
+                gpsLink ? gpsLocation(gpsLink) : '⚠️ *Sin ubicación GPS*',
+                customer.address.calle ? `🏠 ${customer.address.calle} #${customer.address.numero}` : '',
+                customer.address.colonia ? `🏙️ Col. ${customer.address.colonia}` : '',
+                customer.address.referencias ? `👀 Ref: ${customer.address.referencias}` : '',
+                lineSeparator,
+                `🛒 *DETALLE DEL PEDIDO*`,
                 ...itemDetails,
                 ``,
-                generalComments ? `*Comentarios Generales:*\n_${generalComments}_` : '',
-                `---------------------------------`,
-                `*Subtotal:* ${currency} $${cartTotal.toFixed(2)}`,
-                `*Envío:* ${shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : 'Por cotizar'}`,
-                tipAmount > 0 ? `*Propina:* ${currency} $${tipAmount.toFixed(2)}` : '',
-                `*Total Estimado:* ${currency} $${finalTotal.toFixed(2)}`,
-                `*Método de pago:* ${paymentMethod}`,
+                generalComments ? `📝 *NOTAS:* ${generalComments}` : '',
+                lineSeparator,
+                `💰 *RESUMEN*`,
+                `Subtotal: ${currency} $${cartTotal.toFixed(2)}`,
+                `Envío: ${shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : 'Por cotizar'}`,
+                tipAmount > 0 ? `Propina: ${currency} $${tipAmount.toFixed(2)}` : '',
+                `*TOTAL A PAGAR: ${currency} $${finalTotal.toFixed(2)}*`,
+                lineSeparator,
+                `💳 Método: ${paymentMethod}`,
+                `✅ Estado: PENDIENTE DE CONFIRMACIÓN`
             ];
         }
 
@@ -550,7 +580,11 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
     // Filter active promotions
     const activePromotions = promotions.filter(p => {
         if (p.startDate && new Date(p.startDate) > now) return false;
-        if (p.endDate && new Date(p.endDate) < now) return false;
+        if (p.endDate) {
+            const endDate = new Date(p.endDate);
+            endDate.setHours(23, 59, 59, 999); // End of the day
+            if (endDate < now) return false;
+        }
         
         if (p.appliesTo === PromotionAppliesTo.AllProducts) return true;
         return p.productIds.includes(product.id);
@@ -807,14 +841,10 @@ const ProductDetailModal: React.FC<{
         return selectedOptions[pid]?.some(o => o.id === oid);
     };
 
-    // Validation is now optional as requested by user
-    const isValid = true; 
-
-    const totalOptionsPrice = Object.values(selectedOptions).flat().reduce((acc, opt) => acc + opt.price, 0);
+    const totalOptionsPrice = Object.values(selectedOptions).flat().reduce((acc: number, opt: PersonalizationOption) => acc + (opt.price || 0), 0);
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
 
     const handleAdd = () => {
-        // Removed check: if (!isValid) return;
         const flatOptions = Object.values(selectedOptions).flat();
         onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptions);
     }
@@ -834,13 +864,18 @@ const ProductDetailModal: React.FC<{
                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover rounded-t-3xl sm:rounded-t-2xl" />
                      <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent h-full w-full pointer-events-none"></div>
                      {promotion && (
-                        <div className="absolute bottom-12 left-6 bg-rose-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg">
-                            ¡Oferta Especial!
+                        <div className="absolute bottom-4 left-6 flex flex-col items-start gap-1">
+                            <div className="bg-rose-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg">
+                                ¡Oferta Especial!
+                            </div>
+                            <div className="bg-emerald-600 text-white px-3 py-0.5 rounded-full text-xs font-bold shadow-lg">
+                                Ahorras ${(product.price - basePrice).toFixed(2)}
+                            </div>
                         </div>
                      )}
                 </div>
 
-                <div className="p-6 flex-grow overflow-y-auto -mt-12 relative z-10">
+                <div className="p-6 flex-grow overflow-y-auto relative z-10 bg-gray-900 -mt-4 rounded-t-3xl">
                     <h2 className="text-3xl font-bold text-white mb-2">{product.name}</h2>
                     <p className="text-gray-300 leading-relaxed mb-6">{product.description}</p>
                     
@@ -945,7 +980,7 @@ const CartSummaryView: React.FC<{
             <div className="space-y-4">
                 {cartItems.map(item => {
                     const options: PersonalizationOption[] = item.selectedOptions || [];
-                    const optionsTotal = options.reduce((acc: number, o: any) => acc + o.price, 0);
+                    const optionsTotal = options.reduce<number>((acc, o) => acc + (o.price || 0), 0);
                     const itemTotal = (item.price + optionsTotal) * item.quantity;
 
                     return (
@@ -1012,9 +1047,10 @@ const CheckoutView: React.FC<{
     orderType: OrderType 
 }> = ({ cartTotal, onPlaceOrder, settings, orderType }) => {
     const [customer, setCustomer] = useState<Customer>({
-        name: '', phone: '', address: { colonia: '', calle: '', numero: '', entreCalles: '', referencias: '' }
+        name: '', phone: '', address: { colonia: '', calle: '', numero: '', entreCalles: '', referencias: '', googleMapsLink: '' }
     });
     const [tipAmount, setTipAmount] = useState(0);
+    const [isLocating, setIsLocating] = useState(false);
     
     const isDelivery = orderType === OrderType.Delivery;
     const isPickup = orderType === OrderType.TakeAway;
@@ -1033,6 +1069,48 @@ const CheckoutView: React.FC<{
             ...prev,
             address: { ...prev.address, [name]: value }
         }));
+    };
+
+    const handleGetLocation = () => {
+        if (!navigator.geolocation) {
+            alert("Tu navegador no soporta geolocalización.");
+            return;
+        }
+        setIsLocating(true);
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                // Add accuracy and timestamp parameter to URL to indicate real-time capture
+                const link = `https://www.google.com/maps?q=${latitude},${longitude}`;
+                
+                setCustomer(prev => ({
+                    ...prev,
+                    address: { 
+                        ...prev.address, 
+                        googleMapsLink: link,
+                        // Auto-fill informational fields to indicate GPS usage
+                        colonia: prev.address.colonia || 'Ubicación GPS adjunta',
+                        entreCalles: prev.address.entreCalles || 'Coordenadas Satelitales'
+                    }
+                }));
+                setIsLocating(false);
+            },
+            (error) => {
+                console.error(error);
+                let errorMsg = "No se pudo obtener la ubicación.";
+                if (error.code === 1) errorMsg = "Permiso de ubicación denegado. Por favor activa la ubicación en tu navegador.";
+                else if (error.code === 2) errorMsg = "Ubicación no disponible. Intenta de nuevo.";
+                else if (error.code === 3) errorMsg = "Se agotó el tiempo de espera. Intenta de nuevo.";
+                
+                alert(errorMsg);
+                setIsLocating(false);
+            },
+            { 
+                enableHighAccuracy: true, // Use GPS if available for real-time precision
+                timeout: 10000,
+                maximumAge: 0 // Do not use cached position
+            }
+        );
     };
 
     const handleTipSelection = (percentage: number) => {
@@ -1069,23 +1147,74 @@ const CheckoutView: React.FC<{
             {isDelivery && (
                 <div className="space-y-4 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
                     <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Entrega</h3>
+                    
+                    {/* Enhanced Real-Time GPS Location Button */}
+                    <div className="mb-6">
+                        {!customer.address.googleMapsLink ? (
+                            <button 
+                                type="button" 
+                                onClick={handleGetLocation}
+                                disabled={isLocating}
+                                className="w-full relative group overflow-hidden py-4 rounded-xl font-bold text-white shadow-lg transition-all active:scale-95 bg-gradient-to-br from-emerald-500 to-emerald-700 hover:from-emerald-400 hover:to-emerald-600"
+                            >
+                                <div className="relative z-10 flex items-center justify-center gap-3">
+                                    {isLocating ? (
+                                        <>
+                                            <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
+                                            <span>Localizando satélites...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <IconLocationMarker className="h-6 w-6 animate-bounce" /> 
+                                            <span>Enviar mi ubicación actual</span>
+                                        </>
+                                    )}
+                                </div>
+                                {/* Glossy effect */}
+                                <div className="absolute top-0 left-0 w-full h-full bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"/>
+                            </button>
+                        ) : (
+                             <div className="w-full p-4 bg-emerald-900/30 border border-emerald-500/50 rounded-xl flex flex-col items-center gap-3 animate-fade-in">
+                                 <div className="flex items-center gap-2 text-emerald-400">
+                                    <IconCheck className="h-5 w-5"/>
+                                    <span className="font-bold">Ubicación guardada</span>
+                                </div>
+                                <div className="flex gap-4 text-sm">
+                                    <a href={customer.address.googleMapsLink} target="_blank" rel="noreferrer" className="text-white underline flex items-center gap-1">
+                                        <IconMap className="h-4 w-4"/> Ver en mapa
+                                    </a>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setCustomer(c => ({...c, address: {...c.address, googleMapsLink: ''}}))} 
+                                        className="text-rose-400 flex items-center gap-1 hover:text-rose-300"
+                                    >
+                                        <IconTrash className="h-4 w-4"/> Quitar
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                        <p className="text-[10px] text-gray-500 mt-2 text-center uppercase tracking-wide">
+                            {isLocating ? "Usando GPS de alta precisión..." : "Recomendado para entregas más rápidas"}
+                        </p>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-2">
-                            <label className={labelClasses}>Calle</label>
-                            <input type="text" name="calle" value={customer.address.calle} onChange={handleAddressChange} className={inputClasses} required />
+                            <label className={labelClasses}>Calle <span className="text-gray-600 font-normal ml-1 text-xs">(Opcional si usas GPS)</span></label>
+                            <input type="text" name="calle" value={customer.address.calle} onChange={handleAddressChange} className={inputClasses} placeholder="Nombre de la calle" required={!customer.address.googleMapsLink} />
                         </div>
                         <div>
-                            <label className={labelClasses}>Número Ext.</label>
-                            <input type="text" name="numero" value={customer.address.numero} onChange={handleAddressChange} className={inputClasses} required />
+                            <label className={labelClasses}>N° Ext / Int</label>
+                            <input type="text" name="numero" value={customer.address.numero} onChange={handleAddressChange} className={inputClasses} placeholder="123 / 4B" required={!customer.address.googleMapsLink} />
                         </div>
                          <div>
                             <label className={labelClasses}>Colonia</label>
-                            <input type="text" name="colonia" value={customer.address.colonia} onChange={handleAddressChange} className={inputClasses} required />
+                            <input type="text" name="colonia" value={customer.address.colonia} onChange={handleAddressChange} className={inputClasses} required={!customer.address.googleMapsLink} />
                         </div>
                     </div>
                     <div>
-                        <label className={labelClasses}>Referencias <span className="font-normal text-gray-500 text-xs">(Opcional)</span></label>
-                        <input type="text" name="referencias" value={customer.address.referencias} onChange={handleAddressChange} className={inputClasses} placeholder="Color de casa, portón, etc." />
+                        <label className={labelClasses}>Referencias <span className="font-normal text-gray-500 text-xs">(Fachada, portón, etc.)</span></label>
+                        <input type="text" name="referencias" value={customer.address.referencias} onChange={handleAddressChange} className={inputClasses} placeholder="Ej. Casa azul, portón negro..." />
                     </div>
                 </div>
             )}
@@ -1099,6 +1228,7 @@ const CheckoutView: React.FC<{
                 </div>
             )}
 
+            {/* ... rest of payment options ... */}
             {settings.payment.showTipField && (
                 <div className="space-y-3 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
                     <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Propina para el equipo</h3>
