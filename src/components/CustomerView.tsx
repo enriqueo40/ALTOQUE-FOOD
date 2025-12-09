@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
@@ -7,338 +5,8 @@ import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, Ic
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
-// Main View Manager
-export default function CustomerView() {
-    const [view, setView] = useState<'menu' | 'cart' | 'checkout' | 'confirmation'>('menu');
-    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-    const [generalComments, setGeneralComments] = useState('');
-    const [settings, setSettings] = useState<AppSettings | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [tableInfo, setTableInfo] = useState<{ table: string; zone: string } | null>(null);
-    // State for Order Type (Delivery, TakeAway, DineIn)
-    const [orderType, setOrderType] = useState<OrderType>(OrderType.Delivery);
+// Sub-components defined first to avoid ReferenceErrors
 
-    const { cartItems, addToCart, removeFromCart, updateQuantity, clearCart, cartTotal, itemCount } = useCart();
-    
-    // Global data for the menu
-    const [allPromotions, setAllPromotions] = useState<Promotion[]>([]);
-    const [allPersonalizations, setAllPersonalizations] = useState<Personalization[]>([]);
-    const [allProducts, setAllProducts] = useState<Product[]>([]);
-    const [allCategories, setAllCategories] = useState<Category[]>([]);
-
-    const fetchMenuData = async () => {
-        try {
-            // Parallel data fetching for speed
-            const [appSettings, fetchedPromotions, fetchedPersonalizations, fetchedProducts, fetchedCategories] = await Promise.all([
-                getAppSettings(),
-                getPromotions(),
-                getPersonalizations(),
-                getProducts(),
-                getCategories()
-            ]);
-            setSettings(appSettings);
-            setAllPromotions(fetchedPromotions);
-            setAllPersonalizations(fetchedPersonalizations);
-            setAllProducts(fetchedProducts);
-            setAllCategories(fetchedCategories);
-        } catch (error) {
-            console.error("Failed to fetch data:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchMenuData();
-        
-        // Subscribe to real-time updates for the menu (Admin changes)
-        subscribeToMenuUpdates(() => {
-            console.log("Menu updated from admin (Realtime), refreshing...");
-            fetchMenuData();
-        });
-
-        // Polling fallback: Check for updates every 30 seconds to ensure sync
-        const intervalId = setInterval(() => {
-            console.log("Auto-refreshing menu data (Polling)...");
-            fetchMenuData();
-        }, 30000);
-
-        const params = new URLSearchParams(window.location.hash.split('?')[1]);
-        const table = params.get('table');
-        const zone = params.get('zone');
-        if (table && zone) {
-            setTableInfo({ table, zone });
-            setOrderType(OrderType.DineIn);
-        }
-
-        return () => {
-            unsubscribeFromChannel();
-            clearInterval(intervalId);
-        };
-    }, []);
-
-    const handleProductClick = (product: Product) => {
-        setSelectedProduct(product);
-    };
-
-    const handleAddToCart = (product: Product, quantity: number, comments?: string, options: PersonalizationOption[] = []) => {
-        addToCart(product, quantity, comments, options);
-        setSelectedProduct(null);
-    };
-
-    const gpsLocation = (link?: string) => {
-        if(!link) return '';
-        return `🌐 *UBICACIÓN EN TIEMPO REAL:*\n${link}`;
-    }
-
-    const handlePlaceOrder = async (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number = 0) => {
-        if (!settings) return;
-
-        const shippingCost = (orderType === OrderType.Delivery && settings.shipping.costType === ShippingCostType.Fixed) 
-            ? (settings.shipping.fixedCost ?? 0) 
-            : 0;
-
-        const finalTotal = cartTotal + shippingCost + tipAmount;
-
-        const newOrder: Omit<Order, 'id' | 'createdAt'> = {
-            customer,
-            items: cartItems,
-            total: finalTotal,
-            status: OrderStatus.Pending,
-            branchId: 'main-branch',
-            generalComments: generalComments + (tipAmount > 0 ? ` | Propina: ${settings.company.currency.code} ${tipAmount.toFixed(2)}` : ''),
-            orderType: orderType,
-            tableId: orderType === OrderType.DineIn && tableInfo ? `${tableInfo.zone} - ${tableInfo.table}` : undefined,
-        };
-
-        try {
-            await saveOrder(newOrder);
-        } catch(e) {
-            console.error("Failed to save order", e);
-            alert("Hubo un error al guardar tu pedido. Por favor, intenta de nuevo.");
-            return; // Stop if saving fails
-        }
-
-        // Helper to format options string
-        const formatOptions = (item: CartItem) => {
-            if (!item.selectedOptions || item.selectedOptions.length === 0) return '';
-            return item.selectedOptions.map(opt => `   + ${opt.name}`).join('\n');
-        };
-
-        let messageParts: string[];
-
-        const itemDetails = cartItems.map(item => {
-            let detail = `▪️ ${item.quantity}x ${item.name}`;
-            const optionsStr = formatOptions(item);
-            if (optionsStr) detail += `\n${optionsStr}`;
-            if (item.comments) detail += `\n   _Nota: ${item.comments}_`;
-            return detail;
-        });
-
-        const currency = settings.company.currency.code;
-        const lineSeparator = "━━━━━━━━━━━━━━━━━━━━";
-        const gpsLink = customer.address.googleMapsLink;
-
-        if (orderType === OrderType.DineIn) {
-            messageParts = [
-                `🧾 *TICKET DE PEDIDO - MESA*`,
-                `📍 *${settings.company.name.toUpperCase()}*`,
-                lineSeparator,
-                `🗓️ Fecha: ${new Date().toLocaleDateString()}`,
-                `⏰ Hora: ${new Date().toLocaleTimeString()}`,
-                lineSeparator,
-                `🪑 *UBICACIÓN*`,
-                `Zona: ${tableInfo?.zone}`,
-                `Mesa: ${tableInfo?.table}`,
-                `👤 Cliente: ${customer.name}`,
-                lineSeparator,
-                `🛒 *DETALLE DEL CONSUMO*`,
-                ...itemDetails,
-                ``,
-                generalComments ? `📝 *NOTAS:* ${generalComments}` : '',
-                lineSeparator,
-                `💰 *RESUMEN*`,
-                `Subtotal: ${currency} $${cartTotal.toFixed(2)}`,
-                tipAmount > 0 ? `Propina: ${currency} $${tipAmount.toFixed(2)}` : '',
-                `*TOTAL A PAGAR: ${currency} $${finalTotal.toFixed(2)}*`,
-                lineSeparator,
-                `💳 Método: ${paymentMethod}`,
-                `✅ Estado: PENDIENTE DE CONFIRMACIÓN`
-            ];
-        } else if (orderType === OrderType.TakeAway) {
-             messageParts = [
-                `🧾 *TICKET PARA RECOGER*`,
-                `📍 *${settings.company.name.toUpperCase()}*`,
-                lineSeparator,
-                `🗓️ Fecha: ${new Date().toLocaleDateString()}`,
-                `⏰ Hora: ${new Date().toLocaleTimeString()}`,
-                lineSeparator,
-                `👤 *CLIENTE*`,
-                `Nombre: ${customer.name}`,
-                `Tel: ${customer.phone}`,
-                `🏷️ Tipo: Para llevar (Pick-up)`,
-                lineSeparator,
-                `🛒 *DETALLE DEL PEDIDO*`,
-                ...itemDetails,
-                ``,
-                generalComments ? `📝 *NOTAS:* ${generalComments}` : '',
-                lineSeparator,
-                `💰 *RESUMEN*`,
-                `Subtotal: ${currency} $${cartTotal.toFixed(2)}`,
-                tipAmount > 0 ? `Propina: ${currency} $${tipAmount.toFixed(2)}` : '',
-                `*TOTAL A PAGAR: ${currency} $${finalTotal.toFixed(2)}*`,
-                lineSeparator,
-                `💳 Método: ${paymentMethod}`,
-                `✅ Estado: PENDIENTE DE CONFIRMACIÓN`
-            ];
-        } else {
-            // Delivery
-            messageParts = [
-                `🧾 *TICKET DE ENTREGA*`,
-                `📍 *${settings.company.name.toUpperCase()}*`,
-                lineSeparator,
-                `🗓️ Fecha: ${new Date().toLocaleDateString()}`,
-                `⏰ Hora: ${new Date().toLocaleTimeString()}`,
-                lineSeparator,
-                `👤 *CLIENTE*`,
-                `Nombre: ${customer.name}`,
-                `Tel: ${customer.phone}`,
-                lineSeparator,
-                `📍 *DIRECCIÓN DE ENTREGA*`,
-                gpsLink ? gpsLocation(gpsLink) : '⚠️ *Sin ubicación GPS*',
-                customer.address.calle ? `🏠 ${customer.address.calle} #${customer.address.numero}` : '',
-                customer.address.colonia ? `🏙️ Col. ${customer.address.colonia}` : '',
-                customer.address.referencias ? `👀 Ref: ${customer.address.referencias}` : '',
-                lineSeparator,
-                `🛒 *DETALLE DEL PEDIDO*`,
-                ...itemDetails,
-                ``,
-                generalComments ? `📝 *NOTAS:* ${generalComments}` : '',
-                lineSeparator,
-                `💰 *RESUMEN*`,
-                `Subtotal: ${currency} $${cartTotal.toFixed(2)}`,
-                `Envío: ${shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : 'Por cotizar'}`,
-                tipAmount > 0 ? `Propina: ${currency} $${tipAmount.toFixed(2)}` : '',
-                `*TOTAL A PAGAR: ${currency} $${finalTotal.toFixed(2)}*`,
-                lineSeparator,
-                `💳 Método: ${paymentMethod}`,
-                `✅ Estado: PENDIENTE DE CONFIRMACIÓN`
-            ];
-        }
-
-
-        const whatsappMessage = encodeURIComponent(messageParts.filter(p => p !== '').join('\n'));
-        const whatsappUrl = `https://wa.me/${settings.branch.whatsappNumber}?text=${whatsappMessage}`;
-        
-        window.open(whatsappUrl, '_blank');
-        setView('confirmation');
-    };
-
-    const handleStartNewOrder = () => {
-        clearCart();
-        setGeneralComments('');
-        setView('menu');
-        // Do not clear tableInfo, as the customer is likely still at the same table.
-    };
-
-    const getHeaderTitle = () => {
-        switch(view) {
-            case 'cart': return 'Tu pedido';
-            case 'checkout': return 'Completa tu pedido';
-            case 'confirmation': return 'Confirmación';
-            default: return '';
-        }
-    };
-    
-    const canGoBack = view === 'cart' || view === 'checkout';
-    const handleBack = () => {
-        if (view === 'checkout') setView('cart');
-        else if (view === 'cart') setView('menu');
-    }
-    
-    if (isLoading || !settings) {
-        return (
-            <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-gray-300">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500 mb-4"></div>
-                <p className="animate-pulse">Sincronizando menú...</p>
-            </div>
-        );
-    }
-
-    return (
-        <div className="bg-gray-900 min-h-screen font-sans text-gray-100 selection:bg-emerald-500 selection:text-white">
-            <div className="container mx-auto max-w-md bg-gray-900 min-h-screen shadow-2xl relative pb-24 border-x border-gray-800">
-                
-                {view !== 'menu' && <Header title={getHeaderTitle()} onBack={canGoBack ? handleBack : undefined} />}
-
-                {view === 'menu' && (
-                    <>
-                        <RestaurantHero 
-                            settings={settings} 
-                            tableInfo={tableInfo} 
-                            orderType={orderType}
-                            setOrderType={setOrderType}
-                        />
-                        <MenuList 
-                            products={allProducts}
-                            categories={allCategories}
-                            onProductClick={handleProductClick} 
-                            cartItems={cartItems} 
-                            currency={settings.company.currency.code}
-                            promotions={allPromotions}
-                        />
-                    </>
-                )}
-
-                {view === 'cart' && (
-                    <CartSummaryView 
-                        cartItems={cartItems}
-                        cartTotal={cartTotal}
-                        onUpdateQuantity={updateQuantity}
-                        onRemoveItem={removeFromCart}
-                        generalComments={generalComments}
-                        onGeneralCommentsChange={setGeneralComments}
-                        onProceedToCheckout={() => setView('checkout')}
-                    />
-                )}
-                
-                {view === 'checkout' && (
-                    <CheckoutView 
-                        cartTotal={cartTotal}
-                        onPlaceOrder={handlePlaceOrder}
-                        settings={settings}
-                        orderType={orderType}
-                    />
-                )}
-
-                {view === 'confirmation' && (
-                    <OrderConfirmation onNewOrder={handleStartNewOrder} settings={settings} />
-                )}
-
-                {selectedProduct && (
-                    <ProductDetailModal 
-                        product={selectedProduct} 
-                        onAddToCart={handleAddToCart}
-                        onClose={() => setSelectedProduct(null)}
-                        personalizations={allPersonalizations}
-                        promotions={allPromotions}
-                    />
-                )}
-
-                {view === 'menu' && itemCount > 0 && (
-                    <FooterBar 
-                        itemCount={itemCount} 
-                        cartTotal={cartTotal}
-                        onViewCart={() => setView('cart')} 
-                    />
-                )}
-                <Chatbot />
-            </div>
-        </div>
-    );
-}
-
-// Sub-components
 const Header: React.FC<{ title: string; onBack?: () => void }> = ({ title, onBack }) => (
     <header className="p-4 flex justify-between items-center sticky top-0 bg-gray-900/90 backdrop-blur-md z-20 border-b border-gray-800">
         {onBack ? (
@@ -613,6 +281,46 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
     return { price: bestPrice, promotion: bestPromo };
 };
 
+const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: () => void; currency: string; promotions: Promotion[] }> = ({ product, quantityInCart, onClick, currency, promotions }) => {
+    const { price: discountedPrice, promotion } = getDiscountedPrice(product, promotions);
+    const hasDiscount = promotion !== undefined;
+
+    return (
+        <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group relative overflow-hidden">
+            {hasDiscount && (
+                <div className="absolute top-0 left-0 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-br-lg z-10">
+                    -{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}
+                </div>
+            )}
+            <div className="relative h-24 w-24 flex-shrink-0">
+                <img src={product.imageUrl} alt={product.name} className="w-full h-full rounded-lg object-cover" />
+                {quantityInCart > 0 && (
+                    <div className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg ring-2 ring-gray-900">
+                        {quantityInCart}
+                    </div>
+                )}
+            </div>
+            <div className="flex-1 flex flex-col justify-between py-1">
+                <div>
+                    <h3 className="font-bold text-gray-100 leading-tight group-hover:text-emerald-400 transition-colors">{product.name}</h3>
+                    <p className="text-sm text-gray-400 line-clamp-2 mt-1 leading-snug">{product.description}</p>
+                </div>
+                <div className="flex justify-between items-end mt-2">
+                    <div className="flex flex-col">
+                        {hasDiscount && (
+                            <span className="text-xs text-gray-500 line-through">{currency} ${product.price.toFixed(2)}</span>
+                        )}
+                        <p className={`font-bold ${hasDiscount ? 'text-rose-400' : 'text-white'}`}>{currency} ${discountedPrice.toFixed(2)}</p>
+                    </div>
+                    <div className="bg-gray-700 p-1.5 rounded-full text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                        <IconPlus className="h-4 w-4" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const MenuList: React.FC<{
     products: Product[],
     categories: Category[],
@@ -756,46 +464,6 @@ const MenuList: React.FC<{
     );
 };
 
-const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: () => void; currency: string; promotions: Promotion[] }> = ({ product, quantityInCart, onClick, currency, promotions }) => {
-    const { price: discountedPrice, promotion } = getDiscountedPrice(product, promotions);
-    const hasDiscount = promotion !== undefined;
-
-    return (
-        <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group relative overflow-hidden">
-            {hasDiscount && (
-                <div className="absolute top-0 left-0 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-br-lg z-10">
-                    -{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}
-                </div>
-            )}
-            <div className="relative h-24 w-24 flex-shrink-0">
-                <img src={product.imageUrl} alt={product.name} className="w-full h-full rounded-lg object-cover" />
-                {quantityInCart > 0 && (
-                    <div className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg ring-2 ring-gray-900">
-                        {quantityInCart}
-                    </div>
-                )}
-            </div>
-            <div className="flex-1 flex flex-col justify-between py-1">
-                <div>
-                    <h3 className="font-bold text-gray-100 leading-tight group-hover:text-emerald-400 transition-colors">{product.name}</h3>
-                    <p className="text-sm text-gray-400 line-clamp-2 mt-1 leading-snug">{product.description}</p>
-                </div>
-                <div className="flex justify-between items-end mt-2">
-                    <div className="flex flex-col">
-                        {hasDiscount && (
-                            <span className="text-xs text-gray-500 line-through">{currency} ${product.price.toFixed(2)}</span>
-                        )}
-                        <p className={`font-bold ${hasDiscount ? 'text-rose-400' : 'text-white'}`}>{currency} ${discountedPrice.toFixed(2)}</p>
-                    </div>
-                    <div className="bg-gray-700 p-1.5 rounded-full text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
-                        <IconPlus className="h-4 w-4" />
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
 const ProductDetailModal: React.FC<{
     product: Product, 
     onAddToCart: (product: Product, quantity: number, comments?: string, options?: PersonalizationOption[]) => void, 
@@ -841,12 +509,13 @@ const ProductDetailModal: React.FC<{
         return selectedOptions[pid]?.some(o => o.id === oid);
     };
 
-    const totalOptionsPrice = Object.values(selectedOptions).flat().reduce((acc: number, opt: PersonalizationOption) => acc + (opt.price || 0), 0);
+    const flatOptions = Object.values(selectedOptions).reduce((acc, val) => acc.concat(val), [] as PersonalizationOption[]);
+    const totalOptionsPrice = flatOptions.reduce((acc: number, opt: PersonalizationOption) => acc + (opt.price || 0), 0);
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
 
     const handleAdd = () => {
-        const flatOptions = Object.values(selectedOptions).flat();
-        onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptions);
+        const flatOptionsList = Object.values(selectedOptions).reduce((acc, val) => acc.concat(val), [] as PersonalizationOption[]);
+        onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptionsList);
     }
 
     return (
@@ -1324,3 +993,46 @@ const CheckoutView: React.FC<{
                     {tipAmount > 0 && (
                         <div className="flex justify-between text-emerald-400">
                             <span>Propina</span>
+                            <span>${tipAmount.toFixed(2)}</span>
+                        </div>
+                    )}
+                     <div className="flex justify-between font-bold text-xl text-white pt-2 border-t border-gray-800">
+                        <span>Total</span>
+                        <span>${finalTotal.toFixed(2)} {isDelivery && shippingCost === 0 && "+ envío"}</span>
+                    </div>
+                </div>
+                 <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 px-6 rounded-xl shadow-lg flex items-center justify-center gap-3 transition-all transform active:scale-[0.98]">
+                    <IconWhatsapp className="h-6 w-6" />
+                    Realizar Pedido
+                </button>
+            </div>
+        </form>
+    )
+}
+
+const OrderConfirmation: React.FC<{ onNewOrder: () => void, settings: AppSettings }> = ({ onNewOrder, settings }) => (
+    <div className="p-6 text-center flex flex-col items-center justify-center h-[80vh] animate-fade-in">
+        <div className="w-24 h-24 bg-emerald-500/20 rounded-full flex items-center justify-center mb-6">
+            <svg className="w-12 h-12 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+        </div>
+        <h3 className="text-3xl font-bold mb-3 text-white">¡Pedido Enviado!</h3>
+        <p className="text-gray-400 mb-8 text-lg leading-relaxed">Te redirigimos a WhatsApp con los detalles de tu orden. El equipo de {settings.company.name} confirmará tu pedido en breve.</p>
+        <button onClick={onNewOrder} className="w-full max-w-xs bg-gray-800 text-white py-4 rounded-xl font-bold hover:bg-gray-700 transition-colors border border-gray-700">
+            Volver al Inicio
+        </button>
+    </div>
+);
+
+const FooterBar: React.FC<{ itemCount: number, cartTotal: number, onViewCart: () => void }> = ({ itemCount, cartTotal, onViewCart }) => {
+    return (
+         <footer className="fixed bottom-4 left-4 right-4 max-w-md mx-auto z-20 animate-slide-up">
+            <button onClick={onViewCart} className="w-full bg-emerald-500 text-white font-bold py-4 px-6 rounded-2xl flex justify-between items-center shadow-2xl shadow-emerald-900/50 hover:bg-emerald-400 transition-transform hover:-translate-y-1 active:translate-y-0">
+                <div className="flex items-center gap-3">
+                    <div className="bg-emerald-700/50 px-3 py-1 rounded-lg text-sm font-extrabold border border-emerald-400/30">{itemCount}</div>
+                    <span>Ver Pedido</span>
+                </div>
+                <span className="text-lg">${cartTotal.toFixed(2)}</span>
+            </button>
+        </footer>
+    );
+};
