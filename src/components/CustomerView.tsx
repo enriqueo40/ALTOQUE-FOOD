@@ -203,7 +203,7 @@ export default function CustomerView() {
                 `Tel: ${customer.phone}`,
                 lineSeparator,
                 `📍 *DIRECCIÓN DE ENTREGA*`,
-                gpsLink ? gpsLocation(gpsLink) : '',
+                gpsLocation(gpsLink),
                 customer.address.calle ? `🏠 ${customer.address.calle} #${customer.address.numero}` : '',
                 customer.address.colonia ? `🏙️ Col. ${customer.address.colonia}` : '',
                 customer.address.referencias ? `👀 Ref: ${customer.address.referencias}` : '',
@@ -839,14 +839,10 @@ const ProductDetailModal: React.FC<{
         return selectedOptions[pid]?.some(o => o.id === oid);
     };
 
-    // Validation is now optional as requested by user
-    const isValid = true; 
-
-    const totalOptionsPrice = Object.values(selectedOptions).flat().reduce((acc, opt) => acc + opt.price, 0);
+    const totalOptionsPrice = Object.values(selectedOptions).flat().reduce((acc: number, opt: PersonalizationOption) => acc + (opt.price || 0), 0);
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
 
     const handleAdd = () => {
-        // Removed check: if (!isValid) return;
         const flatOptions = Object.values(selectedOptions).flat();
         onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptions);
     }
@@ -1049,7 +1045,7 @@ const CheckoutView: React.FC<{
     orderType: OrderType 
 }> = ({ cartTotal, onPlaceOrder, settings, orderType }) => {
     const [customer, setCustomer] = useState<Customer>({
-        name: '', phone: '', address: { colonia: '', calle: '', numero: '', entreCalles: '', referencias: '' }
+        name: '', phone: '', address: { colonia: '', calle: '', numero: '', entreCalles: '', referencias: '', googleMapsLink: '' }
     });
     const [tipAmount, setTipAmount] = useState(0);
     const [isLocating, setIsLocating] = useState(false);
