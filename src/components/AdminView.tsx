@@ -1,3 +1,13 @@
+
+const Sidebar: React.FC<{ currentPage: AdminViewPage; setCurrentPage: (page: AdminViewPage) => void }> = ({ currentPage, setCurrentPage }) => {
+    const navItems: { id: AdminViewPage; name: string; icon: React.ReactNode }[] = [
+        { id: 'dashboard', name: 'Inicio', icon: <IconHome /> },
+        { id: 'orders', name: 'Pedidos', icon: <IconOrders /> },
+        { id: 'products', name: 'Menú', icon: <IconMenu /> },
+        { id: 'availability', name: 'Disponibilidad', icon: <IconAvailability /> },
+        { id: 'share', name: 'Compartir', icon: <IconShare /> },
+        { id: 'tutorials', name: 'Tutoriales', icon: <IconTutorials /> },
+    ];
     return (
         <aside className="w-64 bg-white dark:bg-gray-800 shadow-md flex flex-col">
             <div className="h-20 flex items-center justify-center border-b dark:border-gray-700">
@@ -22,7 +32,7 @@
                 <p className="text-gray-600 dark:text-gray-300">+58 414 694 5877</p>
                 <p className="text-gray-500 dark:text-gray-400">Atención rápida</p>
                 <a 
-                    href="https://wa.me/584146945877" 
+                    href="https://wa.me/584146945877"
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="w-full mt-3 flex items-center justify-center space-x-2 px-4 py-2 border dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
