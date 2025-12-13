@@ -594,7 +594,7 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
 
     if (activePromotions.length === 0) return { price: product.price };
 
-    // Find the best discount
+    // Find the best discount or the most relevant promotion
     let bestPrice = product.price;
     let bestPromo: Promotion | undefined;
 
@@ -608,6 +608,11 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
 
         if (currentPrice < bestPrice) {
             bestPrice = currentPrice;
+            bestPromo = promo;
+        } else if (currentPrice === bestPrice && !bestPromo) {
+            // Logic fix: Even if the price doesn't change (0% discount), 
+            // we should still consider this promotion valid for display purposes (e.g. "2x1" badges).
+            // We prioritize the first one found if prices are equal and no promo is set.
             bestPromo = promo;
         }
     });
@@ -624,7 +629,7 @@ const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: 
             <div className="relative h-24 w-24 flex-shrink-0">
                 <img src={product.imageUrl} alt={product.name} className="w-full h-full rounded-lg object-cover" />
                 {hasDiscount && (
-                    <div className="absolute top-2 left-2 bg-yellow-400 text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md z-10 border border-yellow-500">
+                    <div className="absolute top-1 left-1 bg-yellow-400 text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md z-10 border border-yellow-500">
                         {promotion.name}
                     </div>
                 )}
@@ -641,10 +646,11 @@ const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: 
                 </div>
                 <div className="flex justify-between items-end mt-2">
                     <div className="flex flex-col">
-                        {hasDiscount && (
+                        {/* Only show original price if there is an actual monetary discount */}
+                        {hasDiscount && discountedPrice < product.price && (
                             <span className="text-xs text-gray-500 line-through">{currency} ${product.price.toFixed(2)}</span>
                         )}
-                        <p className={`font-bold ${hasDiscount ? 'text-rose-400' : 'text-white'}`}>{currency} ${discountedPrice.toFixed(2)}</p>
+                        <p className={`font-bold ${hasDiscount && discountedPrice < product.price ? 'text-rose-400' : 'text-white'}`}>{currency} ${discountedPrice.toFixed(2)}</p>
                     </div>
                     <div className="bg-gray-700 p-1.5 rounded-full text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
                         <IconPlus className="h-4 w-4" />
@@ -843,11 +849,12 @@ const ProductDetailModal: React.FC<{
         return selectedOptions[pid]?.some(o => o.id === oid);
     };
 
-    const totalOptionsPrice = Object.values(selectedOptions).flat().reduce((acc: number, opt: PersonalizationOption) => acc + (opt.price || 0), 0);
+    // Calculate total price by iterating over options map values and reducing
+    const totalOptionsPrice = Object.values(selectedOptions).reduce((acc, options) => acc + options.reduce((sum, opt) => sum + (opt.price || 0), 0), 0);
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
 
     const handleAdd = () => {
-        const flatOptions = Object.values(selectedOptions).flat();
+        const flatOptions = Object.values(selectedOptions).reduce((acc, curr) => acc.concat(curr), [] as PersonalizationOption[]);
         onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptions);
     }
 
@@ -873,7 +880,7 @@ const ProductDetailModal: React.FC<{
                             </div>
                         </div>
                      )}
-                     {promotion && (
+                     {promotion && (basePrice < product.price) && (
                         <div className="absolute bottom-4 left-6 flex flex-col items-start gap-1">
                             <div className="bg-emerald-600 text-white px-3 py-0.5 rounded-full text-xs font-bold shadow-lg">
                                 Ahorras ${(product.price - basePrice).toFixed(2)}
