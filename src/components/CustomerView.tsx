@@ -98,7 +98,7 @@ export default function CustomerView() {
             ? (settings.shipping.fixedCost ?? 0) 
             : 0;
 
-        const finalTotal = cartTotal + shippingCost + tipAmount;
+        const finalTotal = Number(cartTotal) + Number(shippingCost) + Number(tipAmount);
 
         const newOrder: Omit<Order, 'id' | 'createdAt'> = {
             customer,
@@ -576,17 +576,17 @@ const RestaurantHero: React.FC<{
 };
 
 const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price: number, promotion?: Promotion } => {
-    const now = new Date();
-    // Filter active promotions
-    const activePromotions = promotions.filter(p => {
-        // Fix date parsing to be timezone safe / inclusive
-        // Treat start date as 00:00:00 local time
-        const start = p.startDate ? new Date(p.startDate + 'T00:00:00') : null;
-        // Treat end date as 23:59:59 local time
-        const end = p.endDate ? new Date(p.endDate + 'T23:59:59') : null;
+    // Robust Date Comparison: Use simple ISO string YYYY-MM-DD to avoid timezone issues.
+    // This assumes the admin inputs dates in their local time and expects them to last the full "local" day.
+    const today = new Date();
+    const todayStr = today.toLocaleDateString('en-CA'); // Returns "YYYY-MM-DD" in local time
 
-        if (start && start > now) return false;
-        if (end && end < now) return false;
+    const activePromotions = promotions.filter(p => {
+        // Compare lexicographically (string comparison works for ISO dates)
+        // If start date exists and is in the future (> today), it's not active
+        if (p.startDate && p.startDate > todayStr) return false;
+        // If end date exists and is in the past (< today), it's not active
+        if (p.endDate && p.endDate < todayStr) return false;
         
         if (p.appliesTo === PromotionAppliesTo.AllProducts) return true;
         return p.productIds.includes(product.id);
@@ -624,7 +624,7 @@ const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: 
             <div className="relative h-24 w-24 flex-shrink-0">
                 <img src={product.imageUrl} alt={product.name} className="w-full h-full rounded-lg object-cover" />
                 {hasDiscount && (
-                    <div className="absolute top-1 left-1 bg-yellow-400 text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md z-10 border border-yellow-500">
+                    <div className="absolute top-2 left-2 bg-yellow-400 text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md z-10 border border-yellow-500">
                         {promotion.name}
                     </div>
                 )}
@@ -1156,7 +1156,7 @@ const CheckoutView: React.FC<{
     const labelClasses = "text-sm font-bold text-gray-400 mb-1 block";
 
     const shippingCost = (isDelivery && settings.shipping.costType === ShippingCostType.Fixed) ? (settings.shipping.fixedCost ?? 0) : 0;
-    const finalTotal = Number(cartTotal) + Number(shippingCost) + Number(tipAmount);
+    const finalTotal = Number(cartTotal || 0) + Number(shippingCost || 0) + Number(tipAmount || 0);
     
     return (
         <form onSubmit={handleSubmit} className="p-4 space-y-6 pb-44 animate-fade-in">

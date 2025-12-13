@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { useTheme } from '../hooks/useTheme';
@@ -56,16 +57,11 @@ const Sidebar: React.FC<{ currentPage: AdminViewPage; setCurrentPage: (page: Adm
                 ))}
             </nav>
             <div className="px-4 py-6 border-t dark:border-gray-700 text-sm">
-                <p className="text-gray-600 dark:text-gray-300">+58 414 694 5877</p>
+                <p className="text-gray-600 dark:text-gray-300">+52 (999) 452 3786</p>
                 <p className="text-gray-500 dark:text-gray-400">Atención rápida</p>
-                <a 
-                    href="https://wa.me/584146945877"
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="w-full mt-3 flex items-center justify-center space-x-2 px-4 py-2 border dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                >
+                <button className="w-full mt-3 flex items-center justify-center space-x-2 px-4 py-2 border dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
                     <span>Contactar soporte</span>
-                </a>
+                </button>
             </div>
         </aside>
     );
@@ -1220,22 +1216,17 @@ const PromotionsView: React.FC = () => {
                         <h3 className="text-lg font-semibold mb-4">Promociones Activas</h3>
                         <div className="space-y-4">
                             {promotions.map(promo => {
-                                const now = new Date();
-                                const startDate = promo.startDate ? new Date(promo.startDate) : null;
-                                const endDate = promo.endDate ? new Date(promo.endDate) : null;
-                                
-                                // Adjust end date to be end of day
-                                if (endDate) {
-                                    endDate.setHours(23, 59, 59, 999);
-                                }
+                                // NEW DATE LOGIC: Using string comparison YYYY-MM-DD
+                                const today = new Date();
+                                const todayStr = today.toLocaleDateString('en-CA'); // YYYY-MM-DD local
 
                                 let statusColor = 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400';
                                 let statusText = 'Inactiva';
 
-                                if (startDate && startDate > now) {
+                                if (promo.startDate && promo.startDate > todayStr) {
                                     statusColor = 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400';
                                     statusText = 'Programada';
-                                } else if (endDate && endDate < now) {
+                                } else if (promo.endDate && promo.endDate < todayStr) {
                                     statusColor = 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500';
                                     statusText = 'Finalizada';
                                 } else {
@@ -2345,41 +2336,4 @@ const Analytics: React.FC = () => {
 
 // --- Messages Components ---
 const Messages: React.FC = () => {
-    const [conversations, setConversations] = usePersistentState<Conversation[]>('conversations', MOCK_CONVERSATIONS);
-    const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(conversations[0] || null);
-    const [newMessage, setNewMessage] = useState('');
-
-    const handleSendMessage = () => {
-        if (!newMessage.trim() || !selectedConversation) return;
-
-        const message: AdminChatMessage = {
-            id: `msg-${Date.now()}`,
-            sender: 'admin',
-            text: newMessage.trim(),
-            timestamp: new Date()
-        };
-        
-        const updatedConversation: Conversation = {
-            ...selectedConversation,
-            messages: [...selectedConversation.messages, message],
-            lastMessage: message.text,
-            lastMessageTimestamp: message.timestamp
-        };
-        
-        setConversations(prev => prev.map(c => c.id === updatedConversation.id ? updatedConversation : c));
-        setSelectedConversation(updatedConversation);
-        setNewMessage('');
-    };
-
-    return (
-        <div className="flex h-[calc(100vh-160px)] bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-            <div className="w-1/3 border-r dark:border-gray-700">
-                <div className="p-4 border-b dark:border-gray-700">
-                    <h2 className="text-xl font-bold">Conversaciones</h2>
-                </div>
-                <div className="overflow-y-auto h-full">
-                    {conversations.map(conv => (
-                        <div
-                            key={conv.id}
-                            onClick={() => setSelectedConversation(conv)}
-                            className={`p-4 cursor-pointer border-l-4 ${selectedConversation?.id === conv.id ? 'border-indigo-500 bg-gray-50 dark:bg-gray-700/50' : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-
+    const [conversations, setConversations] = usePersistentState<Conversation[]>('conversations', MOCK_CON
