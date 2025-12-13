@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck, IconCalendar, IconDuplicate, IconMap } from '../constants';
+import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck, IconCalendar, IconDuplicate, IconMap, IconSparkles } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
@@ -579,12 +579,14 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
     const now = new Date();
     // Filter active promotions
     const activePromotions = promotions.filter(p => {
-        if (p.startDate && new Date(p.startDate) > now) return false;
-        if (p.endDate) {
-            const endDate = new Date(p.endDate);
-            endDate.setHours(23, 59, 59, 999); // End of the day
-            if (endDate < now) return false;
-        }
+        // Fix date parsing to be timezone safe / inclusive
+        // Treat start date as 00:00:00 local time
+        const start = p.startDate ? new Date(p.startDate + 'T00:00:00') : null;
+        // Treat end date as 23:59:59 local time
+        const end = p.endDate ? new Date(p.endDate + 'T23:59:59') : null;
+
+        if (start && start > now) return false;
+        if (end && end < now) return false;
         
         if (p.appliesTo === PromotionAppliesTo.AllProducts) return true;
         return p.productIds.includes(product.id);
@@ -619,15 +621,15 @@ const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: 
 
     return (
         <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group relative overflow-hidden">
-            {hasDiscount && (
-                <div className="absolute top-0 left-0 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-br-lg z-10">
-                    -{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}
-                </div>
-            )}
             <div className="relative h-24 w-24 flex-shrink-0">
                 <img src={product.imageUrl} alt={product.name} className="w-full h-full rounded-lg object-cover" />
+                {hasDiscount && (
+                    <div className="absolute top-1 left-1 bg-yellow-400 text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md z-10 border border-yellow-500">
+                        {promotion.name}
+                    </div>
+                )}
                 {quantityInCart > 0 && (
-                    <div className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg ring-2 ring-gray-900">
+                    <div className="absolute -bottom-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg ring-2 ring-gray-900 z-10">
                         {quantityInCart}
                     </div>
                 )}
@@ -864,10 +866,15 @@ const ProductDetailModal: React.FC<{
                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover rounded-t-3xl sm:rounded-t-2xl" />
                      <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent h-full w-full pointer-events-none"></div>
                      {promotion && (
-                        <div className="absolute bottom-4 left-6 flex flex-col items-start gap-1">
-                            <div className="bg-rose-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg">
-                                ¡Oferta Especial!
+                        <div className="absolute top-4 left-4 z-20">
+                            <div className="bg-yellow-400 text-black px-3 py-1 rounded-full text-sm font-bold shadow-lg flex items-center gap-1 border border-yellow-500">
+                                <IconSparkles className="w-3 h-3" />
+                                {promotion.name}
                             </div>
+                        </div>
+                     )}
+                     {promotion && (
+                        <div className="absolute bottom-4 left-6 flex flex-col items-start gap-1">
                             <div className="bg-emerald-600 text-white px-3 py-0.5 rounded-full text-xs font-bold shadow-lg">
                                 Ahorras ${(product.price - basePrice).toFixed(2)}
                             </div>
@@ -895,20 +902,43 @@ const ProductDetailModal: React.FC<{
                                 <div className="space-y-2">
                                     {p.options.filter(o => o.available).map(opt => {
                                         const isSelected = isOptionSelected(p.id, opt.id);
+                                        const isSingleSelect = p.maxSelection === 1;
+                                        
                                         return (
                                             <div 
                                                 key={opt.id} 
                                                 onClick={() => handleOptionToggle(p, opt)}
-                                                className={`flex justify-between items-center p-3 rounded-lg cursor-pointer border transition-all ${isSelected ? 'bg-emerald-500/20 border-emerald-500 ring-1 ring-emerald-500 shadow-lg shadow-emerald-900/20' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}
+                                                className={`flex justify-between items-center p-3 rounded-lg cursor-pointer border transition-all duration-200 group 
+                                                    ${isSelected 
+                                                        ? 'bg-emerald-900/20 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.1)]' 
+                                                        : 'bg-gray-800/50 border-gray-700 hover:border-gray-600 hover:bg-gray-800'
+                                                    }`}
                                             >
                                                 <div className="flex items-center gap-3">
-                                                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${isSelected ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-gray-500'}`}>
-                                                        {isSelected && <IconCheck className="h-3 w-3" />}
+                                                    {/* Selection Indicator */}
+                                                    <div className={`
+                                                        w-5 h-5 flex items-center justify-center border transition-all duration-200 flex-shrink-0
+                                                        ${isSingleSelect ? 'rounded-full' : 'rounded-md'}
+                                                        ${isSelected 
+                                                            ? 'border-emerald-500 bg-emerald-500 text-white' 
+                                                            : 'border-gray-500 bg-transparent group-hover:border-gray-400'}
+                                                    `}>
+                                                        {isSelected && (
+                                                            isSingleSelect 
+                                                                ? <div className="w-2 h-2 bg-white rounded-full shadow-sm" /> 
+                                                                : <IconCheck className="h-3.5 w-3.5" />
+                                                        )}
                                                     </div>
-                                                    <span className={`text-sm ${isSelected ? 'text-white font-medium' : 'text-gray-300'}`}>{opt.name}</span>
+                                                    
+                                                    <span className={`text-sm transition-colors ${isSelected ? 'text-white font-medium' : 'text-gray-300 group-hover:text-gray-200'}`}>
+                                                        {opt.name}
+                                                    </span>
                                                 </div>
+                                                
                                                 {opt.price > 0 && (
-                                                    <span className="text-sm text-emerald-400">+${opt.price.toFixed(2)}</span>
+                                                    <span className={`text-sm font-medium ${isSelected ? 'text-emerald-400' : 'text-gray-500'}`}>
+                                                        +${opt.price.toFixed(2)}
+                                                    </span>
                                                 )}
                                             </div>
                                         )
@@ -1125,8 +1155,8 @@ const CheckoutView: React.FC<{
     const inputClasses = "w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-gray-500 transition-all";
     const labelClasses = "text-sm font-bold text-gray-400 mb-1 block";
 
-    const shippingCost: number = (isDelivery && settings.shipping.costType === ShippingCostType.Fixed) ? (settings.shipping.fixedCost ?? 0) : 0;
-    const finalTotal = cartTotal + shippingCost + tipAmount;
+    const shippingCost = (isDelivery && settings.shipping.costType === ShippingCostType.Fixed) ? (settings.shipping.fixedCost ?? 0) : 0;
+    const finalTotal = Number(cartTotal) + Number(shippingCost) + Number(tipAmount);
     
     return (
         <form onSubmit={handleSubmit} className="p-4 space-y-6 pb-44 animate-fade-in">

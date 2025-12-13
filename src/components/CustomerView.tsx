@@ -1,3 +1,5 @@
+
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
@@ -577,12 +579,14 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
     const now = new Date();
     // Filter active promotions
     const activePromotions = promotions.filter(p => {
-        if (p.startDate && new Date(p.startDate) > now) return false;
-        if (p.endDate) {
-            const endDate = new Date(p.endDate);
-            endDate.setHours(23, 59, 59, 999); // End of the day
-            if (endDate < now) return false;
-        }
+        // Fix date parsing to be timezone safe / inclusive
+        // Treat start date as 00:00:00 local time
+        const start = p.startDate ? new Date(p.startDate + 'T00:00:00') : null;
+        // Treat end date as 23:59:59 local time
+        const end = p.endDate ? new Date(p.endDate + 'T23:59:59') : null;
+
+        if (start && start > now) return false;
+        if (end && end < now) return false;
         
         if (p.appliesTo === PromotionAppliesTo.AllProducts) return true;
         return p.productIds.includes(product.id);
@@ -617,15 +621,15 @@ const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: 
 
     return (
         <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group relative overflow-hidden">
-            {hasDiscount && (
-                <div className="absolute top-0 left-0 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-br-lg z-10">
-                    -{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}
-                </div>
-            )}
             <div className="relative h-24 w-24 flex-shrink-0">
                 <img src={product.imageUrl} alt={product.name} className="w-full h-full rounded-lg object-cover" />
+                {hasDiscount && (
+                    <div className="absolute top-1 left-1 bg-yellow-400 text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md z-10 border border-yellow-500">
+                        {promotion.name}
+                    </div>
+                )}
                 {quantityInCart > 0 && (
-                    <div className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg ring-2 ring-gray-900">
+                    <div className="absolute -bottom-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg ring-2 ring-gray-900 z-10">
                         {quantityInCart}
                     </div>
                 )}
@@ -633,14 +637,7 @@ const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: 
             <div className="flex-1 flex flex-col justify-between py-1">
                 <div>
                     <h3 className="font-bold text-gray-100 leading-tight group-hover:text-emerald-400 transition-colors">{product.name}</h3>
-                    {hasDiscount && (
-                        <div className="mt-1 mb-1">
-                            <span className="inline-block bg-yellow-400/20 text-yellow-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-400/30">
-                                {promotion.name}
-                            </span>
-                        </div>
-                    )}
-                    <p className={`text-sm text-gray-400 line-clamp-2 leading-snug ${hasDiscount ? 'mt-0.5' : 'mt-1'}`}>{product.description}</p>
+                    <p className="text-sm text-gray-400 line-clamp-2 mt-1 leading-snug">{product.description}</p>
                 </div>
                 <div className="flex justify-between items-end mt-2">
                     <div className="flex flex-col">
@@ -869,11 +866,15 @@ const ProductDetailModal: React.FC<{
                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover rounded-t-3xl sm:rounded-t-2xl" />
                      <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent h-full w-full pointer-events-none"></div>
                      {promotion && (
-                        <div className="absolute bottom-4 left-6 flex flex-col items-start gap-1">
-                            <div className="bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full text-sm font-bold shadow-lg flex items-center gap-1 border border-yellow-500">
+                        <div className="absolute top-4 left-4 z-20">
+                            <div className="bg-yellow-400 text-black px-3 py-1 rounded-full text-sm font-bold shadow-lg flex items-center gap-1 border border-yellow-500">
                                 <IconSparkles className="w-3 h-3" />
                                 {promotion.name}
                             </div>
+                        </div>
+                     )}
+                     {promotion && (
+                        <div className="absolute bottom-4 left-6 flex flex-col items-start gap-1">
                             <div className="bg-emerald-600 text-white px-3 py-0.5 rounded-full text-xs font-bold shadow-lg">
                                 Ahorras ${(product.price - basePrice).toFixed(2)}
                             </div>
