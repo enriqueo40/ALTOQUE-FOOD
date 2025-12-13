@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react';
 import { CartItem, Product, PersonalizationOption } from '../types';
 
@@ -46,7 +45,7 @@ export const useCart = () => {
         setCartItems([]);
     };
 
-    const cartTotal = useMemo(() => {
+    const cartTotal: number = useMemo(() => {
         return cartItems.reduce((total, item) => {
             const optionsPrice = item.selectedOptions ? item.selectedOptions.reduce((sum, opt) => sum + opt.price, 0) : 0;
             return total + (item.price + optionsPrice) * item.quantity;

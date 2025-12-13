@@ -34,6 +34,7 @@ const PromotionModal: React.FC<{
     });
     
     const [formData, setFormData] = useState(getInitialFormData());
+    const [showPreview, setShowPreview] = useState(false); // New State for toggling preview on mobile/smaller screens
 
     useEffect(() => {
         if (isOpen) {
@@ -84,16 +85,23 @@ const PromotionModal: React.FC<{
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-start justify-end">
-            <div className="bg-white dark:bg-gray-800 h-full w-full max-w-3xl flex flex-col relative">
+            <div className="bg-white dark:bg-gray-800 h-full w-full max-w-4xl flex flex-col relative transition-all duration-300 ease-in-out">
                 <header className="p-6 border-b dark:border-gray-700 flex justify-between items-center sticky top-0 bg-white dark:bg-gray-800 z-10 shrink-0">
-                    <h2 className="text-xl font-semibold">{promotion ? 'Editar' : 'Agregar'} una promoción</h2>
+                    <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">{promotion ? 'Editar' : 'Agregar'} una promoción</h2>
                     <div className="flex items-center gap-x-4">
+                        <button 
+                            type="button"
+                            onClick={() => setShowPreview(!showPreview)} 
+                            className={`lg:hidden text-sm font-medium px-3 py-1.5 rounded-md border flex items-center gap-1 transition-colors ${showPreview ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 border-gray-300 dark:border-gray-600'}`}
+                        >
+                            <IconEye className="w-4 h-4" /> {showPreview ? 'Ocultar' : 'Vista previa'}
+                        </button>
                         <button onClick={onClose} className="text-gray-500 hover:text-gray-800 p-1"><IconX /></button>
                     </div>
                 </header>
-                <div className="flex flex-1 overflow-hidden">
-                    <form onSubmit={handleSubmit} className="flex-1 flex flex-col lg:w-2/3">
-                        <div className="p-6 flex-1 overflow-y-auto space-y-6">
+                <div className="flex flex-1 overflow-hidden relative">
+                    <form onSubmit={handleSubmit} className="flex-1 flex flex-col w-full lg:w-2/3 h-full overflow-y-auto">
+                        <div className="p-6 space-y-6">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre</label>
                                 <input type="text" name="name" value={formData.name} onChange={handleChange} required className={`${lightInputClasses} mt-1`} placeholder="Ej. 2x1 en hamburguesas"/>
@@ -155,12 +163,18 @@ const PromotionModal: React.FC<{
                             <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700">Agregar promoción</button>
                         </footer>
                     </form>
-                    <div className="w-1/3 bg-gray-100 dark:bg-gray-900/50 p-6 border-l dark:border-gray-700 hidden lg:flex flex-col">
-                         <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-4">Vista previa en menú</h3>
+                    
+                    {/* Preview Panel - Visible on LG screens or when toggled */}
+                    <div className={`absolute inset-0 lg:static lg:w-1/3 bg-gray-100 dark:bg-gray-900/95 p-6 border-l dark:border-gray-700 flex flex-col transition-transform duration-300 z-20 ${showPreview ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}`}>
+                         <div className="flex justify-between items-center lg:hidden mb-4">
+                             <h3 className="font-semibold text-gray-800 dark:text-gray-200">Vista previa</h3>
+                             <button onClick={() => setShowPreview(false)} className="text-gray-500"><IconX/></button>
+                         </div>
+                         <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-4 hidden lg:block">Vista previa en menú</h3>
                          
-                         <div className="bg-white dark:bg-gray-800 rounded-xl p-3 flex gap-4 border border-gray-200 dark:border-gray-700 shadow-sm relative overflow-hidden max-w-sm mx-auto">
+                         <div className="bg-white dark:bg-gray-800 rounded-xl p-3 flex gap-4 border border-gray-200 dark:border-gray-700 shadow-sm relative overflow-hidden max-w-sm mx-auto w-full">
                             <div className="relative h-24 w-24 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded-lg">
-                                {/* Badge Preview */}
+                                {/* Badge Preview - Always Visible in Preview Mode regardless of dates */}
                                 <div className="absolute top-2 left-2 bg-yellow-400 text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md z-10 border border-yellow-500 animate-pulse">
                                     {formData.name || 'Nombre Promo'}
                                 </div>
@@ -186,9 +200,16 @@ const PromotionModal: React.FC<{
                             </div>
                         </div>
 
-                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-6 text-center italic">
-                             Así verán tus clientes la etiqueta sobre el producto.
-                         </p>
+                         <div className="mt-6 text-center">
+                             <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                 Así verán tus clientes la etiqueta sobre el producto.
+                             </p>
+                             {formData.discountValue === 0 && (
+                                 <p className="text-xs text-emerald-600 mt-2 font-medium">
+                                     ℹ️ Al ser descuento 0%, solo se mostrará la etiqueta amarilla. El precio no cambiará.
+                                 </p>
+                             )}
+                         </div>
                     </div>
                 </div>
             </div>
