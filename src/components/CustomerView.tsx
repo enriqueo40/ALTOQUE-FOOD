@@ -1,3 +1,5 @@
+
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
@@ -96,7 +98,7 @@ export default function CustomerView() {
             ? (settings.shipping.fixedCost ?? 0) 
             : 0;
 
-        const finalTotal = (cartTotal || 0) + shippingCost + tipAmount;
+        const finalTotal = cartTotal + shippingCost + tipAmount;
 
         const newOrder: Omit<Order, 'id' | 'createdAt'> = {
             customer,
@@ -574,19 +576,17 @@ const RestaurantHero: React.FC<{
 };
 
 const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price: number, promotion?: Promotion } => {
-    // Robust Date Comparison: Use simple ISO string YYYY-MM-DD to avoid timezone issues.
-    // This assumes the admin inputs dates in their local time and expects them to last the full "local" day.
     const now = new Date();
-    const todayStr = now.getFullYear() + '-' +
-                     String(now.getMonth() + 1).padStart(2, '0') + '-' +
-                     String(now.getDate()).padStart(2, '0');
-
+    // Filter active promotions
     const activePromotions = promotions.filter(p => {
-        // Compare lexicographically (string comparison works for ISO dates)
-        // If start date exists and is in the future (> today), it's not active
-        if (p.startDate && p.startDate > todayStr) return false;
-        // If end date exists and is in the past (< today), it's not active
-        if (p.endDate && p.endDate < todayStr) return false;
+        // Fix date parsing to be timezone safe / inclusive
+        // Treat start date as 00:00:00 local time
+        const start = p.startDate ? new Date(p.startDate + 'T00:00:00') : null;
+        // Treat end date as 23:59:59 local time
+        const end = p.endDate ? new Date(p.endDate + 'T23:59:59') : null;
+
+        if (start && start > now) return false;
+        if (end && end < now) return false;
         
         if (p.appliesTo === PromotionAppliesTo.AllProducts) return true;
         return p.productIds.includes(product.id);
@@ -606,12 +606,8 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
             currentPrice = Math.max(0, product.price - promo.discountValue);
         }
 
-        // Apply discount if better price OR if prices are equal but no promo set yet (prioritizes active promos)
-        // This ensures badges like "2x1" (which might have 0 discount value) still show up.
         if (currentPrice < bestPrice) {
             bestPrice = currentPrice;
-            bestPromo = promo;
-        } else if (currentPrice === bestPrice && !bestPromo) {
             bestPromo = promo;
         }
     });
@@ -628,7 +624,7 @@ const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: 
             <div className="relative h-24 w-24 flex-shrink-0">
                 <img src={product.imageUrl} alt={product.name} className="w-full h-full rounded-lg object-cover" />
                 {hasDiscount && (
-                    <div className="absolute top-2 left-2 bg-yellow-400 text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md z-10 border border-yellow-500">
+                    <div className="absolute top-1 left-1 bg-yellow-400 text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md z-10 border border-yellow-500">
                         {promotion.name}
                     </div>
                 )}
@@ -645,11 +641,10 @@ const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: 
                 </div>
                 <div className="flex justify-between items-end mt-2">
                     <div className="flex flex-col">
-                        {/* Only show original price if there is an actual monetary discount */}
-                        {hasDiscount && discountedPrice < product.price && (
+                        {hasDiscount && (
                             <span className="text-xs text-gray-500 line-through">{currency} ${product.price.toFixed(2)}</span>
                         )}
-                        <p className={`font-bold ${hasDiscount && discountedPrice < product.price ? 'text-rose-400' : 'text-white'}`}>{currency} ${discountedPrice.toFixed(2)}</p>
+                        <p className={`font-bold ${hasDiscount ? 'text-rose-400' : 'text-white'}`}>{currency} ${discountedPrice.toFixed(2)}</p>
                     </div>
                     <div className="bg-gray-700 p-1.5 rounded-full text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
                         <IconPlus className="h-4 w-4" />
@@ -848,11 +843,11 @@ const ProductDetailModal: React.FC<{
         return selectedOptions[pid]?.some(o => o.id === oid);
     };
 
-    const totalOptionsPrice = Object.values(selectedOptions).flat().reduce((acc: number, opt: PersonalizationOption) => acc + (opt.price || 0), 0);
+    const totalOptionsPrice = Object.values(selectedOptions).reduce((acc, options) => acc + options.reduce((sum, opt) => sum + (opt.price || 0), 0), 0);
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
 
     const handleAdd = () => {
-        const flatOptions = Object.values(selectedOptions).flat();
+        const flatOptions = Object.values(selectedOptions).reduce((acc, val) => acc.concat(val), [] as PersonalizationOption[]);
         onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptions);
     }
 
@@ -1161,7 +1156,7 @@ const CheckoutView: React.FC<{
     const labelClasses = "text-sm font-bold text-gray-400 mb-1 block";
 
     const shippingCost = (isDelivery && settings.shipping.costType === ShippingCostType.Fixed) ? (settings.shipping.fixedCost ?? 0) : 0;
-    const finalTotal = (cartTotal || 0) + shippingCost + (tipAmount || 0);
+    const finalTotal = Number(cartTotal) + Number(shippingCost) + Number(tipAmount);
     
     return (
         <form onSubmit={handleSubmit} className="p-4 space-y-6 pb-44 animate-fade-in">

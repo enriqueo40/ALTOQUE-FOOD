@@ -843,11 +843,11 @@ const ProductDetailModal: React.FC<{
         return selectedOptions[pid]?.some(o => o.id === oid);
     };
 
-    const totalOptionsPrice = Object.values(selectedOptions).flat().reduce((acc: number, opt: PersonalizationOption) => acc + (opt.price || 0), 0);
+    const totalOptionsPrice = Object.values(selectedOptions).reduce((acc, options) => acc + options.reduce((sum, opt) => sum + (opt.price || 0), 0), 0);
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
 
     const handleAdd = () => {
-        const flatOptions = Object.values(selectedOptions).flat();
+        const flatOptions = Object.values(selectedOptions).reduce((acc, val) => acc.concat(val), [] as PersonalizationOption[]);
         onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptions);
     }
 
