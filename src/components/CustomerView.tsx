@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
@@ -78,11 +77,12 @@ const ProductDetailModal: React.FC<{
         return selectedOptions[pid]?.some(o => o.id === oid);
     };
 
-    const totalOptionsPrice = Object.values(selectedOptions).reduce((acc, options) => acc + options.reduce((sum, opt) => sum + (opt.price || 0), 0), 0);
+    // Fix: Explicitly cast Object.values return to avoid 'unknown' type issues
+    const totalOptionsPrice = (Object.values(selectedOptions) as PersonalizationOption[][]).reduce((acc, options) => acc + options.reduce((sum, opt) => sum + (opt.price || 0), 0), 0);
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
     
-    // Flatten options for display and adding to cart
-    const allSelectedOptions = Object.values(selectedOptions).reduce((acc, val) => acc.concat(val), [] as PersonalizationOption[]);
+    // Fix: Explicitly cast Object.values return to avoid 'unknown' type issues
+    const allSelectedOptions = (Object.values(selectedOptions) as PersonalizationOption[][]).reduce((acc, val) => acc.concat(val), [] as PersonalizationOption[]);
 
     const handleAdd = () => {
         onAddToCart({ ...product, price: basePrice }, quantity, comments, allSelectedOptions);
