@@ -77,11 +77,11 @@ const ProductDetailModal: React.FC<{
         return selectedOptions[pid]?.some(o => o.id === oid);
     };
 
-    // Fix: Explicitly cast Object.values return to avoid 'unknown' type issues
+    // Fix: Explicitly cast Object.values to PersonalizationOption[][] to avoid 'unknown' type errors
     const totalOptionsPrice = (Object.values(selectedOptions) as PersonalizationOption[][]).reduce((acc, options) => acc + options.reduce((sum, opt) => sum + (opt.price || 0), 0), 0);
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
     
-    // Fix: Explicitly cast Object.values return to avoid 'unknown' type issues
+    // Fix: Explicitly cast Object.values to PersonalizationOption[][] to avoid 'unknown' type errors
     const allSelectedOptions = (Object.values(selectedOptions) as PersonalizationOption[][]).reduce((acc, val) => acc.concat(val), [] as PersonalizationOption[]);
 
     const handleAdd = () => {
