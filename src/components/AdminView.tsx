@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { useTheme } from '../hooks/useTheme';
@@ -153,7 +154,6 @@ const DashboardStatCard: React.FC<{ title: string; value: string; secondaryValue
 );
 
 const Dashboard: React.FC = () => {
-    // Connected to Real Data from Supabase
     const [orders, setOrders] = useState<Order[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     
@@ -167,11 +167,11 @@ const Dashboard: React.FC = () => {
     const totalSales = useMemo(() => orders.reduce((sum, order) => sum + order.total, 0), [orders]);
     const totalOrders = orders.length;
 
-    const previousDaySales = totalSales * 0.9; // Simulation for comparison
-    const previousDayOrders = Math.floor(totalOrders * 0.9); // Simulation for comparison
+    const previousDaySales = totalSales * 0.9;
+    const previousDayOrders = Math.floor(totalOrders * 0.9);
     
     const totalEnvios = orders.filter(o => o.orderType === OrderType.Delivery).length;
-    const totalPropinas = 0; // This would need extraction from order details if stored separately
+    const totalPropinas = 0;
 
     if (isLoading) {
         return <div className="p-10 text-center animate-pulse text-gray-500">Cargando estadísticas...</div>;
@@ -3328,4 +3328,120 @@ const HoursSettings: React.FC<{ onSave: () => Promise<void>; settings: AppSettin
             </div>
 
             {!hasAnyShifts && (
-                 <div className="p-4 bg-orange-
+                 <div className="p-4 bg-orange-100 dark:bg-orange-900/50 border-l-4 border-orange-500 text-orange-700 dark:text-orange-200">
+                    <p className="font-bold">El horario permanecerá abierto las 24 horas hasta que agregues un turno.</p>
+                </div>
+            )}
+
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
+                <div className="p-4 flex justify-between items-center border-b dark:border-gray-700">
+                    <h3 className="font-bold">{activeSchedule?.name}</h3>
+                    <button className="text-gray-500"><IconMoreVertical/></button>
+                </div>
+                <ul className="divide-y dark:divide-gray-700">
+                    {activeSchedule?.days.map(day => (
+                        <li key={day.day} className="p-4 flex justify-between items-center">
+                            <span className="font-semibold w-24">{day.day}</span>
+                            <div className="flex-1 flex flex-wrap gap-2 items-center">
+                                {day.shifts.map((shift, index) => (
+                                    <div key={index} className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded-full px-3 py-1 text-sm">
+                                        <span>{shift.start} - {shift.end}</span>
+                                        <button onClick={() => handleRemoveShift(day.day, index)} className="text-gray-500 hover:text-red-500"><IconX className="h-3 w-3"/></button>
+                                    </div>
+                                ))}
+                            </div>
+                            <button onClick={() => handleAddShift(day.day)} className="text-green-600 font-semibold text-sm flex items-center gap-1"><IconPlus className="h-4 w-4"/> Nuevo turno</button>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+            
+            <ShiftModal 
+                isOpen={isShiftModalOpen}
+                onClose={() => setIsShiftModalOpen(false)}
+                onSave={handleSaveShift}
+                day={selectedDay || ''}
+            />
+            <ScheduleModal
+                isOpen={isScheduleModalOpen}
+                onClose={() => setIsScheduleModalOpen(false)}
+                onSave={handleSaveSchedule}
+            />
+        </div>
+    );
+};
+
+const ZonesAndTablesSettings: React.FC<{
+    zones: Zone[];
+    onAddZone: () => void;
+    onEditZoneName: (zone: Zone) => void;
+    onDeleteZone: (zoneId: string) => void;
+    onEditZoneLayout: (zone: Zone) => void;
+}> = ({ zones, onAddZone, onEditZoneName, onDeleteZone, onEditZoneLayout }) => {
+    
+    const ActionMenu: React.FC<{zone: Zone}> = ({zone}) => {
+        const [isOpen, setIsOpen] = useState(false);
+        const menuRef = useRef<HTMLDivElement>(null);
+
+        useEffect(() => {
+            const handleClickOutside = (event: MouseEvent) => {
+                if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                    setIsOpen(false);
+                }
+            };
+            document.addEventListener("mousedown", handleClickOutside);
+            return () => document.removeEventListener("mousedown", handleClickOutside);
+        }, []);
+
+        return (
+             <div className="relative" ref={menuRef}>
+                <button onClick={() => setIsOpen(p => !p)} className="p-2 text-gray-500 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"><IconMoreVertical/></button>
+                {isOpen && (
+                    <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-gray-900 rounded-md shadow-lg z-10 border dark:border-gray-700">
+                        <div className="p-1">
+                             <p className="px-3 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Acciones</p>
+                            <button onClick={() => { onEditZoneLayout(zone); setIsOpen(false); }} className="w-full text-left flex items-center gap-x-2 px-3 py-1.5 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"> <IconEdit className="h-4 w-4" /> Editar distribución</button>
+                            <button onClick={() => { onDeleteZone(zone.id); setIsOpen(false); }} className="w-full text-left flex items-center gap-x-2 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-900/50"><IconTrash className="h-4 w-4" /> Borrar</button>
+                        </div>
+                    </div>
+                )}
+             </div>
+        )
+    }
+
+    return (
+        <div className="space-y-6">
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/50 border border-blue-200 dark:border-blue-800 rounded-md flex items-center gap-x-3 text-sm text-blue-800 dark:text-blue-200 mb-6">
+                <IconInfo className="h-5 w-5 flex-shrink-0" />
+                <span>Encuentra el código QR de cada mesa en <a href="#" className="font-semibold underline hover:text-blue-600">Compartir</a>.</span>
+            </div>
+
+            <div className="flex justify-end">
+                 <button onClick={onAddZone} className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md text-sm font-semibold hover:bg-green-700">
+                    <IconPlus className="h-5 w-5" />
+                    <span>Nueva zona</span>
+                </button>
+            </div>
+            
+             {zones.length === 0 ? (
+                <div className="text-center py-10 px-6 border-2 border-dashed dark:border-gray-600 rounded-lg">
+                    <h4 className="text-md font-semibold text-gray-800 dark:text-gray-200">Aún no tienes zonas creadas</h4>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Empieza por agregar tu primera zona para organizar tus mesas.</p>
+                </div>
+            ) : (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
+                   <ul className="divide-y dark:divide-gray-700">
+                        {zones.map(zone => (
+                           <li key={zone.id} className="p-4 flex justify-between items-center">
+                                <div className="flex-grow">
+                                    <input type="text" defaultValue={zone.name} onBlur={(e) => onEditZoneName({ ...zone, name: e.target.value })} className="font-semibold bg-transparent border-none focus:ring-0 p-0 m-0 w-full" />
+                                </div>
+                                <div className="pr-2">
+                                    <ActionMenu zone={zone}/>
+                                </div>
+                           </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+        </div>
