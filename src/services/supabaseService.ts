@@ -1,4 +1,3 @@
-
 import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 import { Product, Category, Personalization, Promotion, PersonalizationOption, Zone, Table, AppSettings, Order } from '../types';
 import { INITIAL_SETTINGS } from '../constants';

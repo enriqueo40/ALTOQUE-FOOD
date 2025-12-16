@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
@@ -346,6 +345,7 @@ export default function CustomerView() {
             return;
         }
 
+        // --- SHIPPING COST LOGIC ---
         const shippingCost = (orderType === OrderType.Delivery && settings.shipping.costType === ShippingCostType.Fixed) 
             ? (settings.shipping.fixedCost ?? 0) 
             : 0;
@@ -542,8 +542,7 @@ export default function CustomerView() {
         );
     }
 
-    // ... (Cart and Checkout views remain identical)
-    // Included for file completeness if copied, but unchanged logically
+    // --- Render: Cart View ---
     if (view === 'cart') {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
@@ -601,6 +600,7 @@ export default function CustomerView() {
         )
     }
 
+    // --- Render: Checkout View ---
     if (view === 'checkout') {
         const shippingCost = (orderType === OrderType.Delivery && settings?.shipping.costType === ShippingCostType.Fixed) ? (settings.shipping.fixedCost ?? 0) : 0;
         return (
