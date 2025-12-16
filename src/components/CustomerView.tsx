@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
@@ -10,12 +11,28 @@ import Chatbot from './Chatbot';
 const getDiscountedPrice = (product: Product, promotions: Promotion[]) => {
     const applicablePromo = promotions.find(p => {
         const now = new Date();
-        const start = p.startDate ? new Date(p.startDate) : null;
-        const end = p.endDate ? new Date(p.endDate) : null;
-        if(end) end.setHours(23,59,59);
         
-        if (start && now < start) return false;
-        if (end && now > end) return false;
+        // Parse dates safely as local time [Year, Month, Day]
+        let startTime = 0;
+        if (p.startDate) {
+            const [y, m, d] = p.startDate.split('-').map(Number);
+            const startDate = new Date(y, m - 1, d); // Month is 0-indexed
+            startDate.setHours(0, 0, 0, 0);
+            startTime = startDate.getTime();
+        }
+
+        let endTime = Infinity;
+        if (p.endDate) {
+            const [y, m, d] = p.endDate.split('-').map(Number);
+            const endDate = new Date(y, m - 1, d);
+            endDate.setHours(23, 59, 59, 999); // End of the day
+            endTime = endDate.getTime();
+        }
+        
+        const nowTime = now.getTime();
+
+        if (nowTime < startTime) return false;
+        if (nowTime > endTime) return false;
 
         if (p.appliesTo === PromotionAppliesTo.AllProducts) return true;
         return p.productIds.includes(product.id);
@@ -350,7 +367,7 @@ export default function CustomerView() {
             ? (settings.shipping.fixedCost ?? 0) 
             : 0;
 
-        const finalTotal = cartTotal + shippingCost; // Add tip logic if needed
+        const finalTotal = cartTotal + shippingCost; 
 
         const customer: Customer = {
             name: customerName,
