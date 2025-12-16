@@ -121,29 +121,74 @@ export const deleteCategory = async (categoryId: string): Promise<void> => {
 
 // --- Products Functions ---
 export const getProducts = async (): Promise<Product[]> => {
-    const { data, error } = await getClient().from('products').select('*').order('name');
+    // Modified to fetch related personalizations via the join table
+    const { data, error } = await getClient()
+        .from('products')
+        .select('*, product_personalizations(personalization_id)')
+        .order('name');
+        
     if (error) {
         console.error("Error fetching products:", error);
         throw error;
     }
-    return data || [];
+    
+    // Transform the result to include personalizationIds array
+    return data?.map(product => ({
+        ...product,
+        personalizationIds: product.product_personalizations?.map((pp: any) => pp.personalization_id) || []
+    })) || [];
 };
 
 export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & { id?: string }): Promise<Product> => {
-    const { id, ...productData } = product;
+    const { id, personalizationIds, ...productData } = product;
+    
+    // 1. Save Product
     const { data, error } = await getClient()
         .from('products')
         .upsert({ id, ...productData })
-        .select();
+        .select()
+        .single();
 
     if (error) {
         console.error("Error saving product:", error);
         throw error;
     }
-     if (!data?.[0]) {
+     if (!data) {
         throw new Error("Could not save product.");
     }
-    return data[0];
+
+    const savedProductId = data.id;
+
+    // 2. Manage Personalization Links
+    // First, remove existing links for this product
+    const { error: deleteError } = await getClient()
+        .from('product_personalizations')
+        .delete()
+        .eq('product_id', savedProductId);
+        
+    if (deleteError) {
+        console.error("Error clearing product personalizations:", deleteError);
+        // Continue anyway to try insert
+    }
+
+    // Then, add new links if any
+    if (personalizationIds && personalizationIds.length > 0) {
+        const links = personalizationIds.map(pId => ({
+            product_id: savedProductId,
+            personalization_id: pId
+        }));
+        
+        const { error: insertError } = await getClient()
+            .from('product_personalizations')
+            .insert(links);
+            
+        if (insertError) {
+            console.error("Error inserting product personalizations:", insertError);
+            throw insertError;
+        }
+    }
+
+    return { ...data, personalizationIds: personalizationIds || [] };
 };
 
 export const updateProductAvailability = async (productId: string, available: boolean): Promise<Product> => {
@@ -517,6 +562,7 @@ export const subscribeToMenuUpdates = (onUpdate: () => void) => {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'promotions' }, onUpdate)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'personalizations' }, onUpdate)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'personalization_options' }, onUpdate)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'product_personalizations' }, onUpdate)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, onUpdate)
         .subscribe((status) => {
             if (status === 'SUBSCRIBED') {

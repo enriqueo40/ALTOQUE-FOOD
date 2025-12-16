@@ -8,6 +8,7 @@ export interface Product {
     imageUrl: string;
     categoryId: string;
     available: boolean;
+    personalizationIds?: string[]; // New field for linking
     created_at?: string;
 }
 

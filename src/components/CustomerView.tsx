@@ -55,6 +55,12 @@ const ProductDetailModal: React.FC<{
 
     const { price: basePrice, promotion } = getDiscountedPrice(product, promotions);
 
+    // Filter personalizations relevant to this product
+    const relevantPersonalizations = useMemo(() => {
+        if (!product.personalizationIds || product.personalizationIds.length === 0) return [];
+        return personalizations.filter(p => product.personalizationIds!.includes(p.id));
+    }, [product, personalizations]);
+
     const handleOptionToggle = (personalization: Personalization, option: PersonalizationOption) => {
         setSelectedOptions(prev => {
             const currentSelection = prev[personalization.id] || [];
@@ -128,63 +134,65 @@ const ProductDetailModal: React.FC<{
                     
                     {/* Personalizations */}
                     <div className="space-y-6">
-                        {personalizations.map(p => (
-                            <div key={p.id} className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
-                                <div className="flex justify-between items-center mb-3">
-                                    <div>
-                                        <h4 className="font-bold text-gray-900 dark:text-white">{p.name}</h4>
+                        {relevantPersonalizations.length > 0 ? (
+                            relevantPersonalizations.map(p => (
+                                <div key={p.id} className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <div>
+                                            <h4 className="font-bold text-gray-900 dark:text-white">{p.name}</h4>
+                                        </div>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-md">
+                                            {p.maxSelection === 1 ? 'Elige 1' : `Máx ${p.maxSelection || 'ilimitado'}`}
+                                        </span>
                                     </div>
-                                    <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-md">
-                                        {p.maxSelection === 1 ? 'Elige 1' : `Máx ${p.maxSelection || 'ilimitado'}`}
-                                    </span>
-                                </div>
-                                <div className="space-y-2">
-                                    {p.options.filter(o => o.available).map(opt => {
-                                        const isSelected = isOptionSelected(p.id, opt.id);
-                                        const isSingleSelect = p.maxSelection === 1;
-                                        
-                                        return (
-                                            <div 
-                                                key={opt.id} 
-                                                onClick={() => handleOptionToggle(p, opt)}
-                                                className={`flex justify-between items-center p-3 rounded-lg cursor-pointer border transition-all duration-200 group 
-                                                    ${isSelected 
-                                                        ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-500 shadow-sm' 
-                                                        : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:border-emerald-300 dark:hover:border-emerald-700'
-                                                    }`}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    {/* Selection Indicator */}
-                                                    <div className={`
-                                                        w-5 h-5 flex items-center justify-center border transition-all duration-200 flex-shrink-0
-                                                        ${isSingleSelect ? 'rounded-full' : 'rounded-md'}
+                                    <div className="space-y-2">
+                                        {p.options.filter(o => o.available).map(opt => {
+                                            const isSelected = isOptionSelected(p.id, opt.id);
+                                            const isSingleSelect = p.maxSelection === 1;
+                                            
+                                            return (
+                                                <div 
+                                                    key={opt.id} 
+                                                    onClick={() => handleOptionToggle(p, opt)}
+                                                    className={`flex justify-between items-center p-3 rounded-lg cursor-pointer border transition-all duration-200 group 
                                                         ${isSelected 
-                                                            ? 'border-emerald-500 bg-emerald-500 text-white' 
-                                                            : 'border-gray-300 dark:border-gray-500 bg-transparent'}
-                                                    `}>
-                                                        {isSelected && (
-                                                            isSingleSelect 
-                                                                ? <div className="w-2 h-2 bg-white rounded-full shadow-sm" /> 
-                                                                : <IconCheck className="h-3.5 w-3.5" />
-                                                        )}
+                                                            ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-500 shadow-sm' 
+                                                            : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:border-emerald-300 dark:hover:border-emerald-700'
+                                                        }`}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        {/* Selection Indicator */}
+                                                        <div className={`
+                                                            w-5 h-5 flex items-center justify-center border transition-all duration-200 flex-shrink-0
+                                                            ${isSingleSelect ? 'rounded-full' : 'rounded-md'}
+                                                            ${isSelected 
+                                                                ? 'border-emerald-500 bg-emerald-500 text-white' 
+                                                                : 'border-gray-300 dark:border-gray-500 bg-transparent'}
+                                                        `}>
+                                                            {isSelected && (
+                                                                isSingleSelect 
+                                                                    ? <div className="w-2 h-2 bg-white rounded-full shadow-sm" /> 
+                                                                    : <IconCheck className="h-3.5 w-3.5" />
+                                                            )}
+                                                        </div>
+                                                        
+                                                        <span className={`text-sm font-medium ${isSelected ? 'text-emerald-900 dark:text-emerald-100' : 'text-gray-700 dark:text-gray-300'}`}>
+                                                            {opt.name}
+                                                        </span>
                                                     </div>
                                                     
-                                                    <span className={`text-sm font-medium ${isSelected ? 'text-emerald-900 dark:text-emerald-100' : 'text-gray-700 dark:text-gray-300'}`}>
-                                                        {opt.name}
-                                                    </span>
+                                                    {opt.price > 0 && (
+                                                        <span className={`text-sm font-medium ${isSelected ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                                            +${opt.price.toFixed(2)}
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                
-                                                {opt.price > 0 && (
-                                                    <span className={`text-sm font-medium ${isSelected ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                                                        +${opt.price.toFixed(2)}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        )
-                                    })}
+                                            )
+                                        })}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))
+                        ) : null}
                     </div>
 
                     {/* Summary Section */}
@@ -534,7 +542,8 @@ export default function CustomerView() {
         );
     }
 
-    // --- Render: Cart View ---
+    // ... (Cart and Checkout views remain identical)
+    // Included for file completeness if copied, but unchanged logically
     if (view === 'cart') {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
@@ -592,7 +601,6 @@ export default function CustomerView() {
         )
     }
 
-    // --- Render: Checkout View ---
     if (view === 'checkout') {
         const shippingCost = (orderType === OrderType.Delivery && settings?.shipping.costType === ShippingCostType.Fixed) ? (settings.shipping.fixedCost ?? 0) : 0;
         return (
