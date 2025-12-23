@@ -2,15 +2,20 @@
 import { GoogleGenAI } from "@google/genai";
 import { ChatMessage, Order, Product } from '../types';
 
-// Guidelines: API key handled exclusively from process.env.API_KEY.
-// Guidelines: New instance created right before API call.
+// IMPORTANT: In a real application, the API key would be handled securely
+// and not exposed in the client-side code. It's assumed to be available
+// in the environment variables.
+const API_KEY = process.env.API_KEY;
+
+if (!API_KEY) {
+  console.warn("API_KEY for Gemini is not set. AI features will be disabled.");
+}
+
+const ai = new GoogleGenAI({ apiKey: API_KEY! });
+
 
 export const generateProductDescription = async (productName: string, categoryName: string, currentDescription: string): Promise<string> => {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) return "AI service is unavailable.";
-    
-    const ai = new GoogleGenAI({ apiKey });
-    
+    if (!API_KEY) return "AI service is unavailable.";
     try {
         const prompt = `Generate a chic, minimalist, and enticing one-sentence description for a cafe menu item.
         Item Name: ${productName}
@@ -19,14 +24,12 @@ export const generateProductDescription = async (productName: string, categoryNa
         
         Focus on fresh ingredients, taste, and experience. Keep it under 15 words.`;
 
-        // Fix: gemini-3-flash-preview for text tasks
         const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
+            model: 'gemini-2.5-flash',
             contents: prompt,
         });
 
-        // Fix: Use .text property
-        return response.text?.trim() || "Delicious choice prepared with fresh ingredients.";
+        return response.text.trim();
     } catch (error) {
         console.error("Error generating product description:", error);
         return "Failed to generate description.";
@@ -34,10 +37,8 @@ export const generateProductDescription = async (productName: string, categoryNa
 };
 
 export const getChatbotResponse = async (history: ChatMessage[], newMessage: string): Promise<string> => {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) return "I'm sorry, my AI brain is taking a little coffee break. Please try again later.";
+    if (!API_KEY) return "I'm sorry, my AI brain is taking a little coffee break. Please try again later.";
     
-    const ai = new GoogleGenAI({ apiKey });
     const systemInstruction = `You are "OrdoBot", a friendly and helpful AI assistant for a chic cafe. 
     Your personality is warm, professional, and slightly witty.
     You can answer questions about the menu, store hours (8 AM - 8 PM daily), and general inquiries.
@@ -45,20 +46,21 @@ export const getChatbotResponse = async (history: ChatMessage[], newMessage: str
     Keep your answers concise and friendly.
     Here is the menu: Artisanal Coffees, Fresh Pastries, Savory Bites, Cold Brews & Teas.`;
 
+    const contents = history.map(msg => ({
+        role: msg.sender === 'user' ? 'user' : 'model',
+        parts: [{ text: msg.text }]
+    }));
+    contents.push({ role: 'user', parts: [{ text: newMessage }] });
+
     try {
-        // Fix: Initialization and history usage
         const chat = ai.chats.create({
-            model: 'gemini-3-flash-preview',
+            model: 'gemini-2.5-flash',
             config: { systemInstruction },
-            history: history.map(msg => ({
-                role: msg.sender === 'user' ? 'user' : 'model',
-                parts: [{ text: msg.text }]
-            }))
+            history: contents.slice(0, -1), // Send previous history
         });
 
         const response = await chat.sendMessage({ message: newMessage });
-        // Fix: .text property usage
-        return response.text?.trim() || "How else can I help you today?";
+        return response.text.trim();
 
     } catch (error) {
         console.error("Error getting chatbot response:", error);
@@ -67,10 +69,8 @@ export const getChatbotResponse = async (history: ChatMessage[], newMessage: str
 };
 
 export const getAdvancedInsights = async (query: string, orders: Order[]): Promise<string> => {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) return "AI service is unavailable.";
+    if (!API_KEY) return "AI service is unavailable.";
     
-    const ai = new GoogleGenAI({ apiKey });
     const prompt = `As a world-class restaurant business analyst, analyze the following order data based on the user's query. Provide actionable insights, identify trends, and give specific, data-driven recommendations.
 
     **Order Data (JSON format):**
@@ -88,14 +88,13 @@ export const getAdvancedInsights = async (query: string, orders: Order[]): Promi
     
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-2.5-pro',
             contents: prompt,
             config: {
-                thinkingConfig: { thinkingBudget: 8192 }
+                thinkingConfig: { thinkingBudget: 32768 }
             }
         });
-        // Fix: .text property usage
-        return response.text || "No insights found.";
+        return response.text;
     } catch (error) {
         console.error("Error getting advanced insights:", error);
         return `An error occurred while analyzing the data. ${error instanceof Error ? error.message : String(error)}`;

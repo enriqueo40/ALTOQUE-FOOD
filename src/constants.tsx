@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Product, Category, Order, OrderStatus, Conversation, Personalization, Promotion, Zone, Customer, OrderType, DiscountType, PromotionAppliesTo, Table, Currency, AppSettings, ShippingCostType, PrintingMethod } from './types';
 
@@ -241,8 +240,8 @@ export const INITIAL_SETTINGS: AppSettings = {
         coverImageUrl: '',
     },
     shipping: {
-        costType: ShippingCostType.Fixed,
-        fixedCost: 5.00,
+        costType: ShippingCostType.ToBeQuoted,
+        fixedCost: null,
         freeShippingMinimum: null,
         enableShippingMinimum: null,
         deliveryTime: { min: 25, max: 45 },
