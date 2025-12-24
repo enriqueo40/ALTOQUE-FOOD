@@ -5,7 +5,6 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   // Cargar variables de entorno del sistema (Netlify las inyecta aquí)
-  // Fix: Property 'cwd' does not exist on type 'Process'. Cast process to any to allow access to the Node.js cwd() method.
   const env = loadEnv(mode, (process as any).cwd(), '');
   
   return {
@@ -17,7 +16,6 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: 'dist',
-      // Desactivar source maps en producción para no exponer lógica de variables
       sourcemap: false,
     }
   }

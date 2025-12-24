@@ -14,7 +14,7 @@ let menuChannel: RealtimeChannel | null = null;
 const getClient = (): SupabaseClient => {
     if (supabase) return supabase;
     if (!supabaseUrl || !supabaseAnonKey) {
-        console.warn("Supabase credentials missing. Ensure environment variables are set.");
+        console.warn("Supabase credentials missing. Ensure environment variables are set in your hosting provider.");
     }
     supabase = createClient(supabaseUrl, supabaseAnonKey);
     return supabase;
@@ -128,6 +128,23 @@ export const savePersonalization = async (personalization: Omit<Personalization,
     return all.find(p => p.id === saved.id)!;
 };
 
+// Fix: Added deletePersonalization export to fix AdminView.tsx error and maintain consistency.
+export const deletePersonalization = async (id: string): Promise<void> => {
+    const { error } = await getClient().from('personalizations').delete().eq('id', id);
+    if (error) throw error;
+};
+
+export const updatePersonalizationOptionAvailability = async (optionId: string, available: boolean): Promise<PersonalizationOption> => {
+    const { data, error } = await getClient()
+        .from('personalization_options')
+        .update({ available })
+        .eq('id', optionId)
+        .select()
+        .single();
+    if (error) throw error;
+    return data;
+};
+
 // --- Promotions ---
 export const getPromotions = async (): Promise<Promotion[]> => {
     const { data, error } = await getClient().from('promotions').select('*, promotion_products(product_id)');
@@ -168,6 +185,11 @@ export const savePromotion = async (promotion: Omit<Promotion, 'id' | 'created_a
     return { ...promotion, id: saved.id };
 };
 
+export const deletePromotion = async (promotionId: string): Promise<void> => {
+    const { error } = await getClient().from('promotions').delete().eq('id', promotionId);
+    if (error) throw error;
+};
+
 // --- Zones and Tables ---
 export const getZones = async (): Promise<Zone[]> => {
     const { data, error } = await getClient().from('zones').select('*, tables(*)').order('created_at');
@@ -177,7 +199,7 @@ export const getZones = async (): Promise<Zone[]> => {
 
 export const saveZone = async (zone: Pick<Zone, 'name' | 'rows' | 'cols'> & { id?: string }): Promise<Zone> => {
     const { id, ...zoneData } = zone;
-    const { data, error } = await getClient().from('zones').upsert({ id, ...zoneData }).select('*, tables(*)').single();
+    const { data, error = null } = await getClient().from('zones').upsert({ id, ...zoneData }).select('*, tables(*)').single();
     if (error) throw error;
     return data as Zone;
 };
@@ -211,7 +233,7 @@ export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created
         branch_id: order.branchId || null,
         order_type: order.orderType || null,
         table_id: order.tableId || null,
-        general_comments: order.generalComments || null,
+        general_comments: order.general_comments || null,
         payment_status: order.paymentStatus || 'pending'
     };
     const { error } = await getClient().from('orders').insert(payload);
