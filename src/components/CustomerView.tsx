@@ -43,7 +43,6 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]) => {
 
 // --- Sub-Components ---
 
-// Fix: Typed ProductCard as React.FC to properly handle the 'key' prop used during list rendering.
 const ProductCard: React.FC<{ product: Product; promotions: Promotion[]; onClick: () => void }> = ({ product, promotions, onClick }) => {
     const { price, promotion } = getDiscountedPrice(product, promotions);
     
@@ -98,7 +97,15 @@ export default function CustomerView() {
     const [allCategories, setAllCategories] = useState<Category[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [orderType, setOrderType] = useState<OrderType>(OrderType.Delivery);
+    const [searchTerm, setSearchTerm] = useState('');
     
+    // Form States
+    const [customerName, setCustomerName] = useState('');
+    const [customerPhone, setCustomerPhone] = useState('');
+    const [customerAddress, setCustomerAddress] = useState({ colonia: '', calle: '', numero: '', referencias: '' });
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | ''>('');
+    const [generalComments, setGeneralComments] = useState('');
+
     const { cartItems, addToCart, removeFromCart, updateQuantity, clearCart, cartTotal, itemCount } = useCart();
     const categoryRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
@@ -131,7 +138,7 @@ export default function CustomerView() {
         setSelectedCategory(id);
         const element = categoryRefs.current[id];
         if (element) {
-            const offset = 140; // Ajuste para el header fijo
+            const offset = 140; 
             const bodyRect = document.body.getBoundingClientRect().top;
             const elementRect = element.getBoundingClientRect().top;
             const elementPosition = elementRect - bodyRect;
@@ -142,6 +149,45 @@ export default function CustomerView() {
                 behavior: 'smooth'
             });
         }
+    };
+
+    const filteredProducts = useMemo(() => {
+        return allProducts.filter(p => p.available && p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    }, [allProducts, searchTerm]);
+
+    const handlePlaceOrder = async () => {
+        if (!settings) return;
+        if (!customerName || !customerPhone) { alert("Completa tus datos básicos."); return; }
+        if (orderType === OrderType.Delivery && (!customerAddress.calle || !customerAddress.colonia)) { alert("Completa tu dirección."); return; }
+        if (!selectedPaymentMethod) { alert("Selecciona método de pago."); return; }
+
+        const shippingCost = (orderType === OrderType.Delivery && settings.shipping.costType === ShippingCostType.Fixed) ? (settings.shipping.fixedCost || 0) : 0;
+        const finalTotal = cartTotal + shippingCost;
+
+        const customer: Customer = {
+            name: customerName,
+            phone: customerPhone,
+            address: orderType === OrderType.Delivery ? customerAddress : { colonia: '', calle: '', numero: '', referencias: '' }
+        };
+
+        const newOrder: Omit<Order, 'id' | 'createdAt'> = {
+            customer,
+            items: cartItems,
+            total: finalTotal,
+            status: OrderStatus.Pending,
+            branchId: 'main-branch',
+            generalComments: generalComments,
+            orderType: orderType,
+            paymentStatus: 'pending'
+        };
+
+        try {
+            await saveOrder(newOrder);
+            const message = encodeURIComponent(`NUEVO PEDIDO WEB\nCliente: ${customerName}\nTotal: $${finalTotal.toFixed(2)}`);
+            window.open(`https://wa.me/${settings.branch.whatsappNumber.replace(/\D/g, '')}?text=${message}`, '_blank');
+            clearCart();
+            setView('confirmation');
+        } catch(e) { alert("Error al guardar pedido."); }
     };
 
     if (isLoading) return (
@@ -169,7 +215,6 @@ export default function CustomerView() {
                     </div>
                     
                     <div className="bg-white dark:bg-gray-800 px-4 pb-4 shadow-sm relative">
-                        {/* Logo Overlay */}
                         <div className="absolute -top-10 left-1/2 -translate-x-1/2">
                             <div className="w-20 h-20 bg-white dark:bg-gray-800 rounded-full p-1 shadow-xl border-2 border-white dark:border-gray-700">
                                 {settings?.branch.logoUrl ? (
@@ -205,7 +250,7 @@ export default function CustomerView() {
                                 </div>
                             </div>
 
-                            {/* Logistics Info */}
+                            {/* Logistics Info Bar */}
                             <div className="mt-4 flex justify-center gap-8 border-t dark:border-gray-700 pt-4">
                                 <div className="text-center">
                                     <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Tiempo envío</p>
@@ -230,7 +275,7 @@ export default function CustomerView() {
                     </div>
                 </div>
 
-                {/* Sticky Navigation */}
+                {/* Sticky Navigation & Search */}
                 <div className="sticky top-0 z-40 bg-white dark:bg-gray-800 shadow-md border-b dark:border-gray-700">
                     <div className="flex overflow-x-auto px-4 py-3 gap-2 no-scrollbar scroll-smooth">
                         <button
@@ -249,23 +294,34 @@ export default function CustomerView() {
                             </button>
                         ))}
                     </div>
+                    <div className="px-4 pb-2">
+                        <div className="relative">
+                            <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4"/>
+                            <input 
+                                type="text"
+                                placeholder="Busca tu producto favorito..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full bg-gray-50 dark:bg-gray-700 border-none rounded-xl pl-10 py-2 text-sm focus:ring-emerald-500 font-bold"
+                            />
+                        </div>
+                    </div>
                 </div>
 
                 {/* Menu Content */}
                 <div className="mt-4 px-4 space-y-10">
-                    {/* Active Promotions Banner */}
-                    {allPromotions.length > 0 && (
+                    {allPromotions.length > 0 && searchTerm === '' && (
                         <div className="bg-yellow-100 dark:bg-yellow-900/30 border-l-4 border-yellow-400 p-4 rounded-xl flex items-center justify-between">
                             <div>
                                 <h4 className="font-black text-yellow-800 dark:text-yellow-400 text-sm uppercase">{allPromotions[0].name}</h4>
-                                <p className="text-xs text-yellow-700 dark:text-yellow-500 font-bold">Haz clic para ver más detalles...</p>
+                                <p className="text-xs text-yellow-700 dark:text-yellow-500 font-bold">¡Haz clic en los productos para aplicar!</p>
                             </div>
-                            <span className="text-3xl font-black text-yellow-500 opacity-50 italic">PROMO</span>
+                            <span className="text-3xl font-black text-yellow-500 opacity-50 italic">OFERTA</span>
                         </div>
                     )}
 
                     {allCategories.map(category => {
-                        const categoryProducts = allProducts.filter(p => p.categoryId === category.id && p.available);
+                        const categoryProducts = filteredProducts.filter(p => p.categoryId === category.id);
                         if (categoryProducts.length === 0) return null;
 
                         return (
@@ -310,7 +366,6 @@ export default function CustomerView() {
                     </div>
                 </div>
                 
-                {/* Product Detail Modal stays similar but with updated branding */}
                 {selectedProduct && (
                     <ProductDetailModal 
                         product={selectedProduct} 
@@ -326,11 +381,132 @@ export default function CustomerView() {
         );
     }
 
-    // Default simplified views for Cart/Checkout
-    return <div className="p-10 text-center">Vistas auxiliares en proceso de optimización estética.</div>;
+    if (view === 'cart') {
+        return (
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col font-sans">
+                <header className="bg-white dark:bg-gray-800 p-4 shadow-sm flex items-center gap-3 sticky top-0 z-30">
+                    <button onClick={() => setView('menu')} className="p-2 hover:bg-gray-100 rounded-full"><IconArrowLeft className="h-6 w-6 text-gray-900 dark:text-white"/></button>
+                    <h1 className="font-black text-xl uppercase tracking-tighter">Mi Carrito</h1>
+                </header>
+                <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+                    {cartItems.map((item, idx) => (
+                        <div key={item.cartItemId} className="bg-white dark:bg-gray-800 p-4 rounded-2xl border dark:border-gray-700 flex gap-4 animate-in slide-in-from-bottom-2 duration-300" style={{ animationDelay: `${idx * 50}ms` }}>
+                            <img src={item.imageUrl} className="w-20 h-20 rounded-xl object-cover" alt={item.name} />
+                            <div className="flex-1 flex flex-col justify-between">
+                                <div className="flex justify-between items-start">
+                                    <h4 className="font-black text-sm dark:text-white uppercase tracking-tight">{item.name}</h4>
+                                    <button onClick={() => removeFromCart(item.cartItemId)} className="text-red-500"><IconTrash className="h-5 w-5"/></button>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="font-black text-emerald-600">${(item.price * item.quantity).toFixed(2)}</span>
+                                    <div className="flex items-center gap-3 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
+                                        <button onClick={() => updateQuantity(item.cartItemId, item.quantity - 1)} className="p-1"><IconMinus className="h-4 w-4"/></button>
+                                        <span className="font-black text-sm w-4 text-center">{item.quantity}</span>
+                                        <button onClick={() => updateQuantity(item.cartItemId, item.quantity + 1)} className="p-1"><IconPlus className="h-4 w-4"/></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <div className="p-6 bg-white dark:bg-gray-800 border-t dark:border-gray-700 rounded-t-3xl shadow-lg">
+                    <div className="flex justify-between items-center mb-6">
+                        <span className="font-bold text-gray-500 uppercase text-xs tracking-widest">Total del carrito</span>
+                        <span className="text-2xl font-black text-emerald-600">${cartTotal.toFixed(2)}</span>
+                    </div>
+                    <button onClick={() => setView('checkout')} className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-emerald-600/20 active:scale-[0.98] transition-all">
+                        FINALIZAR PEDIDO
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (view === 'checkout') {
+        const shippingCost = (orderType === OrderType.Delivery && settings?.shipping.costType === ShippingCostType.Fixed) ? (settings.shipping.fixedCost || 0) : 0;
+        return (
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col font-sans">
+                <header className="bg-white dark:bg-gray-800 p-4 shadow-sm flex items-center gap-3 sticky top-0 z-30">
+                    <button onClick={() => setView('cart')} className="p-2 hover:bg-gray-100 rounded-full"><IconArrowLeft className="h-6 w-6 text-gray-900 dark:text-white"/></button>
+                    <h1 className="font-black text-xl uppercase tracking-tighter">Checkout</h1>
+                </header>
+                <div className="flex-1 p-4 space-y-6 overflow-y-auto">
+                    <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                        <h3 className="font-black mb-4 uppercase text-xs tracking-widest text-gray-400">Tipo de entrega</h3>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button onClick={() => setOrderType(OrderType.Delivery)} className={`p-4 rounded-2xl border-2 font-black flex flex-col items-center gap-2 transition-all ${orderType === OrderType.Delivery ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600' : 'border-gray-100 dark:border-gray-700 text-gray-400'}`}>
+                                <IconDelivery className="h-7 w-7"/> DOMICILIO
+                            </button>
+                            <button onClick={() => setOrderType(OrderType.TakeAway)} className={`p-4 rounded-2xl border-2 font-black flex flex-col items-center gap-2 transition-all ${orderType === OrderType.TakeAway ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600' : 'border-gray-100 dark:border-gray-700 text-gray-400'}`}>
+                                <IconStore className="h-7 w-7"/> RECOGER
+                            </button>
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
+                        <h3 className="font-black uppercase text-xs tracking-widest text-gray-400">Tus Datos</h3>
+                        <input type="text" placeholder="Nombre completo" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full p-4 bg-gray-50 dark:bg-gray-700 rounded-xl border-none focus:ring-2 focus:ring-emerald-500 font-bold" />
+                        <input type="tel" placeholder="WhatsApp / Teléfono" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full p-4 bg-gray-50 dark:bg-gray-700 rounded-xl border-none focus:ring-2 focus:ring-emerald-500 font-bold" />
+                        {orderType === OrderType.Delivery && (
+                            <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
+                                <input type="text" placeholder="Calle y Número" value={customerAddress.calle} onChange={e => setCustomerAddress({...customerAddress, calle: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-700 rounded-xl border-none focus:ring-2 focus:ring-emerald-500 font-bold" />
+                                <input type="text" placeholder="Colonia / Sector" value={customerAddress.colonia} onChange={e => setCustomerAddress({...customerAddress, colonia: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-700 rounded-xl border-none focus:ring-2 focus:ring-emerald-500 font-bold" />
+                            </div>
+                        )}
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                        <h3 className="font-black mb-4 uppercase text-xs tracking-widest text-gray-400">Método de Pago</h3>
+                        <div className="grid grid-cols-2 gap-3">
+                            {settings?.payment[orderType === OrderType.Delivery ? 'deliveryMethods' : 'pickupMethods'].map(m => (
+                                <button key={m} onClick={() => setSelectedPaymentMethod(m)} className={`p-3 text-xs font-black rounded-xl border-2 transition-all ${selectedPaymentMethod === m ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600' : 'border-gray-50 dark:border-gray-700 text-gray-500'}`}>
+                                    {m.toUpperCase()}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+                <div className="p-6 bg-white dark:bg-gray-800 border-t dark:border-gray-700 rounded-t-3xl shadow-lg">
+                    <div className="space-y-2 mb-6">
+                        <div className="flex justify-between text-gray-400 font-bold uppercase text-[10px] tracking-widest">
+                            <span>Subtotal</span>
+                            <span>${cartTotal.toFixed(2)}</span>
+                        </div>
+                        {shippingCost > 0 && (
+                            <div className="flex justify-between text-emerald-600 font-bold uppercase text-[10px] tracking-widest">
+                                <span>Envío</span>
+                                <span>+${shippingCost.toFixed(2)}</span>
+                            </div>
+                        )}
+                        <div className="flex justify-between text-2xl font-black pt-2 border-t dark:border-gray-700">
+                            <span className="text-gray-900 dark:text-white">TOTAL</span>
+                            <span className="text-emerald-600">${(cartTotal + shippingCost).toFixed(2)}</span>
+                        </div>
+                    </div>
+                    <button onClick={handlePlaceOrder} className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-emerald-600/20 active:scale-[0.98] transition-all flex items-center justify-center gap-3">
+                        <IconWhatsapp className="h-6 w-6"/> CONFIRMAR POR WHATSAPP
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (view === 'confirmation') {
+        return (
+            <div className="min-h-screen bg-emerald-600 flex flex-col items-center justify-center p-8 text-white text-center">
+                <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-8 shadow-2xl animate-bounce">
+                    <IconCheck className="h-12 w-12 text-emerald-600" />
+                </div>
+                <h1 className="text-4xl font-black mb-4 uppercase tracking-tighter">¡Pedido Enviado!</h1>
+                <p className="text-emerald-50 mb-10 font-bold">Te hemos redirigido a WhatsApp para procesar tu orden. El restaurante te contactará en breve.</p>
+                <button onClick={() => setView('menu')} className="bg-white text-emerald-600 px-10 py-4 rounded-2xl font-black shadow-xl hover:bg-emerald-50 transition-colors uppercase tracking-widest text-sm">
+                    Hacer otro pedido
+                </button>
+            </div>
+        )
+    }
+
+    return null;
 }
 
-// --- ProductDetailModal Re-implementation for brevity and integration ---
 const ProductDetailModal: React.FC<{
     product: Product, 
     onAddToCart: (product: Product, quantity: number, comments?: string, options?: PersonalizationOption[]) => void, 
@@ -401,6 +577,16 @@ const ProductDetailModal: React.FC<{
                                 </div>
                             </div>
                         ))}
+                    </div>
+
+                    <div className="mt-8">
+                         <h4 className="font-black text-xs uppercase tracking-widest text-gray-400 mb-3">Notas adicionales</h4>
+                         <textarea 
+                            value={comments} 
+                            onChange={e => setComments(e.target.value)}
+                            placeholder="Ej. Sin cebolla, extra salsa..."
+                            className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border-none focus:ring-2 focus:ring-emerald-500 font-bold text-sm resize-none h-24"
+                         />
                     </div>
                 </div>
 

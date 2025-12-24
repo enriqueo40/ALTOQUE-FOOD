@@ -3,8 +3,9 @@ import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabas
 import { Product, Category, Personalization, Promotion, PersonalizationOption, Zone, Table, AppSettings, Order } from '../types';
 import { INITIAL_SETTINGS } from '../constants';
 
-const supabaseUrl = "https://cnbntnnhxlvkvallumdg.supabase.co";
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuYm50bm5oeGx2a3ZhbGx1bWRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwNjQ1MjksImV4cCI6MjA3ODY0MDUyOX0.TuovcK2Ao2tb3GM0I2j5n2BpL5DIVLSl-yjdoCHS9pM";
+// Keys must be set in the build environment (e.g., Netlify Environment Variables)
+const supabaseUrl = process.env.SUPABASE_URL || "https://cnbntnnhxlvkvallumdg.supabase.co";
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || "";
 
 let supabase: SupabaseClient | null = null;
 let ordersChannel: RealtimeChannel | null = null;
@@ -12,7 +13,9 @@ let menuChannel: RealtimeChannel | null = null;
 
 const getClient = (): SupabaseClient => {
     if (supabase) return supabase;
-    if (!supabaseUrl || !supabaseAnonKey) throw new Error("Supabase URL or Anon Key is not defined.");
+    if (!supabaseUrl || !supabaseAnonKey) {
+        console.error("Supabase credentials missing. Check environment variables.");
+    }
     supabase = createClient(supabaseUrl, supabaseAnonKey);
     return supabase;
 };
@@ -71,23 +74,49 @@ export const deleteCategory = async (categoryId: string): Promise<void> => {
 };
 
 export const getProducts = async (): Promise<Product[]> => {
+    // Fetch products and their linked personalizations via the join table
     const { data, error } = await getClient()
         .from('products')
-        .select('id, name, description, price, imageUrl, available, categoryId, created_at')
+        .select('*, product_personalizations(personalization_id)')
         .order('name');
+    
     if (error) throw error;
-    return data || [];
+
+    return data?.map((p: any) => ({
+        ...p,
+        personalizationIds: p.product_personalizations?.map((pp: any) => pp.personalization_id) || []
+    })) || [];
 };
 
 export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & { id?: string }): Promise<Product> => {
-    const { id, ...productData } = product;
+    const { id, personalizationIds, ...productData } = product;
+    
     const { data, error } = await getClient()
         .from('products')
         .upsert({ id, ...productData })
-        .select();
+        .select()
+        .single();
+
     if (error) throw error;
-    if (!data?.[0]) throw new Error("Could not save product.");
-    return data[0];
+    if (!data) throw new Error("Could not save product.");
+
+    // Update many-to-many links if provided
+    if (personalizationIds) {
+        await updateProductPersonalizationLinks(data.id, personalizationIds);
+    }
+
+    return data;
+};
+
+export const updateProductPersonalizationLinks = async (productId: string, personalizationIds: string[]): Promise<void> => {
+    const client = getClient();
+    // Clear existing
+    await client.from('product_personalizations').delete().eq('product_id', productId);
+    // Insert new
+    if (personalizationIds.length > 0) {
+        const links = personalizationIds.map(pid => ({ product_id: productId, personalization_id: pid }));
+        await client.from('product_personalizations').insert(links);
+    }
 };
 
 export const updateProductAvailability = async (productId: string, available: boolean): Promise<Product> => {
@@ -276,13 +305,12 @@ export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created
 };
 
 export const getActiveOrders = async (): Promise<Order[]> => {
-    // Optimization: Traer solo pedidos no cancelados y limitar a los últimos 50
     const { data, error } = await getClient()
         .from('orders')
         .select('*')
         .neq('status', 'Cancelled') 
         .order('created_at', { ascending: false })
-        .limit(50); // Límite de carga para mayor velocidad
+        .limit(50);
 
     if (error) return [];
     return data.map((o: any) => ({
@@ -333,7 +361,7 @@ export const subscribeToNewOrders = (
                 total: newOrder.total,
                 createdAt: new Date(newOrder.created_at),
                 branchId: newOrder.branch_id,
-                orderType: newOrder.order_type,
+                order_type: newOrder.order_type,
                 tableId: newOrder.table_id,
                 generalComments: newOrder.general_comments,
                 paymentStatus: newOrder.payment_status,
