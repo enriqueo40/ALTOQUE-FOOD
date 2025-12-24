@@ -2,19 +2,12 @@
 import { GoogleGenAI } from "@google/genai";
 import { ChatMessage, Order, Product } from '../types';
 
-const API_KEY = process.env.API_KEY;
-let ai: GoogleGenAI | null = null;
-
-if (API_KEY) {
-    try {
-        ai = new GoogleGenAI({ apiKey: API_KEY });
-    } catch (e) {
-        console.error("Error initializing GoogleGenAI client:", e);
-    }
-}
-
 export const generateProductDescription = async (productName: string, categoryName: string, currentDescription: string): Promise<string> => {
-    if (!ai) return "AI service is unavailable.";
+    // Fix: Initialize client inside function using process.env.API_KEY directly.
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) return "AI service is unavailable.";
+    const ai = new GoogleGenAI({ apiKey });
+
     try {
         const prompt = `Generate a chic, minimalist, and enticing one-sentence description for a cafe menu item.
         Item Name: ${productName}
@@ -34,7 +27,11 @@ export const generateProductDescription = async (productName: string, categoryNa
 };
 
 export const getAdvancedInsights = async (query: string, orders: Order[]): Promise<string> => {
-    if (!ai) return "AI insights unavailable.";
+    // Fix: Initialize client inside function using process.env.API_KEY directly.
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) return "AI insights unavailable.";
+    const ai = new GoogleGenAI({ apiKey });
+
     const prompt = `Analyze this restaurant order data: ${JSON.stringify(orders)}. Query: ${query}. Provide actionable business recommendations in Markdown.`;
     
     try {
@@ -52,12 +49,24 @@ export const getAdvancedInsights = async (query: string, orders: Order[]): Promi
 };
 
 export const getChatbotResponse = async (history: ChatMessage[], newMessage: string): Promise<string> => {
-    if (!ai) return "Offline.";
+    // Fix: Initialize client inside function using process.env.API_KEY directly.
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) return "Offline.";
+    const ai = new GoogleGenAI({ apiKey });
+
     const systemInstruction = `You are OrdoBot, a witty and professional restaurant assistant. Answer menu questions concisely.`;
+    
+    // Fix: Transform history to correct role-based format for the Chat API.
+    const historyParts = history.map(msg => ({
+        role: msg.sender === 'user' ? 'user' : 'model',
+        parts: [{ text: msg.text }]
+    }));
+
     try {
         const chat = ai.chats.create({
             model: 'gemini-3-flash-preview',
             config: { systemInstruction },
+            history: historyParts,
         });
         const response = await chat.sendMessage({ message: newMessage });
         return response.text?.trim() || "I'm here to help!";
