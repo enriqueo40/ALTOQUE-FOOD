@@ -3,8 +3,7 @@ import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabas
 import { Product, Category, Personalization, Promotion, PersonalizationOption, Zone, Table, AppSettings, Order } from '../types';
 import { INITIAL_SETTINGS } from '../constants';
 
-// Configuración de Supabase usando variables de entorno inyectadas por Vite.
-// Estos valores se configuran en el panel de Netlify.
+// Las credenciales se obtienen exclusivamente del entorno para cumplir con las políticas de seguridad de Netlify.
 const supabaseUrl = process.env.SUPABASE_URL || "";
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || "";
 
@@ -14,11 +13,9 @@ let menuChannel: RealtimeChannel | null = null;
 
 const getClient = (): SupabaseClient => {
     if (supabase) return supabase;
-    
     if (!supabaseUrl || !supabaseAnonKey) {
-        console.warn("Supabase credentials missing. Ensure SUPABASE_URL and SUPABASE_ANON_KEY are set in environment variables.");
+        console.warn("Configuración de Supabase no encontrada. Verifique las variables de entorno SUPABASE_URL y SUPABASE_ANON_KEY.");
     }
-
     supabase = createClient(supabaseUrl, supabaseAnonKey);
     return supabase;
 };
@@ -47,8 +44,7 @@ export const getAppSettings = async (): Promise<AppSettings> => {
 export const saveAppSettings = async (settings: AppSettings): Promise<void> => {
     const { error } = await getClient()
         .from('app_settings')
-        .update({ settings, updated_at: new Date().toISOString() })
-        .eq('id', 1);
+        .upsert({ id: 1, settings, updated_at: new Date().toISOString() });
     if (error) throw error;
 };
 
@@ -131,11 +127,6 @@ export const savePersonalization = async (personalization: Omit<Personalization,
     }
     const all = await getPersonalizations();
     return all.find(p => p.id === saved.id)!;
-};
-
-export const deletePersonalization = async (id: string): Promise<void> => {
-    const { error } = await getClient().from('personalizations').delete().eq('id', id);
-    if (error) throw error;
 };
 
 // --- Promotions ---
