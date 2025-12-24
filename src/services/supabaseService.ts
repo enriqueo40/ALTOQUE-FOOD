@@ -3,7 +3,7 @@ import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabas
 import { Product, Category, Personalization, Promotion, PersonalizationOption, Zone, Table, AppSettings, Order } from '../types';
 import { INITIAL_SETTINGS } from '../constants';
 
-// Las credenciales se obtienen exclusivamente del entorno para cumplir con las políticas de seguridad de Netlify.
+// Las credenciales se obtienen exclusivamente del entorno inyectado por Vite/Netlify
 const supabaseUrl = process.env.SUPABASE_URL || "";
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || "";
 
@@ -14,7 +14,7 @@ let menuChannel: RealtimeChannel | null = null;
 const getClient = (): SupabaseClient => {
     if (supabase) return supabase;
     if (!supabaseUrl || !supabaseAnonKey) {
-        console.warn("Configuración de Supabase no encontrada. Verifique las variables de entorno SUPABASE_URL y SUPABASE_ANON_KEY.");
+        console.warn("Supabase credentials missing. Ensure environment variables are set.");
     }
     supabase = createClient(supabaseUrl, supabaseAnonKey);
     return supabase;
@@ -48,7 +48,7 @@ export const saveAppSettings = async (settings: AppSettings): Promise<void> => {
     if (error) throw error;
 };
 
-// --- Categories Functions ---
+// --- Categories & Products ---
 export const getCategories = async (): Promise<Category[]> => {
     const { data, error } = await getClient().from('categories').select('*').order('created_at');
     if (error) throw error;
@@ -67,7 +67,6 @@ export const deleteCategory = async (categoryId: string): Promise<void> => {
     if (error) throw error;
 };
 
-// --- Products Functions ---
 export const getProducts = async (): Promise<Product[]> => {
     const { data, error } = await getClient().from('products').select('*').order('name');
     if (error) throw error;
@@ -202,7 +201,7 @@ export const saveZoneLayout = async (zone: Zone): Promise<void> => {
     }
 };
 
-// --- Orders ---
+// --- Orders Real-time ---
 export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created_at'>): Promise<void> => {
     const payload = {
         customer: { ...order.customer, paymentProof: order.paymentProof },
