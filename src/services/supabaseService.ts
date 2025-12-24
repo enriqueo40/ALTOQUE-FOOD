@@ -3,8 +3,9 @@ import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabas
 import { Product, Category, Personalization, Promotion, PersonalizationOption, Zone, Table, AppSettings, Order } from '../types';
 import { INITIAL_SETTINGS } from '../constants';
 
-// Keys must be set in the build environment (e.g., Netlify Environment Variables)
-const supabaseUrl = process.env.SUPABASE_URL || "https://cnbntnnhxlvkvallumdg.supabase.co";
+// Supabase configuration using environment variables to prevent build blockers and security leaks.
+// These should be configured in the hosting provider's environment settings (e.g. Netlify UI).
+const supabaseUrl = process.env.SUPABASE_URL || "";
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || "";
 
 let supabase: SupabaseClient | null = null;
@@ -14,12 +15,14 @@ let menuChannel: RealtimeChannel | null = null;
 const getClient = (): SupabaseClient => {
     if (supabase) return supabase;
     if (!supabaseUrl || !supabaseAnonKey) {
-        console.error("Supabase credentials missing. Check environment variables.");
+        // Log warning but don't crash immediately; allows the UI to show a "setup required" state if needed.
+        console.warn("Supabase configuration missing. Ensure SUPABASE_URL and SUPABASE_ANON_KEY are set in environment variables.");
     }
     supabase = createClient(supabaseUrl, supabaseAnonKey);
     return supabase;
 };
 
+// --- Settings Functions ---
 export const getAppSettings = async (): Promise<AppSettings> => {
     const { data, error } = await getClient()
         .from('app_settings')
@@ -43,29 +46,22 @@ export const getAppSettings = async (): Promise<AppSettings> => {
 export const saveAppSettings = async (settings: AppSettings): Promise<void> => {
     const { error } = await getClient()
         .from('app_settings')
-        .update({ settings, updated_at: new Date().toISOString() })
-        .eq('id', 1);
+        .upsert({ id: 1, settings, updated_at: new Date().toISOString() });
     if (error) throw error;
 };
 
+// --- Categories Functions ---
 export const getCategories = async (): Promise<Category[]> => {
-    const { data, error } = await getClient()
-        .from('categories')
-        .select('id, name, created_at')
-        .order('created_at');
+    const { data, error } = await getClient().from('categories').select('*').order('created_at');
     if (error) throw error;
     return data || [];
 };
 
 export const saveCategory = async (category: Omit<Category, 'id' | 'created_at'> & { id?: string }): Promise<Category> => {
     const { id, ...categoryData } = category;
-    const { data, error } = await getClient()
-        .from('categories')
-        .upsert({ id, ...categoryData })
-        .select();
+    const { data, error } = await getClient().from('categories').upsert({ id, ...categoryData }).select().single();
     if (error) throw error;
-    if (!data?.[0]) throw new Error("Could not save category.");
-    return data[0];
+    return data;
 };
 
 export const deleteCategory = async (categoryId: string): Promise<void> => {
@@ -73,8 +69,8 @@ export const deleteCategory = async (categoryId: string): Promise<void> => {
     if (error) throw error;
 };
 
+// --- Products Functions ---
 export const getProducts = async (): Promise<Product[]> => {
-    // Fetch products and their linked personalizations via the join table
     const { data, error } = await getClient()
         .from('products')
         .select('*, product_personalizations(personalization_id)')
@@ -98,21 +94,15 @@ export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & 
         .single();
 
     if (error) throw error;
-    if (!data) throw new Error("Could not save product.");
-
-    // Update many-to-many links if provided
     if (personalizationIds) {
         await updateProductPersonalizationLinks(data.id, personalizationIds);
     }
-
     return data;
 };
 
 export const updateProductPersonalizationLinks = async (productId: string, personalizationIds: string[]): Promise<void> => {
     const client = getClient();
-    // Clear existing
     await client.from('product_personalizations').delete().eq('product_id', productId);
-    // Insert new
     if (personalizationIds.length > 0) {
         const links = personalizationIds.map(pid => ({ product_id: productId, personalization_id: pid }));
         await client.from('product_personalizations').insert(links);
@@ -120,12 +110,7 @@ export const updateProductPersonalizationLinks = async (productId: string, perso
 };
 
 export const updateProductAvailability = async (productId: string, available: boolean): Promise<Product> => {
-    const { data, error } = await getClient()
-        .from('products')
-        .update({ available })
-        .eq('id', productId)
-        .select()
-        .single();
+    const { data, error } = await getClient().from('products').update({ available }).eq('id', productId).select().single();
     if (error) throw error;
     return data;
 };
@@ -135,10 +120,9 @@ export const deleteProduct = async (productId: string): Promise<void> => {
     if (error) throw error;
 };
 
+// --- Personalizations ---
 export const getPersonalizations = async (): Promise<Personalization[]> => {
-    const { data, error } = await getClient()
-        .from('personalizations')
-        .select('*, options:personalization_options(*)');
+    const { data, error } = await getClient().from('personalizations').select('*, options:personalization_options(*)');
     if (error) throw error;
     return (data?.map(p => ({
         ...p,
@@ -148,20 +132,9 @@ export const getPersonalizations = async (): Promise<Personalization[]> => {
     })) || []) as Personalization[];
 };
 
-export const updatePersonalizationOptionAvailability = async (optionId: string, available: boolean): Promise<PersonalizationOption> => {
-    const { data, error } = await getClient()
-        .from('personalization_options')
-        .update({ available })
-        .eq('id', optionId)
-        .select()
-        .single();
-    if (error) throw error;
-    return data;
-};
-
 export const savePersonalization = async (personalization: Omit<Personalization, 'id' | 'created_at'> & { id?: string }): Promise<Personalization> => {
     const { options, ...personalizationData } = personalization;
-    const { data: savedPersonalization, error: pError } = await getClient()
+    const { data: saved, error } = await getClient()
         .from('personalizations')
         .upsert({
             id: personalizationData.id,
@@ -173,28 +146,29 @@ export const savePersonalization = async (personalization: Omit<Personalization,
         })
         .select()
         .single();
-    if (pError) throw pError;
-    const { error: deleteError } = await getClient().from('personalization_options').delete().eq('personalization_id', savedPersonalization.id);
-    if (deleteError) throw deleteError;
+    if (error) throw error;
+
+    await getClient().from('personalization_options').delete().eq('personalization_id', saved.id);
     if (options && options.length > 0) {
-        const optionsToInsert = options.map(opt => ({
-            personalization_id: savedPersonalization.id,
-            name: opt.name,
-            price: opt.price,
-            available: true
-        }));
-        const { error: optionsError } = await getClient().from('personalization_options').insert(optionsToInsert);
-        if (optionsError) throw optionsError;
+        const toInsert = options.map(opt => ({ personalization_id: saved.id, name: opt.name, price: opt.price, available: true }));
+        await getClient().from('personalization_options').insert(toInsert);
     }
-    const finalData = await getPersonalizations();
-    return finalData.find(p => p.id === savedPersonalization.id)!;
+    const all = await getPersonalizations();
+    return all.find(p => p.id === saved.id)!;
 };
 
-export const deletePersonalization = async (personalizationId: string): Promise<void> => {
-    const { error } = await getClient().from('personalizations').delete().eq('id', personalizationId);
+export const deletePersonalization = async (id: string): Promise<void> => {
+    const { error } = await getClient().from('personalizations').delete().eq('id', id);
     if (error) throw error;
 };
 
+export const updatePersonalizationOptionAvailability = async (id: string, available: boolean): Promise<PersonalizationOption> => {
+    const { data, error } = await getClient().from('personalization_options').update({ available }).eq('id', id).select().single();
+    if (error) throw error;
+    return data;
+};
+
+// --- Promotions ---
 export const getPromotions = async (): Promise<Promotion[]> => {
     const { data, error } = await getClient().from('promotions').select('*, promotion_products(product_id)');
     if (error) throw error;
@@ -211,7 +185,7 @@ export const getPromotions = async (): Promise<Promotion[]> => {
 
 export const savePromotion = async (promotion: Omit<Promotion, 'id' | 'created_at'> & { id?: string }): Promise<Promotion> => {
     const { productIds, ...promoData } = promotion;
-    const { data: savedPromo, error: promoError } = await getClient()
+    const { data: saved, error } = await getClient()
         .from('promotions')
         .upsert({
             id: promoData.id,
@@ -224,98 +198,77 @@ export const savePromotion = async (promotion: Omit<Promotion, 'id' | 'created_a
         })
         .select()
         .single();
-    if (promoError) throw promoError;
-    const { error: deleteError } = await getClient().from('promotion_products').delete().eq('promotion_id', savedPromo.id);
-    if (deleteError) throw deleteError;
+    if (error) throw error;
+
+    await getClient().from('promotion_products').delete().eq('promotion_id', saved.id);
     if (productIds && productIds.length > 0) {
-        const linksToInsert = productIds.map(pid => ({ promotion_id: savedPromo.id, product_id: pid }));
-        const { error: linkError } = await getClient().from('promotion_products').insert(linksToInsert);
-        if (linkError) throw linkError;
+        const links = productIds.map(pid => ({ promotion_id: saved.id, product_id: pid }));
+        await getClient().from('promotion_products').insert(links);
     }
-    return { ...promotion, id: savedPromo.id };
+    return { ...promotion, id: saved.id };
 };
 
-export const deletePromotion = async (promotionId: string): Promise<void> => {
-    const { error } = await getClient().from('promotions').delete().eq('id', promotionId);
+export const deletePromotion = async (id: string): Promise<void> => {
+    const { error } = await getClient().from('promotions').delete().eq('id', id);
     if (error) throw error;
 };
 
+// --- Zones & Tables ---
 export const getZones = async (): Promise<Zone[]> => {
-    const { data, error } = await getClient()
-        .from('zones')
-        .select('*, tables(*)')
-        .order('created_at');
+    const { data, error } = await getClient().from('zones').select('*, tables(*)').order('created_at');
     if (error) throw error;
     return (data as Zone[]) || [];
 };
 
 export const saveZone = async (zone: Pick<Zone, 'name' | 'rows' | 'cols'> & { id?: string }): Promise<Zone> => {
     const { id, ...zoneData } = zone;
-    const { data, error } = await getClient()
-        .from('zones')
-        .upsert({ id, ...zoneData })
-        .select('*, tables(*)')
-        .single();
+    const { data, error } = await getClient().from('zones').upsert({ id, ...zoneData }).select('*, tables(*)').single();
     if (error) throw error;
     return data as Zone;
 };
 
-export const deleteZone = async (zoneId: string): Promise<void> => {
-    const { error } = await getClient().from('zones').delete().eq('id', zoneId);
+export const deleteZone = async (id: string): Promise<void> => {
+    const { error } = await getClient().from('zones').delete().eq('id', id);
     if (error) throw error;
 };
 
 export const saveZoneLayout = async (zone: Zone): Promise<void> => {
     const { tables, ...zoneData } = zone;
-    const { error: zoneError } = await getClient().from('zones').update({ name: zoneData.name, rows: zoneData.rows, cols: zoneData.cols }).eq('id', zoneData.id);
-    if (zoneError) throw zoneError;
-    const { data: existingTables, error: fetchError } = await getClient().from('tables').select('id').eq('zone_id', zone.id);
-    if (fetchError) throw fetchError;
-    const existingTableIds = existingTables.map(t => t.id);
-    const newTableIds = tables.map(t => t.id);
-    const tablesToDelete = existingTableIds.filter(id => !newTableIds.includes(id));
-    if (tablesToDelete.length > 0) {
-        const { error: deleteError } = await getClient().from('tables').delete().in('id', tablesToDelete);
-        if (deleteError) throw deleteError;
-    }
+    await getClient().from('zones').update({ name: zoneData.name, rows: zoneData.rows, cols: zoneData.cols }).eq('id', zoneData.id);
+    const { data: existing } = await getClient().from('tables').select('id').eq('zone_id', zone.id);
+    const existingIds = (existing || []).map(t => t.id);
+    const newIds = tables.map(t => t.id);
+    const toDelete = existingIds.filter(id => !newIds.includes(id));
+    if (toDelete.length > 0) await getClient().from('tables').delete().in('id', toDelete);
     if (tables.length > 0) {
-         const tablesToSave = tables.map(({ created_at, zoneId, ...rest }) => ({
-            ...rest,
-            zone_id: zone.id 
-        }));
-        const { error: upsertError } = await getClient().from('tables').upsert(tablesToSave);
-        if (upsertError) throw upsertError;
+        const toSave = tables.map(({ created_at, zoneId, ...rest }) => ({ ...rest, zone_id: zone.id }));
+        await getClient().from('tables').upsert(toSave);
     }
 };
 
+// --- Orders & Realtime ---
 export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created_at'>): Promise<void> => {
-    const dbOrderPayload = {
+    const payload = {
         customer: { ...order.customer, paymentProof: order.paymentProof },
         items: order.items,
         status: order.status,
         total: order.total,
-        branch_id: order.branchId || null,       
-        order_type: order.orderType || null,      
-        table_id: order.tableId || null,          
-        general_comments: order.generalComments || null, 
-        payment_status: order.paymentStatus || 'pending' 
+        branch_id: order.branchId || null,
+        order_type: order.orderType || null,
+        table_id: order.tableId || null,
+        general_comments: order.generalComments || null,
+        payment_status: order.paymentStatus || 'pending'
     };
-    const { error } = await getClient().from('orders').insert(dbOrderPayload);
-    if (error) throw new Error(error.message);
+    const { error } = await getClient().from('orders').insert(payload);
+    if (error) throw error;
 };
 
 export const getActiveOrders = async (): Promise<Order[]> => {
-    const { data, error } = await getClient()
-        .from('orders')
-        .select('*')
-        .neq('status', 'Cancelled') 
-        .order('created_at', { ascending: false })
-        .limit(50);
-
+    const { data, error } = await getClient().from('orders').select('*').neq('status', 'Cancelled').order('created_at', { ascending: false });
     if (error) return [];
     return data.map((o: any) => ({
         id: o.id,
-        customer: o.customer, 
+        customer: o.customer,
         items: o.items,
         status: o.status,
         total: o.total,
@@ -325,7 +278,7 @@ export const getActiveOrders = async (): Promise<Order[]> => {
         tableId: o.table_id,
         generalComments: o.general_comments,
         paymentStatus: o.payment_status,
-        paymentProof: o.customer?.paymentProof 
+        paymentProof: o.customer?.paymentProof
     })) as Order[];
 };
 
@@ -336,72 +289,44 @@ export const updateOrder = async (orderId: string, updates: Partial<Order>): Pro
     if (updates.tableId) { dbUpdates.table_id = updates.tableId; delete dbUpdates.tableId; }
     if (updates.generalComments) { dbUpdates.general_comments = updates.generalComments; delete dbUpdates.generalComments; }
     if (updates.paymentStatus) { dbUpdates.payment_status = updates.paymentStatus; delete dbUpdates.paymentStatus; }
-    if (updates.paymentProof) { delete dbUpdates.paymentProof; } 
     const { error } = await getClient().from('orders').update(dbUpdates).eq('id', orderId);
-    if (error) throw new Error(error.message);
+    if (error) throw error;
 };
 
-export const subscribeToNewOrders = (
-    onInsert: (payload: any) => void, 
-    onUpdate?: (payload: any) => void
-) => {
+export const subscribeToNewOrders = (onInsert: (payload: any) => void, onUpdate?: (payload: any) => void) => {
     const client = getClient();
-    if (ordersChannel) {
-        client.removeChannel(ordersChannel).then(() => { ordersChannel = null; });
-    }
-    ordersChannel = client.channel('orders-channel');
-    ordersChannel
+    if (ordersChannel) client.removeChannel(ordersChannel);
+    ordersChannel = client.channel('orders-channel')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-             const newOrder = payload.new;
-             onInsert({
-                id: newOrder.id,
-                customer: newOrder.customer,
-                items: newOrder.items,
-                status: newOrder.status,
-                total: newOrder.total,
-                createdAt: new Date(newOrder.created_at),
-                branchId: newOrder.branch_id,
-                order_type: newOrder.order_type,
-                tableId: newOrder.table_id,
-                generalComments: newOrder.general_comments,
-                paymentStatus: newOrder.payment_status,
-                paymentProof: newOrder.customer?.paymentProof
-             });
+            const o = payload.new;
+            onInsert({
+                id: o.id, customer: o.customer, items: o.items, status: o.status, total: o.total,
+                createdAt: new Date(o.created_at), branchId: o.branch_id, orderType: o.order_type,
+                tableId: o.table_id, generalComments: o.general_comments, paymentStatus: o.payment_status,
+                paymentProof: o.customer?.paymentProof
+            });
         })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
-            if (onUpdate) {
-                 const updatedOrder = payload.new;
-                 onUpdate({
-                    id: updatedOrder.id,
-                    customer: updatedOrder.customer,
-                    items: updatedOrder.items,
-                    status: updatedOrder.status,
-                    total: updatedOrder.total,
-                    createdAt: new Date(updatedOrder.created_at),
-                    branchId: updatedOrder.branch_id,
-                    orderType: updatedOrder.order_type,
-                    tableId: updatedOrder.table_id,
-                    generalComments: updatedOrder.general_comments,
-                    paymentStatus: updatedOrder.payment_status,
-                    paymentProof: updatedOrder.customer?.paymentProof
-                 });
-            }
+            const o = payload.new;
+            if (onUpdate) onUpdate({
+                id: o.id, customer: o.customer, items: o.items, status: o.status, total: o.total,
+                createdAt: new Date(o.created_at), branchId: o.branch_id, orderType: o.order_type,
+                tableId: o.table_id, generalComments: o.general_comments, paymentStatus: o.payment_status,
+                paymentProof: o.customer?.paymentProof
+            });
         })
         .subscribe();
     return ordersChannel;
-}
+};
 
 export const subscribeToMenuUpdates = (onUpdate: () => void) => {
     const client = getClient();
-    if (menuChannel) {
-        client.removeChannel(menuChannel).then(() => { menuChannel = null; });
-    }
+    if (menuChannel) client.removeChannel(menuChannel);
     menuChannel = client.channel('menu-updates')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, onUpdate)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, onUpdate)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'promotions' }, onUpdate)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'personalizations' }, onUpdate)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'personalization_options' }, onUpdate)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, onUpdate)
         .subscribe();
     return menuChannel;
@@ -409,6 +334,6 @@ export const subscribeToMenuUpdates = (onUpdate: () => void) => {
 
 export const unsubscribeFromChannel = () => {
     const client = getClient();
-    if (ordersChannel) client.removeChannel(ordersChannel);
-    if (menuChannel) client.removeChannel(menuChannel);
+    if (ordersChannel) client.removeChannel(ordersChannel).then(() => ordersChannel = null);
+    if (menuChannel) client.removeChannel(menuChannel).then(() => menuChannel = null);
 }

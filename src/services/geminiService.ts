@@ -3,10 +3,8 @@ import { GoogleGenAI } from "@google/genai";
 import { ChatMessage, Order, Product } from '../types';
 
 export const generateProductDescription = async (productName: string, categoryName: string, currentDescription: string): Promise<string> => {
-    // Fix: Initialize client inside function using process.env.API_KEY directly.
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) return "AI service is unavailable.";
-    const ai = new GoogleGenAI({ apiKey });
+    // Initialization inside function ensures fresh API key access.
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     try {
         const prompt = `Generate a chic, minimalist, and enticing one-sentence description for a cafe menu item.
@@ -22,15 +20,13 @@ export const generateProductDescription = async (productName: string, categoryNa
 
         return response.text?.trim() || "Delicious choice prepared with fresh ingredients.";
     } catch (error) {
-        return "Failed to generate description.";
+        console.error("Gemini Error:", error);
+        return "Delicious choice prepared with fresh ingredients.";
     }
 };
 
 export const getAdvancedInsights = async (query: string, orders: Order[]): Promise<string> => {
-    // Fix: Initialize client inside function using process.env.API_KEY directly.
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) return "AI insights unavailable.";
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     const prompt = `Analyze this restaurant order data: ${JSON.stringify(orders)}. Query: ${query}. Provide actionable business recommendations in Markdown.`;
     
@@ -44,19 +40,15 @@ export const getAdvancedInsights = async (query: string, orders: Order[]): Promi
         });
         return response.text || "No insights available for this period.";
     } catch (error) {
-        return "Analysis error.";
+        console.error("Gemini Error:", error);
+        return "AI analysis error. Please check data volume or query complexity.";
     }
 };
 
 export const getChatbotResponse = async (history: ChatMessage[], newMessage: string): Promise<string> => {
-    // Fix: Initialize client inside function using process.env.API_KEY directly.
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) return "Offline.";
-    const ai = new GoogleGenAI({ apiKey });
-
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const systemInstruction = `You are OrdoBot, a witty and professional restaurant assistant. Answer menu questions concisely.`;
     
-    // Fix: Transform history to correct role-based format for the Chat API.
     const historyParts = history.map(msg => ({
         role: msg.sender === 'user' ? 'user' : 'model',
         parts: [{ text: msg.text }]
@@ -71,6 +63,7 @@ export const getChatbotResponse = async (history: ChatMessage[], newMessage: str
         const response = await chat.sendMessage({ message: newMessage });
         return response.text?.trim() || "I'm here to help!";
     } catch (error) {
-        return "Connection trouble, please try again.";
+        console.error("Gemini Error:", error);
+        return "I'm having connection trouble. Please try again in a moment.";
     }
 };
