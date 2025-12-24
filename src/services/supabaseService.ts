@@ -3,6 +3,7 @@ import { Product, Category, Personalization, Promotion, PersonalizationOption, Z
 import { INITIAL_SETTINGS } from '../constants';
 
 // Configuración de Supabase
+// Se utilizan las credenciales proporcionadas como fallback para garantizar el funcionamiento inmediato.
 const supabaseUrl = process.env.SUPABASE_URL || "https://cnbntnnhxlvkvallumdg.supabase.co";
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || "sb_publishable_A8zcPlJUlYq96qG7tWoANQ_48MtXARr";
 
@@ -12,8 +13,11 @@ let menuChannel: RealtimeChannel | null = null;
 
 const getClient = (): SupabaseClient => {
     if (supabase) return supabase;
-    const finalUrl = (supabaseUrl && supabaseUrl.trim() !== "") ? supabaseUrl : "https://cnbntnnhxlvkvallumdg.supabase.co";
-    const finalKey = (supabaseAnonKey && supabaseAnonKey.trim() !== "") ? supabaseAnonKey : "sb_publishable_A8zcPlJUlYq96qG7tWoANQ_48MtXARr";
+    
+    // Si llegara a estar vacío (muy improbable con los fallbacks), inicializamos con strings vacíos para evitar errores de tipo.
+    const finalUrl = supabaseUrl || "https://cnbntnnhxlvkvallumdg.supabase.co";
+    const finalKey = supabaseAnonKey || "sb_publishable_A8zcPlJUlYq96qG7tWoANQ_48MtXARr";
+
     supabase = createClient(finalUrl, finalKey);
     return supabase;
 };
@@ -22,8 +26,12 @@ const getClient = (): SupabaseClient => {
 export const getAppSettings = async (): Promise<AppSettings> => {
     try {
         const { data, error } = await getClient().from('app_settings').select('settings').eq('id', 1).single();
-        if (!error && data?.settings) return { ...INITIAL_SETTINGS, ...data.settings };
-    } catch (e) { console.error(e); }
+        if (!error && data?.settings && Object.keys(data.settings).length > 0) {
+            return { ...INITIAL_SETTINGS, ...data.settings };
+        }
+    } catch (e) {
+        console.error("Error fetching settings:", e);
+    }
     return INITIAL_SETTINGS;
 };
 
@@ -87,7 +95,7 @@ export const getPersonalizations = async (): Promise<Personalization[]> => {
 
 export const savePersonalization = async (personalization: any) => {
     const { options, ...pData } = personalization;
-    const { data: saved, error } = await getClient().from('personalizations').upsert({
+    const { data: saved, error: pError } = await getClient().from('personalizations').upsert({
         id: pData.id,
         name: pData.name,
         label: pData.label,
@@ -95,7 +103,9 @@ export const savePersonalization = async (personalization: any) => {
         min_selection: pData.minSelection,
         max_selection: pData.maxSelection,
     }).select().single();
-    if (error) throw error;
+
+    if (pError) throw pError;
+
     if (saved) {
         await getClient().from('personalization_options').delete().eq('personalization_id', saved.id);
         if (options?.length) {
@@ -134,7 +144,7 @@ export const getPromotions = async (): Promise<Promotion[]> => {
 
 export const savePromotion = async (promotion: any) => {
     const { productIds, ...promoData } = promotion;
-    const { data: saved, error } = await getClient().from('promotions').upsert({
+    const { data: saved, error: promoError } = await getClient().from('promotions').upsert({
         id: promoData.id,
         name: promoData.name,
         discount_type: promoData.discountType,
@@ -143,7 +153,9 @@ export const savePromotion = async (promotion: any) => {
         start_date: promoData.startDate || null,
         end_date: promoData.endDate || null,
     }).select().single();
-    if (error) throw error;
+
+    if (promoError) throw promoError;
+
     if (saved && productIds?.length) {
         await getClient().from('promotion_products').delete().eq('promotion_id', saved.id);
         await getClient().from('promotion_products').insert(productIds.map((pid: string) => ({ promotion_id: saved.id, product_id: pid })));
