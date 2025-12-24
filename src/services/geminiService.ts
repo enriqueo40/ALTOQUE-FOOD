@@ -3,7 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { ChatMessage, Order, Product } from '../types';
 
 export const generateProductDescription = async (productName: string, categoryName: string, currentDescription: string): Promise<string> => {
-    // Initialization inside function ensures fresh API key access.
+    // Fix: Initialization inside function using process.env.API_KEY directly per guidelines.
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     try {
@@ -26,6 +26,7 @@ export const generateProductDescription = async (productName: string, categoryNa
 };
 
 export const getAdvancedInsights = async (query: string, orders: Order[]): Promise<string> => {
+    // Fix: Initialization inside function using process.env.API_KEY directly per guidelines.
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     const prompt = `Analyze this restaurant order data: ${JSON.stringify(orders)}. Query: ${query}. Provide actionable business recommendations in Markdown.`;
@@ -46,6 +47,7 @@ export const getAdvancedInsights = async (query: string, orders: Order[]): Promi
 };
 
 export const getChatbotResponse = async (history: ChatMessage[], newMessage: string): Promise<string> => {
+    // Fix: Initialization inside function using process.env.API_KEY directly per guidelines.
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const systemInstruction = `You are OrdoBot, a witty and professional restaurant assistant. Answer menu questions concisely.`;
     

@@ -3,8 +3,8 @@ import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabas
 import { Product, Category, Personalization, Promotion, PersonalizationOption, Zone, Table, AppSettings, Order } from '../types';
 import { INITIAL_SETTINGS } from '../constants';
 
-// Supabase configuration using environment variables to prevent build blockers and security leaks.
-// These should be configured in the hosting provider's environment settings (e.g. Netlify UI).
+// Configuración de Supabase usando variables de entorno para evitar bloqueos en el despliegue.
+// Estas deben configurarse en el panel de Netlify/Vercel.
 const supabaseUrl = process.env.SUPABASE_URL || "";
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || "";
 
@@ -14,12 +14,19 @@ let menuChannel: RealtimeChannel | null = null;
 
 const getClient = (): SupabaseClient => {
     if (supabase) return supabase;
+    
     if (!supabaseUrl || !supabaseAnonKey) {
-        // Log warning but don't crash immediately; allows the UI to show a "setup required" state if needed.
-        console.warn("Supabase configuration missing. Ensure SUPABASE_URL and SUPABASE_ANON_KEY are set in environment variables.");
+        console.warn("Faltan las credenciales de Supabase. Asegúrate de configurar SUPABASE_URL y SUPABASE_ANON_KEY en las variables de entorno.");
     }
+
     supabase = createClient(supabaseUrl, supabaseAnonKey);
     return supabase;
+};
+
+// --- Connection Check ---
+export const checkDbConnection = async (): Promise<void> => {
+    const { error } = await getClient().from('categories').select('id', { count: 'exact', head: true });
+    if (error) throw error;
 };
 
 // --- Settings Functions ---
@@ -30,7 +37,7 @@ export const getAppSettings = async (): Promise<AppSettings> => {
         .eq('id', 1)
         .single();
 
-    if (!error && data?.settings && Object.keys(data.settings).length > 0) {
+    if (!error && data && data.settings && Object.keys(data.settings).length > 0) {
         return { ...JSON.parse(JSON.stringify(INITIAL_SETTINGS)), ...data.settings };
     }
 
@@ -46,7 +53,9 @@ export const getAppSettings = async (): Promise<AppSettings> => {
 export const saveAppSettings = async (settings: AppSettings): Promise<void> => {
     const { error } = await getClient()
         .from('app_settings')
-        .upsert({ id: 1, settings, updated_at: new Date().toISOString() });
+        .update({ settings, updated_at: new Date().toISOString() })
+        .eq('id', 1);
+
     if (error) throw error;
 };
 
@@ -59,9 +68,14 @@ export const getCategories = async (): Promise<Category[]> => {
 
 export const saveCategory = async (category: Omit<Category, 'id' | 'created_at'> & { id?: string }): Promise<Category> => {
     const { id, ...categoryData } = category;
-    const { data, error } = await getClient().from('categories').upsert({ id, ...categoryData }).select().single();
+    const { data, error } = await getClient()
+        .from('categories')
+        .upsert({ id, ...categoryData })
+        .select();
+
     if (error) throw error;
-    return data;
+    if (!data?.[0]) throw new Error("Could not save category.");
+    return data[0];
 };
 
 export const deleteCategory = async (categoryId: string): Promise<void> => {
@@ -71,46 +85,31 @@ export const deleteCategory = async (categoryId: string): Promise<void> => {
 
 // --- Products Functions ---
 export const getProducts = async (): Promise<Product[]> => {
-    const { data, error } = await getClient()
-        .from('products')
-        .select('*, product_personalizations(personalization_id)')
-        .order('name');
-    
+    const { data, error } = await getClient().from('products').select('*').order('name');
     if (error) throw error;
-
-    return data?.map((p: any) => ({
-        ...p,
-        personalizationIds: p.product_personalizations?.map((pp: any) => pp.personalization_id) || []
-    })) || [];
+    return data || [];
 };
 
 export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & { id?: string }): Promise<Product> => {
-    const { id, personalizationIds, ...productData } = product;
-    
+    const { id, ...productData } = product;
     const { data, error } = await getClient()
         .from('products')
         .upsert({ id, ...productData })
-        .select()
-        .single();
+        .select();
 
     if (error) throw error;
-    if (personalizationIds) {
-        await updateProductPersonalizationLinks(data.id, personalizationIds);
-    }
-    return data;
-};
-
-export const updateProductPersonalizationLinks = async (productId: string, personalizationIds: string[]): Promise<void> => {
-    const client = getClient();
-    await client.from('product_personalizations').delete().eq('product_id', productId);
-    if (personalizationIds.length > 0) {
-        const links = personalizationIds.map(pid => ({ product_id: productId, personalization_id: pid }));
-        await client.from('product_personalizations').insert(links);
-    }
+    if (!data?.[0]) throw new Error("Could not save product.");
+    return data[0];
 };
 
 export const updateProductAvailability = async (productId: string, available: boolean): Promise<Product> => {
-    const { data, error } = await getClient().from('products').update({ available }).eq('id', productId).select().single();
+    const { data, error } = await getClient()
+        .from('products')
+        .update({ available })
+        .eq('id', productId)
+        .select()
+        .single();
+
     if (error) throw error;
     return data;
 };
@@ -122,8 +121,12 @@ export const deleteProduct = async (productId: string): Promise<void> => {
 
 // --- Personalizations ---
 export const getPersonalizations = async (): Promise<Personalization[]> => {
-    const { data, error } = await getClient().from('personalizations').select('*, options:personalization_options(*)');
+    const { data, error } = await getClient()
+        .from('personalizations')
+        .select('*, options:personalization_options(*)');
+        
     if (error) throw error;
+
     return (data?.map(p => ({
         ...p,
         allowRepetition: p.allow_repetition,
@@ -132,9 +135,22 @@ export const getPersonalizations = async (): Promise<Personalization[]> => {
     })) || []) as Personalization[];
 };
 
+export const updatePersonalizationOptionAvailability = async (optionId: string, available: boolean): Promise<PersonalizationOption> => {
+    const { data, error } = await getClient()
+        .from('personalization_options')
+        .update({ available })
+        .eq('id', optionId)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+};
+
 export const savePersonalization = async (personalization: Omit<Personalization, 'id' | 'created_at'> & { id?: string }): Promise<Personalization> => {
     const { options, ...personalizationData } = personalization;
-    const { data: saved, error } = await getClient()
+    
+    const { data: saved, error: pError } = await getClient()
         .from('personalizations')
         .upsert({
             id: personalizationData.id,
@@ -146,32 +162,35 @@ export const savePersonalization = async (personalization: Omit<Personalization,
         })
         .select()
         .single();
-    if (error) throw error;
+    
+    if (pError) throw pError;
 
     await getClient().from('personalization_options').delete().eq('personalization_id', saved.id);
+
     if (options && options.length > 0) {
-        const toInsert = options.map(opt => ({ personalization_id: saved.id, name: opt.name, price: opt.price, available: true }));
-        await getClient().from('personalization_options').insert(toInsert);
+        const optionsToInsert = options.map(opt => ({
+            personalization_id: saved.id,
+            name: opt.name,
+            price: opt.price,
+            available: true
+        }));
+        await getClient().from('personalization_options').insert(optionsToInsert);
     }
-    const all = await getPersonalizations();
-    return all.find(p => p.id === saved.id)!;
+
+    const finalData = await getPersonalizations();
+    return finalData.find(p => p.id === saved.id)!;
 };
 
-export const deletePersonalization = async (id: string): Promise<void> => {
-    const { error } = await getClient().from('personalizations').delete().eq('id', id);
+export const deletePersonalization = async (personalizationId: string): Promise<void> => {
+    const { error } = await getClient().from('personalizations').delete().eq('id', personalizationId);
     if (error) throw error;
-};
-
-export const updatePersonalizationOptionAvailability = async (id: string, available: boolean): Promise<PersonalizationOption> => {
-    const { data, error } = await getClient().from('personalization_options').update({ available }).eq('id', id).select().single();
-    if (error) throw error;
-    return data;
 };
 
 // --- Promotions ---
 export const getPromotions = async (): Promise<Promotion[]> => {
     const { data, error } = await getClient().from('promotions').select('*, promotion_products(product_id)');
     if (error) throw error;
+    
     return data?.map(promo => ({
         ...promo,
         discountType: promo.discount_type,
@@ -185,7 +204,8 @@ export const getPromotions = async (): Promise<Promotion[]> => {
 
 export const savePromotion = async (promotion: Omit<Promotion, 'id' | 'created_at'> & { id?: string }): Promise<Promotion> => {
     const { productIds, ...promoData } = promotion;
-    const { data: saved, error } = await getClient()
+
+    const { data: savedPromo, error: promoError } = await getClient()
         .from('promotions')
         .upsert({
             id: promoData.id,
@@ -198,22 +218,25 @@ export const savePromotion = async (promotion: Omit<Promotion, 'id' | 'created_a
         })
         .select()
         .single();
-    if (error) throw error;
+    
+    if (promoError) throw promoError;
 
-    await getClient().from('promotion_products').delete().eq('promotion_id', saved.id);
+    await getClient().from('promotion_products').delete().eq('promotion_id', savedPromo.id);
+
     if (productIds && productIds.length > 0) {
-        const links = productIds.map(pid => ({ promotion_id: saved.id, product_id: pid }));
-        await getClient().from('promotion_products').insert(links);
+        const linksToInsert = productIds.map(pid => ({ promotion_id: savedPromo.id, product_id: pid }));
+        await getClient().from('promotion_products').insert(linksToInsert);
     }
-    return { ...promotion, id: saved.id };
+
+    return { ...promotion, id: savedPromo.id };
 };
 
-export const deletePromotion = async (id: string): Promise<void> => {
-    const { error } = await getClient().from('promotions').delete().eq('id', id);
+export const deletePromotion = async (promotionId: string): Promise<void> => {
+    const { error } = await getClient().from('promotions').delete().eq('id', promotionId);
     if (error) throw error;
 };
 
-// --- Zones & Tables ---
+// --- Zones and Tables ---
 export const getZones = async (): Promise<Zone[]> => {
     const { data, error } = await getClient().from('zones').select('*, tables(*)').order('created_at');
     if (error) throw error;
@@ -227,8 +250,8 @@ export const saveZone = async (zone: Pick<Zone, 'name' | 'rows' | 'cols'> & { id
     return data as Zone;
 };
 
-export const deleteZone = async (id: string): Promise<void> => {
-    const { error } = await getClient().from('zones').delete().eq('id', id);
+export const deleteZone = async (zoneId: string): Promise<void> => {
+    const { error } = await getClient().from('zones').delete().eq('id', zoneId);
     if (error) throw error;
 };
 
@@ -241,12 +264,12 @@ export const saveZoneLayout = async (zone: Zone): Promise<void> => {
     const toDelete = existingIds.filter(id => !newIds.includes(id));
     if (toDelete.length > 0) await getClient().from('tables').delete().in('id', toDelete);
     if (tables.length > 0) {
-        const toSave = tables.map(({ created_at, zoneId, ...rest }) => ({ ...rest, zone_id: zone.id }));
-        await getClient().from('tables').upsert(toSave);
+        const tablesToSave = tables.map(({ created_at, zoneId, ...rest }) => ({ ...rest, zone_id: zone.id }));
+        await getClient().from('tables').upsert(tablesToSave);
     }
 };
 
-// --- Orders & Realtime ---
+// --- Orders ---
 export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created_at'>): Promise<void> => {
     const payload = {
         customer: { ...order.customer, paymentProof: order.paymentProof },
@@ -260,7 +283,7 @@ export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created
         payment_status: order.paymentStatus || 'pending'
     };
     const { error } = await getClient().from('orders').insert(payload);
-    if (error) throw error;
+    if (error) throw new Error(error.message);
 };
 
 export const getActiveOrders = async (): Promise<Order[]> => {
@@ -268,7 +291,7 @@ export const getActiveOrders = async (): Promise<Order[]> => {
     if (error) return [];
     return data.map((o: any) => ({
         id: o.id,
-        customer: o.customer,
+        customer: o.customer, 
         items: o.items,
         status: o.status,
         total: o.total,
@@ -278,7 +301,7 @@ export const getActiveOrders = async (): Promise<Order[]> => {
         tableId: o.table_id,
         generalComments: o.general_comments,
         paymentStatus: o.payment_status,
-        paymentProof: o.customer?.paymentProof
+        paymentProof: o.customer?.paymentProof 
     })) as Order[];
 };
 
@@ -290,7 +313,7 @@ export const updateOrder = async (orderId: string, updates: Partial<Order>): Pro
     if (updates.generalComments) { dbUpdates.general_comments = updates.generalComments; delete dbUpdates.generalComments; }
     if (updates.paymentStatus) { dbUpdates.payment_status = updates.paymentStatus; delete dbUpdates.paymentStatus; }
     const { error } = await getClient().from('orders').update(dbUpdates).eq('id', orderId);
-    if (error) throw error;
+    if (error) throw new Error(error.message);
 };
 
 export const subscribeToNewOrders = (onInsert: (payload: any) => void, onUpdate?: (payload: any) => void) => {
@@ -298,13 +321,13 @@ export const subscribeToNewOrders = (onInsert: (payload: any) => void, onUpdate?
     if (ordersChannel) client.removeChannel(ordersChannel);
     ordersChannel = client.channel('orders-channel')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-            const o = payload.new;
-            onInsert({
+             const o = payload.new;
+             onInsert({
                 id: o.id, customer: o.customer, items: o.items, status: o.status, total: o.total,
                 createdAt: new Date(o.created_at), branchId: o.branch_id, orderType: o.order_type,
                 tableId: o.table_id, generalComments: o.general_comments, paymentStatus: o.payment_status,
                 paymentProof: o.customer?.paymentProof
-            });
+             });
         })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
             const o = payload.new;
@@ -317,7 +340,7 @@ export const subscribeToNewOrders = (onInsert: (payload: any) => void, onUpdate?
         })
         .subscribe();
     return ordersChannel;
-};
+}
 
 export const subscribeToMenuUpdates = (onUpdate: () => void) => {
     const client = getClient();
@@ -325,8 +348,6 @@ export const subscribeToMenuUpdates = (onUpdate: () => void) => {
     menuChannel = client.channel('menu-updates')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, onUpdate)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, onUpdate)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'promotions' }, onUpdate)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'personalizations' }, onUpdate)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, onUpdate)
         .subscribe();
     return menuChannel;
@@ -334,6 +355,6 @@ export const subscribeToMenuUpdates = (onUpdate: () => void) => {
 
 export const unsubscribeFromChannel = () => {
     const client = getClient();
-    if (ordersChannel) client.removeChannel(ordersChannel).then(() => ordersChannel = null);
-    if (menuChannel) client.removeChannel(menuChannel).then(() => menuChannel = null);
+    if (ordersChannel) client.removeChannel(ordersChannel);
+    if (menuChannel) client.removeChannel(menuChannel);
 }

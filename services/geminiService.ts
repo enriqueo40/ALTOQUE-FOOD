@@ -3,10 +3,8 @@ import { GoogleGenAI } from "@google/genai";
 import { ChatMessage, Order, Product } from '../types';
 
 export const generateProductDescription = async (productName: string, categoryName: string, currentDescription: string): Promise<string> => {
-    // Fix: Using process.env.API_KEY directly and initializing client inside the function to ensure up-to-date credentials.
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) return "AI service is unavailable.";
-    const ai = new GoogleGenAI({ apiKey });
+    // Fix: Initializing GoogleGenAI client strictly using the required process.env.API_KEY format.
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     try {
         const prompt = `Generate a chic, minimalist, and enticing one-sentence description for a cafe menu item.
@@ -30,10 +28,8 @@ export const generateProductDescription = async (productName: string, categoryNa
 };
 
 export const getChatbotResponse = async (history: ChatMessage[], newMessage: string): Promise<string> => {
-    // Fix: Initializing client inside function and using direct process.env.API_KEY.
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) return "I'm sorry, my AI brain is taking a little coffee break. Please try again later.";
-    const ai = new GoogleGenAI({ apiKey });
+    // Fix: Initializing GoogleGenAI client strictly using the required process.env.API_KEY format.
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const systemInstruction = `You are "OrdoBot", a friendly and helpful AI assistant for a chic cafe. 
     Your personality is warm, professional, and slightly witty.
@@ -65,10 +61,8 @@ export const getChatbotResponse = async (history: ChatMessage[], newMessage: str
 };
 
 export const getAdvancedInsights = async (query: string, orders: Order[]): Promise<string> => {
-    // Fix: Initializing client inside function and using direct process.env.API_KEY.
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) return "AI service is unavailable.";
-    const ai = new GoogleGenAI({ apiKey });
+    // Fix: Initializing GoogleGenAI client strictly using the required process.env.API_KEY format.
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const prompt = `As a world-class restaurant business analyst, analyze the following order data based on the user's query. Provide actionable insights, identify trends, and give specific, data-driven recommendations.
 
