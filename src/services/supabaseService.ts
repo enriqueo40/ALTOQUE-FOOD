@@ -3,8 +3,8 @@ import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabas
 import { Product, Category, Personalization, Promotion, PersonalizationOption, Zone, Table, AppSettings, Order } from '../types';
 import { INITIAL_SETTINGS } from '../constants';
 
-// Configuración de Supabase usando variables de entorno para evitar bloqueos en el despliegue.
-// Estas deben configurarse en el panel de Netlify/Vercel.
+// Configuración de Supabase usando variables de entorno inyectadas por Vite.
+// Estos valores se configuran en el panel de Netlify.
 const supabaseUrl = process.env.SUPABASE_URL || "";
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || "";
 
@@ -16,17 +16,11 @@ const getClient = (): SupabaseClient => {
     if (supabase) return supabase;
     
     if (!supabaseUrl || !supabaseAnonKey) {
-        console.warn("Faltan las credenciales de Supabase. Asegúrate de configurar SUPABASE_URL y SUPABASE_ANON_KEY en las variables de entorno.");
+        console.warn("Supabase credentials missing. Ensure SUPABASE_URL and SUPABASE_ANON_KEY are set in environment variables.");
     }
 
     supabase = createClient(supabaseUrl, supabaseAnonKey);
     return supabase;
-};
-
-// --- Connection Check ---
-export const checkDbConnection = async (): Promise<void> => {
-    const { error } = await getClient().from('categories').select('id', { count: 'exact', head: true });
-    if (error) throw error;
 };
 
 // --- Settings Functions ---
@@ -37,7 +31,7 @@ export const getAppSettings = async (): Promise<AppSettings> => {
         .eq('id', 1)
         .single();
 
-    if (!error && data && data.settings && Object.keys(data.settings).length > 0) {
+    if (!error && data?.settings && Object.keys(data.settings).length > 0) {
         return { ...JSON.parse(JSON.stringify(INITIAL_SETTINGS)), ...data.settings };
     }
 
@@ -55,7 +49,6 @@ export const saveAppSettings = async (settings: AppSettings): Promise<void> => {
         .from('app_settings')
         .update({ settings, updated_at: new Date().toISOString() })
         .eq('id', 1);
-
     if (error) throw error;
 };
 
@@ -68,14 +61,9 @@ export const getCategories = async (): Promise<Category[]> => {
 
 export const saveCategory = async (category: Omit<Category, 'id' | 'created_at'> & { id?: string }): Promise<Category> => {
     const { id, ...categoryData } = category;
-    const { data, error } = await getClient()
-        .from('categories')
-        .upsert({ id, ...categoryData })
-        .select();
-
+    const { data, error } = await getClient().from('categories').upsert({ id, ...categoryData }).select().single();
     if (error) throw error;
-    if (!data?.[0]) throw new Error("Could not save category.");
-    return data[0];
+    return data;
 };
 
 export const deleteCategory = async (categoryId: string): Promise<void> => {
@@ -92,24 +80,13 @@ export const getProducts = async (): Promise<Product[]> => {
 
 export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & { id?: string }): Promise<Product> => {
     const { id, ...productData } = product;
-    const { data, error } = await getClient()
-        .from('products')
-        .upsert({ id, ...productData })
-        .select();
-
+    const { data, error } = await getClient().from('products').upsert({ id, ...productData }).select().single();
     if (error) throw error;
-    if (!data?.[0]) throw new Error("Could not save product.");
-    return data[0];
+    return data;
 };
 
 export const updateProductAvailability = async (productId: string, available: boolean): Promise<Product> => {
-    const { data, error } = await getClient()
-        .from('products')
-        .update({ available })
-        .eq('id', productId)
-        .select()
-        .single();
-
+    const { data, error } = await getClient().from('products').update({ available }).eq('id', productId).select().single();
     if (error) throw error;
     return data;
 };
@@ -121,12 +98,8 @@ export const deleteProduct = async (productId: string): Promise<void> => {
 
 // --- Personalizations ---
 export const getPersonalizations = async (): Promise<Personalization[]> => {
-    const { data, error } = await getClient()
-        .from('personalizations')
-        .select('*, options:personalization_options(*)');
-        
+    const { data, error } = await getClient().from('personalizations').select('*, options:personalization_options(*)');
     if (error) throw error;
-
     return (data?.map(p => ({
         ...p,
         allowRepetition: p.allow_repetition,
@@ -135,22 +108,9 @@ export const getPersonalizations = async (): Promise<Personalization[]> => {
     })) || []) as Personalization[];
 };
 
-export const updatePersonalizationOptionAvailability = async (optionId: string, available: boolean): Promise<PersonalizationOption> => {
-    const { data, error } = await getClient()
-        .from('personalization_options')
-        .update({ available })
-        .eq('id', optionId)
-        .select()
-        .single();
-
-    if (error) throw error;
-    return data;
-};
-
 export const savePersonalization = async (personalization: Omit<Personalization, 'id' | 'created_at'> & { id?: string }): Promise<Personalization> => {
     const { options, ...personalizationData } = personalization;
-    
-    const { data: saved, error: pError } = await getClient()
+    const { data: saved, error } = await getClient()
         .from('personalizations')
         .upsert({
             id: personalizationData.id,
@@ -162,27 +122,19 @@ export const savePersonalization = async (personalization: Omit<Personalization,
         })
         .select()
         .single();
-    
-    if (pError) throw pError;
+    if (error) throw error;
 
     await getClient().from('personalization_options').delete().eq('personalization_id', saved.id);
-
     if (options && options.length > 0) {
-        const optionsToInsert = options.map(opt => ({
-            personalization_id: saved.id,
-            name: opt.name,
-            price: opt.price,
-            available: true
-        }));
-        await getClient().from('personalization_options').insert(optionsToInsert);
+        const toInsert = options.map(opt => ({ personalization_id: saved.id, name: opt.name, price: opt.price, available: true }));
+        await getClient().from('personalization_options').insert(toInsert);
     }
-
-    const finalData = await getPersonalizations();
-    return finalData.find(p => p.id === saved.id)!;
+    const all = await getPersonalizations();
+    return all.find(p => p.id === saved.id)!;
 };
 
-export const deletePersonalization = async (personalizationId: string): Promise<void> => {
-    const { error } = await getClient().from('personalizations').delete().eq('id', personalizationId);
+export const deletePersonalization = async (id: string): Promise<void> => {
+    const { error } = await getClient().from('personalizations').delete().eq('id', id);
     if (error) throw error;
 };
 
@@ -190,7 +142,6 @@ export const deletePersonalization = async (personalizationId: string): Promise<
 export const getPromotions = async (): Promise<Promotion[]> => {
     const { data, error } = await getClient().from('promotions').select('*, promotion_products(product_id)');
     if (error) throw error;
-    
     return data?.map(promo => ({
         ...promo,
         discountType: promo.discount_type,
@@ -204,8 +155,7 @@ export const getPromotions = async (): Promise<Promotion[]> => {
 
 export const savePromotion = async (promotion: Omit<Promotion, 'id' | 'created_at'> & { id?: string }): Promise<Promotion> => {
     const { productIds, ...promoData } = promotion;
-
-    const { data: savedPromo, error: promoError } = await getClient()
+    const { data: saved, error } = await getClient()
         .from('promotions')
         .upsert({
             id: promoData.id,
@@ -218,22 +168,14 @@ export const savePromotion = async (promotion: Omit<Promotion, 'id' | 'created_a
         })
         .select()
         .single();
-    
-    if (promoError) throw promoError;
-
-    await getClient().from('promotion_products').delete().eq('promotion_id', savedPromo.id);
-
-    if (productIds && productIds.length > 0) {
-        const linksToInsert = productIds.map(pid => ({ promotion_id: savedPromo.id, product_id: pid }));
-        await getClient().from('promotion_products').insert(linksToInsert);
-    }
-
-    return { ...promotion, id: savedPromo.id };
-};
-
-export const deletePromotion = async (promotionId: string): Promise<void> => {
-    const { error } = await getClient().from('promotions').delete().eq('id', promotionId);
     if (error) throw error;
+
+    await getClient().from('promotion_products').delete().eq('promotion_id', saved.id);
+    if (productIds && productIds.length > 0) {
+        const links = productIds.map(pid => ({ promotion_id: saved.id, product_id: pid }));
+        await getClient().from('promotion_products').insert(links);
+    }
+    return { ...promotion, id: saved.id };
 };
 
 // --- Zones and Tables ---
@@ -250,8 +192,8 @@ export const saveZone = async (zone: Pick<Zone, 'name' | 'rows' | 'cols'> & { id
     return data as Zone;
 };
 
-export const deleteZone = async (zoneId: string): Promise<void> => {
-    const { error } = await getClient().from('zones').delete().eq('id', zoneId);
+export const deleteZone = async (id: string): Promise<void> => {
+    const { error } = await getClient().from('zones').delete().eq('id', id);
     if (error) throw error;
 };
 
@@ -264,8 +206,8 @@ export const saveZoneLayout = async (zone: Zone): Promise<void> => {
     const toDelete = existingIds.filter(id => !newIds.includes(id));
     if (toDelete.length > 0) await getClient().from('tables').delete().in('id', toDelete);
     if (tables.length > 0) {
-        const tablesToSave = tables.map(({ created_at, zoneId, ...rest }) => ({ ...rest, zone_id: zone.id }));
-        await getClient().from('tables').upsert(tablesToSave);
+        const toSave = tables.map(({ created_at, zoneId, ...rest }) => ({ ...rest, zone_id: zone.id }));
+        await getClient().from('tables').upsert(toSave);
     }
 };
 
@@ -283,7 +225,7 @@ export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created
         payment_status: order.paymentStatus || 'pending'
     };
     const { error } = await getClient().from('orders').insert(payload);
-    if (error) throw new Error(error.message);
+    if (error) throw error;
 };
 
 export const getActiveOrders = async (): Promise<Order[]> => {
@@ -313,7 +255,7 @@ export const updateOrder = async (orderId: string, updates: Partial<Order>): Pro
     if (updates.generalComments) { dbUpdates.general_comments = updates.generalComments; delete dbUpdates.generalComments; }
     if (updates.paymentStatus) { dbUpdates.payment_status = updates.paymentStatus; delete dbUpdates.paymentStatus; }
     const { error } = await getClient().from('orders').update(dbUpdates).eq('id', orderId);
-    if (error) throw new Error(error.message);
+    if (error) throw error;
 };
 
 export const subscribeToNewOrders = (onInsert: (payload: any) => void, onUpdate?: (payload: any) => void) => {
@@ -340,7 +282,7 @@ export const subscribeToNewOrders = (onInsert: (payload: any) => void, onUpdate?
         })
         .subscribe();
     return ordersChannel;
-}
+};
 
 export const subscribeToMenuUpdates = (onUpdate: () => void) => {
     const client = getClient();
@@ -355,6 +297,6 @@ export const subscribeToMenuUpdates = (onUpdate: () => void) => {
 
 export const unsubscribeFromChannel = () => {
     const client = getClient();
-    if (ordersChannel) client.removeChannel(ordersChannel);
-    if (menuChannel) client.removeChannel(menuChannel);
-}
+    if (ordersChannel) client.removeChannel(ordersChannel).then(() => ordersChannel = null);
+    if (menuChannel) client.removeChannel(menuChannel).then(() => menuChannel = null);
+};

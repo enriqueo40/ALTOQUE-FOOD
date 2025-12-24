@@ -5,7 +5,6 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   // Inyectar variables de entorno para que process.env funcione en el cliente
-  // Fix: Cast process to any to access cwd property, resolving the TypeScript error where 'cwd' is not found on type 'Process'
   const env = loadEnv(mode, (process as any).cwd(), '');
   return {
     plugins: [react()],
