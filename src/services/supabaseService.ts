@@ -1,33 +1,26 @@
+
 import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 import { Product, Category, Personalization, Promotion, PersonalizationOption, Zone, Table, AppSettings, Order } from '../types';
 import { INITIAL_SETTINGS } from '../constants';
 
-
-// --- WARNING ---
-// The credentials below are hardcoded for demonstration and development purposes as requested.
-// In a production environment, you MUST use environment variables (Secrets)
-// to keep your keys secure. Exposing keys in client-side code is a
-// significant security risk.
-const supabaseUrl = "https://cnbntnnhxlvkvallumdg.supabase.co";
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuYm50bm5oeGx2a3ZhbGx1bWRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwNjQ1MjksImV4cCI6MjA3ODY0MDUyOX0.TuovcK2Ao2tb3GM0I2j5n2BpL5DIVLSl-yjdoCHS9pM";
-
+// Configuration obtained from environment variables via Vite define
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 
 let supabase: SupabaseClient | null = null;
 let ordersChannel: RealtimeChannel | null = null;
 let menuChannel: RealtimeChannel | null = null;
 
 // Helper function to get the client or throw an error.
-// This uses a singleton pattern to create the client only once.
 const getClient = (): SupabaseClient => {
     if (supabase) {
         return supabase;
     }
     
     if (!supabaseUrl || !supabaseAnonKey) {
-        throw new Error("Supabase URL or Anon Key is not defined in services/supabaseService.ts.");
+        throw new Error("Supabase configuration missing. Please ensure SUPABASE_URL and SUPABASE_ANON_KEY are set in your environment variables.");
     }
 
-    // Initialize the client and store it.
     supabase = createClient(supabaseUrl, supabaseAnonKey);
     return supabase;
 };
@@ -49,16 +42,13 @@ export const getAppSettings = async (): Promise<AppSettings> => {
         .single();
 
     if (!error && data && data.settings && Object.keys(data.settings).length > 0) {
-        const mergedSettings = { ...JSON.parse(JSON.stringify(INITIAL_SETTINGS)), ...data.settings };
-        return mergedSettings;
+        return { ...JSON.parse(JSON.stringify(INITIAL_SETTINGS)), ...data.settings };
     }
 
     if (error && error.code !== 'PGRST116') { 
          console.error("An unexpected error occurred while fetching app settings:", error);
     }
     
-    console.warn("App settings are missing or empty. Initializing defaults.");
-
     try {
         const settingsToSave = JSON.parse(JSON.stringify(INITIAL_SETTINGS));
         await saveAppSettings(settingsToSave);
@@ -120,7 +110,6 @@ export const deleteCategory = async (categoryId: string): Promise<void> => {
 
 // --- Products Functions ---
 export const getProducts = async (): Promise<Product[]> => {
-    // Modified to fetch related personalizations via the join table
     const { data, error } = await getClient()
         .from('products')
         .select('*, product_personalizations(personalization_id)')
@@ -131,7 +120,6 @@ export const getProducts = async (): Promise<Product[]> => {
         throw error;
     }
     
-    // Transform the result to include personalizationIds array
     return data?.map(product => ({
         ...product,
         personalizationIds: product.product_personalizations?.map((pp: any) => pp.personalization_id) || []
@@ -141,7 +129,6 @@ export const getProducts = async (): Promise<Product[]> => {
 export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & { id?: string }): Promise<Product> => {
     const { id, personalizationIds, ...productData } = product;
     
-    // 1. Save Product
     const { data, error } = await getClient()
         .from('products')
         .upsert({ id, ...productData })
@@ -158,8 +145,6 @@ export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & 
 
     const savedProductId = data.id;
 
-    // 2. Manage Personalization Links
-    // First, remove existing links for this product
     const { error: deleteError } = await getClient()
         .from('product_personalizations')
         .delete()
@@ -167,10 +152,8 @@ export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & 
         
     if (deleteError) {
         console.error("Error clearing product personalizations:", deleteError);
-        // Continue anyway to try insert
     }
 
-    // Then, add new links if any
     if (personalizationIds && personalizationIds.length > 0) {
         const links = personalizationIds.map(pId => ({
             product_id: savedProductId,
@@ -275,17 +258,15 @@ export const savePersonalization = async (personalization: Omit<Personalization,
     if (pError) throw pError;
     if (!savedPersonalization) throw new Error("Could not save personalization");
 
-    // Clear old options
     const { error: deleteError } = await getClient().from('personalization_options').delete().eq('personalization_id', savedPersonalization.id);
     if (deleteError) throw deleteError;
 
-    // Insert new options
     if (options && options.length > 0) {
         const optionsToInsert = options.map(opt => ({
             personalization_id: savedPersonalization.id,
             name: opt.name,
             price: opt.price,
-            available: true // Default to true on save
+            available: true
         }));
         const { error: optionsError } = await getClient().from('personalization_options').insert(optionsToInsert);
         if (optionsError) throw optionsError;
@@ -339,7 +320,6 @@ export const savePromotion = async (promotion: Omit<Promotion, 'id' | 'created_a
     if (promoError) throw promoError;
     if (!savedPromo) throw new Error("Could not save promotion");
 
-    // Handle product links
     const { error: deleteError } = await getClient().from('promotion_products').delete().eq('promotion_id', savedPromo.id);
     if (deleteError) throw deleteError;
 
@@ -484,7 +464,6 @@ export const updateOrder = async (orderId: string, updates: Partial<Order>): Pro
     if (updates.tableId) { dbUpdates.table_id = updates.tableId; delete dbUpdates.tableId; }
     if (updates.generalComments) { dbUpdates.general_comments = updates.generalComments; delete dbUpdates.generalComments; }
     if (updates.paymentStatus) { dbUpdates.payment_status = updates.paymentStatus; delete dbUpdates.paymentStatus; }
-    if (updates.paymentProof) { delete dbUpdates.paymentProof; } 
     
     const { error } = await getClient().from('orders').update(dbUpdates).eq('id', orderId);
     if (error) {
@@ -563,11 +542,7 @@ export const subscribeToMenuUpdates = (onUpdate: () => void) => {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'personalization_options' }, onUpdate)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'product_personalizations' }, onUpdate)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, onUpdate)
-        .subscribe((status) => {
-            if (status === 'SUBSCRIBED') {
-                console.log('Realtime subscription active for Menu Updates.');
-            }
-        });
+        .subscribe();
     
     return menuChannel;
 };

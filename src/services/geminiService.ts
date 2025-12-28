@@ -1,27 +1,13 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { ChatMessage, Order, Product } from '../types';
 
-// IMPORTANT: In a real application, the API key would be handled securely
-// and not exposed in the client-side code. It's assumed to be available
-// in the environment variables.
-const API_KEY = process.env.API_KEY;
-
-let ai: GoogleGenAI | null = null;
-
-if (API_KEY) {
-    try {
-        ai = new GoogleGenAI({ apiKey: API_KEY });
-    } catch (e) {
-        console.error("Error initializing GoogleGenAI client:", e);
-    }
-} else {
-  console.warn("API_KEY for Gemini is not set. AI features will be disabled.");
-}
-
-
 export const generateProductDescription = async (productName: string, categoryName: string, currentDescription: string): Promise<string> => {
-    if (!ai) return "AI service is unavailable (API Key missing).";
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) return "AI service is unavailable (API Key missing).";
+
     try {
+        const ai = new GoogleGenAI({ apiKey });
         const prompt = `Generate a chic, minimalist, and enticing one-sentence description for a cafe menu item.
         Item Name: ${productName}
         Category: ${categoryName}
@@ -30,7 +16,7 @@ export const generateProductDescription = async (productName: string, categoryNa
         Focus on fresh ingredients, taste, and experience. Keep it under 15 words.`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-flash-preview',
             contents: prompt,
         });
 
@@ -42,7 +28,8 @@ export const generateProductDescription = async (productName: string, categoryNa
 };
 
 export const getChatbotResponse = async (history: ChatMessage[], newMessage: string): Promise<string> => {
-    if (!ai) return "I'm sorry, my AI brain is taking a little coffee break (API Key missing).";
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) return "I'm sorry, my AI brain is taking a little coffee break (API Key missing).";
     
     const systemInstruction = `You are "OrdoBot", a friendly and helpful AI assistant for a chic cafe. 
     Your personality is warm, professional, and slightly witty.
@@ -58,8 +45,9 @@ export const getChatbotResponse = async (history: ChatMessage[], newMessage: str
     contents.push({ role: 'user', parts: [{ text: newMessage }] });
 
     try {
+        const ai = new GoogleGenAI({ apiKey });
         const chat = ai.chats.create({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-flash-preview',
             config: { systemInstruction },
             history: contents.slice(0, -1), // Send previous history
         });
@@ -74,7 +62,8 @@ export const getChatbotResponse = async (history: ChatMessage[], newMessage: str
 };
 
 export const getAdvancedInsights = async (query: string, orders: Order[]): Promise<string> => {
-    if (!ai) return "AI service is unavailable (API Key missing).";
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) return "AI service is unavailable (API Key missing).";
     
     const prompt = `As a world-class restaurant business analyst, analyze the following order data based on the user's query. Provide actionable insights, identify trends, and give specific, data-driven recommendations.
 
@@ -92,8 +81,9 @@ export const getAdvancedInsights = async (query: string, orders: Order[]): Promi
     `;
     
     try {
+        const ai = new GoogleGenAI({ apiKey });
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
+            model: 'gemini-3-pro-preview',
             contents: prompt,
             config: {
                 thinkingConfig: { thinkingBudget: 2048 }
