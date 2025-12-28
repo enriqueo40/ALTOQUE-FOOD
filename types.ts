@@ -1,5 +1,4 @@
 
-
 export interface Product {
     id: string;
     name: string;
@@ -8,6 +7,8 @@ export interface Product {
     imageUrl: string;
     categoryId: string;
     available: boolean;
+    // Added personalizationIds to fix linking between products and personalizations
+    personalizationIds?: string[];
     created_at?: string;
 }
 
@@ -63,7 +64,7 @@ export interface Order {
     customer: Customer;
     status: OrderStatus;
     paymentStatus?: PaymentStatus; // Added this field
-    paymentProof?: string; // Base64 string of the screenshot
+    paymentProof?: string; // Base4 string of the screenshot
     total: number;
     createdAt: Date;
     branchId: string;
