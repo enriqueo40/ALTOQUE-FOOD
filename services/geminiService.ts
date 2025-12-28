@@ -2,13 +2,21 @@
 import { GoogleGenAI } from "@google/genai";
 import { ChatMessage, Order, Product } from '../types';
 
-export const generateProductDescription = async (productName: string, categoryName: string, currentDescription: string): Promise<string> => {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) return "AI service is unavailable (API Key missing).";
+// IMPORTANT: In a real application, the API key would be handled securely
+// and not exposed in the client-side code. It's assumed to be available
+// in the environment variables.
+const API_KEY = process.env.API_KEY;
 
+if (!API_KEY) {
+  console.warn("API_KEY for Gemini is not set. AI features will be disabled.");
+}
+
+const ai = new GoogleGenAI({ apiKey: API_KEY! });
+
+
+export const generateProductDescription = async (productName: string, categoryName: string, currentDescription: string): Promise<string> => {
+    if (!API_KEY) return "AI service is unavailable.";
     try {
-        // Fix: Initializing GoogleGenAI right before the call as per guidelines
-        const ai = new GoogleGenAI({ apiKey });
         const prompt = `Generate a chic, minimalist, and enticing one-sentence description for a cafe menu item.
         Item Name: ${productName}
         Category: ${categoryName}
@@ -17,12 +25,11 @@ export const generateProductDescription = async (productName: string, categoryNa
         Focus on fresh ingredients, taste, and experience. Keep it under 15 words.`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
+            model: 'gemini-2.5-flash',
             contents: prompt,
         });
 
-        // Fix: Accessing .text property directly
-        return response.text?.trim() || "No description generated.";
+        return response.text.trim();
     } catch (error) {
         console.error("Error generating product description:", error);
         return "Failed to generate description.";
@@ -30,8 +37,7 @@ export const generateProductDescription = async (productName: string, categoryNa
 };
 
 export const getChatbotResponse = async (history: ChatMessage[], newMessage: string): Promise<string> => {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) return "I'm sorry, my AI brain is taking a little coffee break (API Key missing).";
+    if (!API_KEY) return "I'm sorry, my AI brain is taking a little coffee break. Please try again later.";
     
     const systemInstruction = `You are "OrdoBot", a friendly and helpful AI assistant for a chic cafe. 
     Your personality is warm, professional, and slightly witty.
@@ -47,16 +53,14 @@ export const getChatbotResponse = async (history: ChatMessage[], newMessage: str
     contents.push({ role: 'user', parts: [{ text: newMessage }] });
 
     try {
-        const ai = new GoogleGenAI({ apiKey });
         const chat = ai.chats.create({
-            model: 'gemini-3-flash-preview',
+            model: 'gemini-2.5-flash',
             config: { systemInstruction },
             history: contents.slice(0, -1), // Send previous history
         });
 
         const response = await chat.sendMessage({ message: newMessage });
-        // Fix: Accessing .text property directly
-        return response.text?.trim() || "I didn't quite catch that.";
+        return response.text.trim();
 
     } catch (error) {
         console.error("Error getting chatbot response:", error);
@@ -65,8 +69,7 @@ export const getChatbotResponse = async (history: ChatMessage[], newMessage: str
 };
 
 export const getAdvancedInsights = async (query: string, orders: Order[]): Promise<string> => {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) return "AI service is unavailable (API Key missing).";
+    if (!API_KEY) return "AI service is unavailable.";
     
     const prompt = `As a world-class restaurant business analyst, analyze the following order data based on the user's query. Provide actionable insights, identify trends, and give specific, data-driven recommendations.
 
@@ -84,17 +87,14 @@ export const getAdvancedInsights = async (query: string, orders: Order[]): Promi
     `;
     
     try {
-        const ai = new GoogleGenAI({ apiKey });
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-2.5-pro',
             contents: prompt,
             config: {
-                // Fix: Added required thinking budget for Gemini 3 series reasoning tasks
-                thinkingConfig: { thinkingBudget: 2048 }
+                thinkingConfig: { thinkingBudget: 32768 }
             }
         });
-        // Fix: Accessing .text property directly
-        return response.text || "No insights generated.";
+        return response.text;
     } catch (error) {
         console.error("Error getting advanced insights:", error);
         return `An error occurred while analyzing the data. ${error instanceof Error ? error.message : String(error)}`;

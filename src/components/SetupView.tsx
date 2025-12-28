@@ -3,20 +3,27 @@ import React, { useState } from 'react';
 import { IconCheck, IconDuplicate, IconInfo, IconKey, IconExternalLink } from '../constants';
 
 const COMPLETE_SQL_SETUP = `-- ALTOQUE FOOD - SUPABASE SETUP SCRIPT
--- Este script configura la estructura inicial de la base de datos.
+-- This script will completely reset and set up your database schema.
+-- It's safe to run multiple times.
 
+-- Part 1: Clean up existing tables (if they exist)
+-- Using CASCADE to automatically drop dependent objects like policies.
 DROP TABLE IF EXISTS public.app_settings CASCADE;
 DROP TABLE IF EXISTS public.orders CASCADE;
 DROP TABLE IF EXISTS public.promotion_products CASCADE;
 DROP TABLE IF EXISTS public.promotions CASCADE;
 DROP TABLE IF EXISTS public.personalization_options CASCADE;
-DROP TABLE IF EXISTS public.product_personalizations CASCADE;
+DROP TABLE IF EXISTS public.product_personalizations CASCADE; -- Dropping the join table
 DROP TABLE IF EXISTS public.personalizations CASCADE;
 DROP TABLE IF EXISTS public.tables CASCADE;
 DROP TABLE IF EXISTS public.zones CASCADE;
 DROP TABLE IF EXISTS public.products CASCADE;
 DROP TABLE IF EXISTS public.categories CASCADE;
 
+
+-- Part 2: Create all tables from scratch
+
+-- 1. Create the categories table
 CREATE TABLE public.categories (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   created_at timestamp with time zone NOT NULL DEFAULT now(),
@@ -24,6 +31,7 @@ CREATE TABLE public.categories (
   CONSTRAINT categories_pkey PRIMARY KEY (id)
 );
 
+-- 2. Create the products table
 CREATE TABLE public.products (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   created_at timestamp with time zone NOT NULL DEFAULT now(),
@@ -37,6 +45,7 @@ CREATE TABLE public.products (
   CONSTRAINT "products_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES public.categories(id) ON DELETE CASCADE
 );
 
+-- 3. Create personalizations table
 CREATE TABLE public.personalizations (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     created_at timestamp with time zone NOT NULL DEFAULT now(),
@@ -48,6 +57,7 @@ CREATE TABLE public.personalizations (
     CONSTRAINT personalizations_pkey PRIMARY KEY (id)
 );
 
+-- 4. Create personalization_options table
 CREATE TABLE public.personalization_options (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     created_at timestamp with time zone NOT NULL DEFAULT now(),
@@ -59,6 +69,7 @@ CREATE TABLE public.personalization_options (
     CONSTRAINT personalization_options_personalization_id_fkey FOREIGN KEY (personalization_id) REFERENCES public.personalizations(id) ON DELETE CASCADE
 );
 
+-- 5. Create product_personalizations join table (Many-to-Many)
 CREATE TABLE public.product_personalizations (
     product_id uuid NOT NULL,
     personalization_id uuid NOT NULL,
@@ -67,6 +78,7 @@ CREATE TABLE public.product_personalizations (
     CONSTRAINT product_personalizations_personalization_id_fkey FOREIGN KEY (personalization_id) REFERENCES public.personalizations(id) ON DELETE CASCADE
 );
 
+-- 6. Create promotions table
 CREATE TABLE public.promotions (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     created_at timestamp with time zone NOT NULL DEFAULT now(),
@@ -79,6 +91,7 @@ CREATE TABLE public.promotions (
     CONSTRAINT promotions_pkey PRIMARY KEY (id)
 );
 
+-- 7. Create promotion_products join table
 CREATE TABLE public.promotion_products (
     promotion_id uuid NOT NULL,
     product_id uuid NOT NULL,
@@ -87,6 +100,7 @@ CREATE TABLE public.promotion_products (
     CONSTRAINT promotion_products_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE
 );
 
+-- 8. Create zones table
 CREATE TABLE public.zones (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   created_at timestamp with time zone NOT NULL DEFAULT now(),
@@ -96,6 +110,7 @@ CREATE TABLE public.zones (
   CONSTRAINT zones_pkey PRIMARY KEY (id)
 );
 
+-- 9. Create tables table
 CREATE TABLE public.tables (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   created_at timestamp with time zone NOT NULL DEFAULT now(),
@@ -111,6 +126,7 @@ CREATE TABLE public.tables (
   CONSTRAINT tables_zone_id_fkey FOREIGN KEY (zone_id) REFERENCES public.zones(id) ON DELETE CASCADE
 );
 
+-- 10. Create orders table
 CREATE TABLE public.orders (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     created_at timestamp with time zone NOT NULL DEFAULT now(),
@@ -126,6 +142,7 @@ CREATE TABLE public.orders (
     CONSTRAINT orders_pkey PRIMARY KEY (id)
 );
 
+-- 11. Create app_settings table (single row)
 CREATE TABLE public.app_settings (
   id int8 NOT NULL,
   settings jsonb NOT NULL,
@@ -133,7 +150,11 @@ CREATE TABLE public.app_settings (
   CONSTRAINT app_settings_pkey PRIMARY KEY (id)
 );
 
+-- 12. Insert the single row for settings
 INSERT INTO public.app_settings (id, settings) VALUES (1, '{}'::jsonb);
+
+
+-- Part 3: Enable Row Level Security (RLS) and create policies
 
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
@@ -147,29 +168,31 @@ ALTER TABLE public.tables ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow public read access" ON public.categories FOR SELECT USING (true);
-CREATE POLICY "Allow public read access" ON public.products FOR SELECT USING (true);
-CREATE POLICY "Allow public read access" ON public.personalizations FOR SELECT USING (true);
-CREATE POLICY "Allow public read access" ON public.personalization_options FOR SELECT USING (true);
-CREATE POLICY "Allow public read access" ON public.product_personalizations FOR SELECT USING (true);
-CREATE POLICY "Allow public read access" ON public.promotions FOR SELECT USING (true);
-CREATE POLICY "Allow public read access" ON public.promotion_products FOR SELECT USING (true);
-CREATE POLICY "Allow public read access" ON public.zones FOR SELECT USING (true);
-CREATE POLICY "Allow public read access" ON public.tables FOR SELECT USING (true);
-CREATE POLICY "Allow public read access" ON public.orders FOR SELECT USING (true);
-CREATE POLICY "Allow public read access" ON public.app_settings FOR SELECT USING (true);
+CREATE POLICY "Allow public read access to categories" ON public.categories FOR SELECT USING (true);
+CREATE POLICY "Allow public read access to products" ON public.products FOR SELECT USING (true);
+CREATE POLICY "Allow public read access to personalizations" ON public.personalizations FOR SELECT USING (true);
+CREATE POLICY "Allow public read access to personalization_options" ON public.personalization_options FOR SELECT USING (true);
+CREATE POLICY "Allow public read access to product_personalizations" ON public.product_personalizations FOR SELECT USING (true);
+CREATE POLICY "Allow public read access to promotions" ON public.promotions FOR SELECT USING (true);
+CREATE POLICY "Allow public read access to promotion_products" ON public.promotion_products FOR SELECT USING (true);
+CREATE POLICY "Allow public read access to zones" ON public.zones FOR SELECT USING (true);
+CREATE POLICY "Allow public read access to tables" ON public.tables FOR SELECT USING (true);
+CREATE POLICY "Allow public read access to orders" ON public.orders FOR SELECT USING (true);
+CREATE POLICY "Allow public read access to app_settings" ON public.app_settings FOR SELECT USING (true);
 
-CREATE POLICY "Allow all manage" ON public.categories FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all manage" ON public.products FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all manage" ON public.personalizations FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all manage" ON public.personalization_options FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all manage" ON public.product_personalizations FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all manage" ON public.promotions FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all manage" ON public.promotion_products FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all manage" ON public.zones FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all manage" ON public.tables FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all manage" ON public.orders FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all manage" ON public.app_settings FOR ALL USING (true) WITH CHECK (true);
+-- For this demo, we allow any user (including anonymous) to write.
+-- For a production app, you would restrict this to authenticated users.
+CREATE POLICY "Allow all users to manage categories" ON public.categories FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all users to manage products" ON public.products FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all users to manage personalizations" ON public.personalizations FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all users to manage personalization_options" ON public.personalization_options FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all users to manage product_personalizations" ON public.product_personalizations FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all users to manage promotions" ON public.promotions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all users to manage promotion_products" ON public.promotion_products FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all users to manage zones" ON public.zones FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all users to manage tables" ON public.tables FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all users to manage orders" ON public.orders FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all users to manage app_settings" ON public.app_settings FOR ALL USING (true) WITH CHECK (true);
 `;
 
 const PATCH_SQL = `-- Parche SQL: Agregar tabla intermedia para personalizaciones
@@ -216,9 +239,6 @@ const CodeBlock: React.FC<{ title: string; code: string; }> = ({ title, code }) 
 };
 
 const SetupView: React.FC = () => {
-    // Obtenemos de process.env para mostrar solo si existen, evitando strings hardcoded en el repo.
-    const url = process.env.SUPABASE_URL || "Configurada en variables de entorno";
-    
     return (
         <div className="p-8 max-w-4xl mx-auto">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-6">Configuración de Base de Datos</h1>
@@ -232,7 +252,7 @@ const SetupView: React.FC = () => {
                     <div>
                         <h4 className="font-bold text-yellow-800 dark:text-yellow-200">Importante</h4>
                         <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                            Asegúrate de configurar las variables de entorno en Netlify (SUPABASE_URL y SUPABASE_ANON_KEY) para que la conexión funcione.
+                            El script completo borrará los datos existentes para reiniciar la estructura. Si solo necesitas actualizar la estructura para las personalizaciones, usa el "Parche SQL".
                         </p>
                     </div>
                 </div>
@@ -242,15 +262,15 @@ const SetupView: React.FC = () => {
             <CodeBlock title="Parche SQL (Solo Personalizaciones)" code={PATCH_SQL} />
 
             <div className="mt-8">
-                <h3 className="text-xl font-bold mb-4">Estado de Conexión</h3>
+                <h3 className="text-xl font-bold mb-4">Credenciales (Demo)</h3>
                 <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm font-mono space-y-2">
                     <div className="flex justify-between">
-                        <span className="text-gray-500">URL del Proyecto:</span>
-                        <span>{url}</span>
+                        <span className="text-gray-500">URL:</span>
+                        <span>https://cnbntnnhxlvkvallumdg.supabase.co</span>
                     </div>
                     <div className="flex justify-between">
-                        <span className="text-gray-500">Llave de API:</span>
-                        <span className="italic text-gray-400">Protegida por Netlify</span>
+                        <span className="text-gray-500">Anon Key:</span>
+                        <span className="truncate w-64">eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...</span>
                     </div>
                 </div>
             </div>
