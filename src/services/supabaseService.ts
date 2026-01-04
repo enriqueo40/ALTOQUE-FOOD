@@ -3,16 +3,19 @@ import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabas
 import { Product, Category, Personalization, Promotion, PersonalizationOption, Zone, Table, AppSettings, Order } from '../types';
 import { INITIAL_SETTINGS } from '../constants';
 
-const supabaseUrl = "https://cnbntnnhxlvkvallumdg.supabase.co";
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuYm50bm5oeGx2a3ZhbGx1bWRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwNjQ1MjksImV4cCI6MjA3ODY0MDUyOX0.TuovcK2Ao2tb3GM0I2j5n2BpL5DIVLSl-yjdoCHS9pM";
+// Las credenciales se obtienen exclusivamente de las variables de entorno inyectadas
+const supabaseUrl = process.env.SUPABASE_URL || '';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
 
 let supabase: SupabaseClient | null = null;
 let ordersChannel: RealtimeChannel | null = null;
 let menuChannel: RealtimeChannel | null = null;
 
-const getClient = (): SupabaseClient => {
+export const getClient = (): SupabaseClient => {
     if (supabase) return supabase;
-    if (!supabaseUrl || !supabaseAnonKey) throw new Error("Supabase URL or Anon Key is not defined.");
+    if (!supabaseUrl || !supabaseAnonKey) {
+        console.warn("Supabase credentials missing in environment variables.");
+    }
     supabase = createClient(supabaseUrl, supabaseAnonKey);
     return supabase;
 };
@@ -115,7 +118,8 @@ export const getPersonalizations = async (): Promise<Personalization[]> => {
         ...p,
         allowRepetition: p.allow_repetition,
         minSelection: p.min_selection,
-        maxSelection: p.max_selection
+        maxSelection: p.max_selection,
+        options: p.options || []
     })) || []) as Personalization[];
 };
 
@@ -174,7 +178,7 @@ export const getPromotions = async (): Promise<Promotion[]> => {
         discountType: promo.discount_type,
         discountValue: promo.discount_value,
         appliesTo: promo.applies_to,
-        productIds: promo.promotion_products.map((p: any) => p.product_id),
+        productIds: promo.promotion_products?.map((p: any) => p.product_id) || [],
         startDate: promo.start_date,
         endDate: promo.end_date,
     })) || [];
@@ -276,13 +280,12 @@ export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created
 };
 
 export const getActiveOrders = async (): Promise<Order[]> => {
-    // Optimization: Traer solo pedidos no cancelados y limitar a los últimos 50
     const { data, error } = await getClient()
         .from('orders')
         .select('*')
         .neq('status', 'Cancelled') 
         .order('created_at', { ascending: false })
-        .limit(50); // Límite de carga para mayor velocidad
+        .limit(50);
 
     if (error) return [];
     return data.map((o: any) => ({
@@ -308,7 +311,6 @@ export const updateOrder = async (orderId: string, updates: Partial<Order>): Pro
     if (updates.tableId) { dbUpdates.table_id = updates.tableId; delete dbUpdates.tableId; }
     if (updates.generalComments) { dbUpdates.general_comments = updates.generalComments; delete dbUpdates.generalComments; }
     if (updates.paymentStatus) { dbUpdates.payment_status = updates.paymentStatus; delete dbUpdates.paymentStatus; }
-    if (updates.paymentProof) { delete dbUpdates.paymentProof; } 
     const { error } = await getClient().from('orders').update(dbUpdates).eq('id', orderId);
     if (error) throw new Error(error.message);
 };
