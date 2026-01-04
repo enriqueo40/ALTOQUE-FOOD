@@ -1,8 +1,8 @@
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule, DaySchedule } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck, IconCalendar, IconDuplicate, IconMap, IconSparkles, IconChevronDown } from '../constants';
+import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck, IconCalendar, IconDuplicate, IconMap, IconSparkles, IconChevronDown, IconInfo } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
@@ -41,6 +41,69 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]) => {
     return { price: Math.max(0, product.price - discount), promotion: applicablePromo };
 };
 
+const checkIfOpen = (schedules: Schedule[]) => {
+    if (!schedules || schedules.length === 0) return true;
+    const now = new Date();
+    const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const currentDayName = days[now.getDay()];
+    const currentTime = now.getHours() * 60 + now.getMinutes();
+
+    // Check general schedule
+    const general = schedules.find(s => s.id === 'general') || schedules[0];
+    const today = general.days.find(d => d.day === currentDayName);
+
+    if (!today || !today.isOpen) return false;
+    if (today.shifts.length === 0) return true; // Open 24h if no shifts defined but isOpen
+
+    return today.shifts.some(shift => {
+        const [hStart, mStart] = shift.start.split(':').map(Number);
+        const [hEnd, mEnd] = shift.end.split(':').map(Number);
+        const start = hStart * 60 + mStart;
+        const end = hEnd * 60 + mEnd;
+        return currentTime >= start && currentTime <= end;
+    });
+};
+
+// --- Sub-Components ---
+
+const StoreInfoModal: React.FC<{ settings: AppSettings; onClose: () => void }> = ({ settings, onClose }) => (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="p-6 border-b dark:border-gray-800 flex justify-between items-center">
+                <h3 className="text-xl font-black uppercase tracking-tight">Información</h3>
+                <button onClick={onClose} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full"><IconX/></button>
+            </div>
+            <div className="p-6 space-y-6">
+                <section>
+                    <h4 className="text-xs font-bold text-gray-400 uppercase mb-3 tracking-widest">Ubicación</h4>
+                    <div className="flex items-start gap-3">
+                        <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 rounded-xl"><IconLocationMarker className="h-5 w-5"/></div>
+                        <div>
+                            <p className="font-bold text-gray-900 dark:text-white">{settings.branch.fullAddress || 'Dirección no disponible'}</p>
+                            {settings.branch.googleMapsLink && (
+                                <a href={settings.branch.googleMapsLink} target="_blank" className="text-sm text-emerald-600 font-bold hover:underline">Ver en el mapa</a>
+                            )}
+                        </div>
+                    </div>
+                </section>
+                <section>
+                    <h4 className="text-xs font-bold text-gray-400 uppercase mb-3 tracking-widest">Horarios de atención</h4>
+                    <div className="space-y-2">
+                        {settings.schedules[0].days.map(d => (
+                            <div key={d.day} className="flex justify-between text-sm">
+                                <span className={`font-medium ${new Date().toLocaleDateString('es-ES', {weekday: 'long'}).toLowerCase() === d.day.toLowerCase() ? 'text-emerald-600 font-bold' : 'text-gray-500'}`}>{d.day}</span>
+                                <span className="text-gray-700 dark:text-gray-300">
+                                    {d.isOpen ? (d.shifts.length > 0 ? d.shifts.map(s => `${s.start} - ${s.end}`).join(', ') : '24 Horas') : 'Cerrado'}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+);
+
 // --- Main View Component ---
 
 export default function CustomerView() {
@@ -49,10 +112,10 @@ export default function CustomerView() {
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
     const [settings, setSettings] = useState<AppSettings | null>(null);
     const [allPromotions, setAllPromotions] = useState<Promotion[]>([]);
-    const [allPersonalizations, setAllPersonalizations] = useState<Personalization[]>([]);
     const [allProducts, setAllProducts] = useState<Product[]>([]);
     const [allCategories, setAllCategories] = useState<Category[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [showInfo, setShowInfo] = useState(false);
     
     const { cartItems, addToCart, removeFromCart, updateQuantity, clearCart, cartTotal, itemCount } = useCart();
 
@@ -67,7 +130,6 @@ export default function CustomerView() {
             ]);
             setSettings(appSettings);
             setAllPromotions(fetchedPromotions);
-            setAllPersonalizations(fetchedPersonalizations);
             setAllProducts(fetchedProducts);
             setAllCategories(fetchedCategories);
         } finally {
@@ -87,6 +149,8 @@ export default function CustomerView() {
         return available.filter(p => p.categoryId === selectedCategory);
     }, [allProducts, selectedCategory]);
 
+    const isOpen = useMemo(() => settings ? checkIfOpen(settings.schedules) : false, [settings]);
+
     if (isLoading) {
         return (
             <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -97,64 +161,117 @@ export default function CustomerView() {
 
     if (view === 'menu') {
         return (
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-28">
-                {/* Header */}
-                <div className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-30">
-                    <div className="px-4 py-4 flex justify-between items-center border-b dark:border-gray-700">
-                         <div className="flex items-center gap-3">
-                             <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold uppercase">
-                                {settings?.company.name.charAt(0)}
-                             </div>
-                             <div>
-                                 <h1 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">{settings?.branch.alias}</h1>
-                             </div>
-                         </div>
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-32">
+                {/* 1. Profesional Header (Cover & Logo) */}
+                <div className="relative">
+                    <div className="h-48 sm:h-64 w-full relative overflow-hidden">
+                        <img 
+                            src={settings?.branch.coverImageUrl || 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1200&q=80'} 
+                            className="w-full h-full object-cover" 
+                            alt="Cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
+                        
+                        {/* Top Action Buttons */}
+                        <div className="absolute top-4 right-4 flex gap-2">
+                            <button onClick={() => setShowInfo(true)} className="p-2.5 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white/40 transition-colors"><IconInfo className="h-5 w-5"/></button>
+                            <button className="p-2.5 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white/40 transition-colors"><IconShare className="h-5 w-5"/></button>
+                        </div>
                     </div>
-                    {/* Categories */}
-                    <div className="flex overflow-x-auto px-4 py-3 gap-2 no-scrollbar bg-white dark:bg-gray-800">
+
+                    {/* Logo & Store Header */}
+                    <div className="relative px-4 -mt-12 text-center">
+                        <div className="inline-block relative">
+                            <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-white dark:border-gray-900 bg-white dark:bg-gray-800 shadow-xl overflow-hidden mx-auto">
+                                {settings?.branch.logoUrl ? (
+                                    <img src={settings.branch.logoUrl} className="w-full h-full object-cover" alt="Logo" />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-3xl font-black text-emerald-500">{settings?.company.name.charAt(0)}</div>
+                                )}
+                            </div>
+                            <div className={`absolute bottom-1 right-1 w-6 h-6 rounded-full border-2 border-white dark:border-gray-900 shadow-sm ${isOpen ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                        </div>
+                        
+                        <div className="mt-4">
+                            <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">{settings?.company.name}</h1>
+                            <div className="flex flex-wrap justify-center gap-4 mt-3 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                <div className="flex items-center gap-1.5"><IconStore className="h-4 w-4 text-emerald-500"/> A domicilio</div>
+                                <div className="flex items-center gap-1.5"><IconClock className="h-4 w-4 text-emerald-500"/> 25 - 45 mins</div>
+                                <div className="flex items-center gap-1.5"><IconTag className="h-4 w-4 text-emerald-500"/> Envío ${settings?.shipping.fixedCost || '0'}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 2. Promo Banner Style (Yellow Reference) */}
+                {allPromotions.length > 0 && (
+                    <div className="px-4 mt-6">
+                        <div className="bg-yellow-100 border border-yellow-200 p-3 rounded-2xl flex items-center gap-3 animate-pulse shadow-sm">
+                            <div className="bg-yellow-400 p-2 rounded-xl text-yellow-900 font-black text-lg">2x1</div>
+                            <div className="flex-1">
+                                <p className="text-sm font-black text-yellow-900 uppercase">Oferta en Hamburguesas</p>
+                                <p className="text-xs text-yellow-800 font-medium">Haz clic para ver más detalles...</p>
+                            </div>
+                            <IconChevronDown className="h-5 w-5 text-yellow-600 -rotate-90"/>
+                        </div>
+                    </div>
+                )}
+
+                {/* 3. Category Nav (Sticky & Fluid) */}
+                <div className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b dark:border-gray-800 mt-6 shadow-sm">
+                    <div className="flex overflow-x-auto px-4 py-4 gap-3 no-scrollbar">
                         <button
                             onClick={() => setSelectedCategory('all')}
-                            className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedCategory === 'all' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
+                            className={`px-6 py-2.5 rounded-full text-sm font-black whitespace-nowrap transition-all duration-300 ${selectedCategory === 'all' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20 scale-105' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}
                         >
-                            Todo
+                            TODO EL MENÚ
                         </button>
                         {allCategories.map(cat => (
                             <button
                                 key={cat.id}
                                 onClick={() => setSelectedCategory(cat.id)}
-                                className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedCategory === cat.id ? 'bg-emerald-600 text-white shadow-lg' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
+                                className={`px-6 py-2.5 rounded-full text-sm font-black whitespace-nowrap transition-all duration-300 ${selectedCategory === cat.id ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20 scale-105' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}
                             >
-                                {cat.name}
+                                {cat.name.toUpperCase()}
                             </button>
                         ))}
                     </div>
                 </div>
 
-                {/* Grid */}
-                <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* 4. Product Grid (Professional Cards) */}
+                <div className="px-4 py-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredProducts.map((product, idx) => {
                         const { price, promotion } = getDiscountedPrice(product, allPromotions);
                         return (
-                            <div key={product.id} onClick={() => setSelectedProduct(product)} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border dark:border-gray-700 overflow-hidden cursor-pointer hover:shadow-md transition-all flex flex-row h-32 group">
-                                <div className="w-32 flex-shrink-0 bg-gray-200 dark:bg-gray-700 relative overflow-hidden">
-                                     {/* Optimization: Lazy loading on catalog images except first few */}
-                                     <img 
+                            <div key={product.id} onClick={() => setSelectedProduct(product)} className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm hover:shadow-xl border dark:border-gray-800 overflow-hidden cursor-pointer transition-all duration-300 flex flex-col group active:scale-95">
+                                <div className="h-48 relative overflow-hidden">
+                                    <img 
                                         src={product.imageUrl} 
                                         alt={product.name} 
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-                                        loading={idx < 4 ? "eager" : "lazy"} 
-                                     />
-                                     {promotion && <div className="absolute top-2 left-2 bg-yellow-400 text-black text-[10px] font-bold px-2 py-1 rounded-full">OFERTA</div>}
+                                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                                        loading={idx < 4 ? "eager" : "lazy"}
+                                    />
+                                    {promotion && (
+                                        <div className="absolute top-4 left-4 bg-emerald-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg border border-white/20">
+                                            {promotion.discountType === DiscountType.Percentage ? `-${promotion.discountValue}%` : 'OFERTA'}
+                                        </div>
+                                    )}
                                 </div>
-                                <div className="p-3 flex flex-col flex-1 justify-between">
-                                    <div>
-                                        <h3 className="font-bold text-gray-900 dark:text-white text-sm line-clamp-1">{product.name}</h3>
-                                        <p className="text-xs text-gray-500 line-clamp-2 mt-1">{product.description}</p>
+                                <div className="p-5 flex-1 flex flex-col">
+                                    <div className="flex-1">
+                                        <h3 className="font-black text-gray-900 dark:text-white text-lg leading-tight mb-2 group-hover:text-emerald-500 transition-colors">{product.name}</h3>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed">{product.description}</p>
                                     </div>
-                                    <div className="flex justify-between items-end">
-                                        <span className="font-bold text-emerald-600 dark:text-emerald-400">${price.toFixed(2)}</span>
-                                        <button className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 p-1 rounded-lg">
-                                            <IconPlus className="h-4 w-4"/>
+                                    <div className="flex justify-between items-center mt-5 pt-4 border-t dark:border-gray-700">
+                                        <div className="flex flex-col">
+                                            <span className="text-xs text-gray-400 font-bold uppercase tracking-tighter">Desde</span>
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="font-black text-emerald-600 dark:text-emerald-400 text-2xl tracking-tighter">${price.toFixed(2)}</span>
+                                                {promotion && <span className="text-sm text-gray-400 line-through font-bold">${product.price.toFixed(2)}</span>}
+                                            </div>
+                                        </div>
+                                        <button className="bg-emerald-500 hover:bg-emerald-600 text-white p-3 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all group-hover:rotate-90">
+                                            <IconPlus className="h-6 w-6"/>
                                         </button>
                                     </div>
                                 </div>
@@ -163,26 +280,34 @@ export default function CustomerView() {
                     })}
                 </div>
 
+                {/* Floating Bottom Bar (Professional) */}
                 {itemCount > 0 && (
-                    <div className="fixed bottom-4 left-4 right-4 z-40 max-w-2xl mx-auto">
-                        <button onClick={() => setView('cart')} className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-xl flex justify-between px-6 active:scale-[0.98] transition-all">
-                            <span>{itemCount} items en el carrito</span>
-                            <span>Ver Pedido (${cartTotal.toFixed(2)})</span>
+                    <div className="fixed bottom-6 left-6 right-6 z-50 max-w-xl mx-auto">
+                        <button 
+                            onClick={() => setView('cart')} 
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white p-5 rounded-[2rem] font-black shadow-2xl flex justify-between items-center px-8 transition-all active:scale-95 group"
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className="bg-white/20 px-3 py-1 rounded-full text-sm">{itemCount}</div>
+                                <span className="tracking-tighter uppercase">Ver mi pedido</span>
+                            </div>
+                            <span className="text-xl font-black tracking-tighter group-hover:translate-x-1 transition-transform">${cartTotal.toFixed(2)}</span>
                         </button>
                     </div>
                 )}
                 
+                {/* Modals */}
                 {selectedProduct && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                        <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-2xl overflow-hidden relative">
-                             <img src={selectedProduct.imageUrl} className="w-full h-64 object-cover" />
-                             <button onClick={() => setSelectedProduct(null)} className="absolute top-4 right-4 bg-black/40 p-2 rounded-full text-white"><IconX/></button>
-                             <div className="p-6">
-                                <h2 className="text-2xl font-bold mb-2">{selectedProduct.name}</h2>
-                                <p className="text-gray-600 dark:text-gray-400 mb-6">{selectedProduct.description}</p>
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+                        <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[2.5rem] overflow-hidden relative shadow-2xl animate-in slide-in-from-bottom-10 duration-500">
+                             <img src={selectedProduct.imageUrl} className="w-full h-72 object-cover" />
+                             <button onClick={() => setSelectedProduct(null)} className="absolute top-6 right-6 bg-black/40 backdrop-blur-md p-2 rounded-full text-white hover:bg-black/60 transition-colors"><IconX className="h-6 w-6"/></button>
+                             <div className="p-8">
+                                <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-3 tracking-tighter">{selectedProduct.name}</h2>
+                                <p className="text-gray-500 dark:text-gray-400 mb-8 leading-relaxed font-medium">{selectedProduct.description}</p>
                                 <button 
                                     onClick={() => { addToCart(selectedProduct, 1); setSelectedProduct(null); }}
-                                    className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold"
+                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-emerald-500/20 transition-all uppercase tracking-tighter"
                                 >
                                     Agregar al Pedido
                                 </button>
@@ -190,11 +315,12 @@ export default function CustomerView() {
                         </div>
                     </div>
                 )}
+
+                {showInfo && settings && <StoreInfoModal settings={settings} onClose={() => setShowInfo(false)} />}
                 <Chatbot />
             </div>
         );
     }
 
-    // ... (Cart and Checkout views remain similar but benefit from service level optimizations) ...
-    return <div className="p-10 text-center">Vista en construcción</div>;
+    return <div className="p-10 text-center font-black text-gray-400 uppercase tracking-widest">Vista en construcción</div>;
 }
