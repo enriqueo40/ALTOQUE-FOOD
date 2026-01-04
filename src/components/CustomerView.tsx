@@ -2,7 +2,8 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule, DaySchedule } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck, IconCalendar, IconDuplicate, IconMap, IconSparkles, IconChevronDown, IconInfo } from '../constants';
+// Fix: Added IconExternalLink to the imports list
+import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck, IconCalendar, IconDuplicate, IconMap, IconSparkles, IconChevronDown, IconInfo, IconExternalLink } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
@@ -48,12 +49,12 @@ const checkIfOpen = (schedules: Schedule[]) => {
     const currentDayName = days[now.getDay()];
     const currentTime = now.getHours() * 60 + now.getMinutes();
 
-    // Check general schedule
-    const general = schedules.find(s => s.id === 'general') || schedules[0];
-    const today = general.days.find(d => d.day === currentDayName);
+    // El horario general suele ser el ID 'general'
+    const schedule = schedules.find(s => s.id === 'general') || schedules[0];
+    const today = schedule.days.find(d => d.day === currentDayName);
 
     if (!today || !today.isOpen) return false;
-    if (today.shifts.length === 0) return true; // Open 24h if no shifts defined but isOpen
+    if (!today.shifts || today.shifts.length === 0) return true; // Abierto 24h si no hay turnos pero está marcado como abierto
 
     return today.shifts.some(shift => {
         const [hStart, mStart] = shift.start.split(':').map(Number);
@@ -67,36 +68,41 @@ const checkIfOpen = (schedules: Schedule[]) => {
 // --- Sub-Components ---
 
 const StoreInfoModal: React.FC<{ settings: AppSettings; onClose: () => void }> = ({ settings, onClose }) => (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-        <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
-            <div className="p-6 border-b dark:border-gray-800 flex justify-between items-center">
-                <h3 className="text-xl font-black uppercase tracking-tight">Información</h3>
-                <button onClick={onClose} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full"><IconX/></button>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="p-8 border-b dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
+                <h3 className="text-xl font-black uppercase tracking-tighter">Información del Local</h3>
+                <button onClick={onClose} className="p-2 bg-white dark:bg-gray-800 rounded-full shadow-sm hover:scale-110 transition-transform"><IconX/></button>
             </div>
-            <div className="p-6 space-y-6">
+            <div className="p-8 space-y-8">
                 <section>
-                    <h4 className="text-xs font-bold text-gray-400 uppercase mb-3 tracking-widest">Ubicación</h4>
-                    <div className="flex items-start gap-3">
-                        <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 rounded-xl"><IconLocationMarker className="h-5 w-5"/></div>
+                    <h4 className="text-[10px] font-black text-emerald-600 uppercase mb-4 tracking-[0.2em]">Donde estamos</h4>
+                    <div className="flex items-start gap-4">
+                        <div className="p-3 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 rounded-2xl"><IconLocationMarker className="h-6 w-6"/></div>
                         <div>
-                            <p className="font-bold text-gray-900 dark:text-white">{settings.branch.fullAddress || 'Dirección no disponible'}</p>
+                            <p className="font-bold text-gray-900 dark:text-white leading-tight mb-2">{settings.branch.fullAddress || 'Dirección no configurada'}</p>
                             {settings.branch.googleMapsLink && (
-                                <a href={settings.branch.googleMapsLink} target="_blank" className="text-sm text-emerald-600 font-bold hover:underline">Ver en el mapa</a>
+                                <a href={settings.branch.googleMapsLink} target="_blank" className="text-sm text-emerald-600 font-black hover:underline flex items-center gap-1">
+                                    VER EN GOOGLE MAPS <IconExternalLink className="h-3 w-3"/>
+                                </a>
                             )}
                         </div>
                     </div>
                 </section>
                 <section>
-                    <h4 className="text-xs font-bold text-gray-400 uppercase mb-3 tracking-widest">Horarios de atención</h4>
-                    <div className="space-y-2">
-                        {settings.schedules[0].days.map(d => (
-                            <div key={d.day} className="flex justify-between text-sm">
-                                <span className={`font-medium ${new Date().toLocaleDateString('es-ES', {weekday: 'long'}).toLowerCase() === d.day.toLowerCase() ? 'text-emerald-600 font-bold' : 'text-gray-500'}`}>{d.day}</span>
-                                <span className="text-gray-700 dark:text-gray-300">
-                                    {d.isOpen ? (d.shifts.length > 0 ? d.shifts.map(s => `${s.start} - ${s.end}`).join(', ') : '24 Horas') : 'Cerrado'}
-                                </span>
-                            </div>
-                        ))}
+                    <h4 className="text-[10px] font-black text-emerald-600 uppercase mb-4 tracking-[0.2em]">Horarios de la semana</h4>
+                    <div className="space-y-3 bg-gray-50 dark:bg-gray-800/50 p-6 rounded-3xl">
+                        {settings.schedules[0].days.map(d => {
+                            const isToday = new Date().toLocaleDateString('es-ES', {weekday: 'long'}).toLowerCase() === d.day.toLowerCase();
+                            return (
+                                <div key={d.day} className={`flex justify-between text-sm ${isToday ? 'scale-105' : ''}`}>
+                                    <span className={`font-bold ${isToday ? 'text-emerald-600' : 'text-gray-500'}`}>{d.day}</span>
+                                    <span className={`font-medium ${isToday ? 'text-emerald-600' : 'text-gray-700 dark:text-gray-300'}`}>
+                                        {d.isOpen ? (d.shifts.length > 0 ? d.shifts.map(s => `${s.start} - ${s.end}`).join(', ') : '24 Horas') : 'Cerrado'}
+                                    </span>
+                                </div>
+                            );
+                        })}
                     </div>
                 </section>
             </div>
@@ -162,67 +168,84 @@ export default function CustomerView() {
     if (view === 'menu') {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-32">
-                {/* 1. Profesional Header (Cover & Logo) */}
+                {/* Header Profesional con Portada */}
                 <div className="relative">
-                    <div className="h-48 sm:h-64 w-full relative overflow-hidden">
+                    <div className="h-56 sm:h-72 w-full relative overflow-hidden">
                         <img 
                             src={settings?.branch.coverImageUrl || 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1200&q=80'} 
                             className="w-full h-full object-cover" 
                             alt="Cover"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
                         
-                        {/* Top Action Buttons */}
-                        <div className="absolute top-4 right-4 flex gap-2">
-                            <button onClick={() => setShowInfo(true)} className="p-2.5 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white/40 transition-colors"><IconInfo className="h-5 w-5"/></button>
-                            <button className="p-2.5 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white/40 transition-colors"><IconShare className="h-5 w-5"/></button>
+                        <div className="absolute top-6 right-6 flex gap-3">
+                            <button onClick={() => setShowInfo(true)} className="p-3 bg-white/20 backdrop-blur-xl rounded-full text-white hover:bg-white/40 transition-all border border-white/20 shadow-lg"><IconInfo className="h-5 w-5"/></button>
+                            <button className="p-3 bg-white/20 backdrop-blur-xl rounded-full text-white hover:bg-white/40 transition-all border border-white/20 shadow-lg"><IconShare className="h-5 w-5"/></button>
                         </div>
                     </div>
 
-                    {/* Logo & Store Header */}
-                    <div className="relative px-4 -mt-12 text-center">
+                    {/* Logo e Información Centralizada */}
+                    <div className="relative px-6 -mt-16 text-center">
                         <div className="inline-block relative">
-                            <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-white dark:border-gray-900 bg-white dark:bg-gray-800 shadow-xl overflow-hidden mx-auto">
+                            <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-full border-4 border-white dark:border-gray-900 bg-white dark:bg-gray-800 shadow-2xl overflow-hidden mx-auto">
                                 {settings?.branch.logoUrl ? (
                                     <img src={settings.branch.logoUrl} className="w-full h-full object-cover" alt="Logo" />
                                 ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-3xl font-black text-emerald-500">{settings?.company.name.charAt(0)}</div>
+                                    <div className="w-full h-full flex items-center justify-center text-4xl font-black text-emerald-500">{settings?.company.name.charAt(0)}</div>
                                 )}
                             </div>
-                            <div className={`absolute bottom-1 right-1 w-6 h-6 rounded-full border-2 border-white dark:border-gray-900 shadow-sm ${isOpen ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                            {/* Indicador de Estado Flotante */}
+                            <div className={`absolute bottom-2 right-2 px-3 py-1 rounded-full border-2 border-white dark:border-gray-900 shadow-lg flex items-center gap-1.5 transition-colors ${isOpen ? 'bg-green-500' : 'bg-red-500'}`}>
+                                <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
+                                <span className="text-[10px] font-black text-white uppercase tracking-tighter">{isOpen ? 'Abierto' : 'Cerrado'}</span>
+                            </div>
                         </div>
                         
-                        <div className="mt-4">
-                            <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">{settings?.company.name}</h1>
-                            <div className="flex flex-wrap justify-center gap-4 mt-3 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                                <div className="flex items-center gap-1.5"><IconStore className="h-4 w-4 text-emerald-500"/> A domicilio</div>
-                                <div className="flex items-center gap-1.5"><IconClock className="h-4 w-4 text-emerald-500"/> 25 - 45 mins</div>
-                                <div className="flex items-center gap-1.5"><IconTag className="h-4 w-4 text-emerald-500"/> Envío ${settings?.shipping.fixedCost || '0'}</div>
+                        <div className="mt-6">
+                            <h1 className="text-3xl sm:text-4xl font-black text-gray-900 dark:text-white tracking-tighter leading-none mb-2">{settings?.company.name}</h1>
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center justify-center gap-2 mb-4">
+                                <IconLocationMarker className="h-3 w-3 text-emerald-500"/> {settings?.branch.fullAddress || 'Ubicación'}
+                            </p>
+                            
+                            <div className="flex flex-wrap justify-center gap-3 mt-4">
+                                <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border dark:border-gray-800 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                                    <IconStore className="h-4 w-4 text-emerald-500"/> A domicilio
+                                </div>
+                                <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border dark:border-gray-800 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                                    <IconClock className="h-4 w-4 text-emerald-500"/> {settings?.shipping.deliveryTime.min}-{settings?.shipping.deliveryTime.max} mins
+                                </div>
+                                <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border dark:border-gray-800 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                                    <IconTag className="h-4 w-4 text-emerald-500"/> Envío ${settings?.shipping.fixedCost || '0'}
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* 2. Promo Banner Style (Yellow Reference) */}
+                {/* Banner de Promociones Destacado */}
                 {allPromotions.length > 0 && (
-                    <div className="px-4 mt-6">
-                        <div className="bg-yellow-100 border border-yellow-200 p-3 rounded-2xl flex items-center gap-3 animate-pulse shadow-sm">
-                            <div className="bg-yellow-400 p-2 rounded-xl text-yellow-900 font-black text-lg">2x1</div>
-                            <div className="flex-1">
-                                <p className="text-sm font-black text-yellow-900 uppercase">Oferta en Hamburguesas</p>
-                                <p className="text-xs text-yellow-800 font-medium">Haz clic para ver más detalles...</p>
+                    <div className="px-6 mt-10">
+                        <button onClick={() => setView('menu')} className="w-full bg-yellow-100 border-2 border-yellow-300 p-4 rounded-[2rem] flex items-center justify-between group transition-all active:scale-95">
+                            <div className="flex items-center gap-4">
+                                <div className="bg-yellow-400 p-3 rounded-2xl text-yellow-900 font-black text-xl shadow-sm">2x1</div>
+                                <div className="text-left">
+                                    <p className="text-xs font-black text-yellow-900 uppercase tracking-widest">Oferta Especial</p>
+                                    <p className="text-sm font-bold text-yellow-800">Hamburguesas seleccionadas</p>
+                                </div>
                             </div>
-                            <IconChevronDown className="h-5 w-5 text-yellow-600 -rotate-90"/>
-                        </div>
+                            <div className="p-2 bg-yellow-200 rounded-full group-hover:translate-x-1 transition-transform">
+                                <IconChevronDown className="h-5 w-5 text-yellow-600 -rotate-90"/>
+                            </div>
+                        </button>
                     </div>
                 )}
 
-                {/* 3. Category Nav (Sticky & Fluid) */}
-                <div className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b dark:border-gray-800 mt-6 shadow-sm">
-                    <div className="flex overflow-x-auto px-4 py-4 gap-3 no-scrollbar">
+                {/* Navegación de Categorías Sticky */}
+                <div className="sticky top-0 z-40 bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-2xl border-b dark:border-gray-800 mt-10 shadow-sm">
+                    <div className="flex overflow-x-auto px-6 py-5 gap-3 no-scrollbar">
                         <button
                             onClick={() => setSelectedCategory('all')}
-                            className={`px-6 py-2.5 rounded-full text-sm font-black whitespace-nowrap transition-all duration-300 ${selectedCategory === 'all' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20 scale-105' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}
+                            className={`px-8 py-3 rounded-2xl text-[11px] font-black whitespace-nowrap transition-all duration-300 ${selectedCategory === 'all' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/30 scale-105' : 'bg-white dark:bg-gray-800 text-gray-500 border dark:border-gray-800'}`}
                         >
                             TODO EL MENÚ
                         </button>
@@ -230,7 +253,7 @@ export default function CustomerView() {
                             <button
                                 key={cat.id}
                                 onClick={() => setSelectedCategory(cat.id)}
-                                className={`px-6 py-2.5 rounded-full text-sm font-black whitespace-nowrap transition-all duration-300 ${selectedCategory === cat.id ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20 scale-105' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}
+                                className={`px-8 py-3 rounded-2xl text-[11px] font-black whitespace-nowrap transition-all duration-300 ${selectedCategory === cat.id ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/30 scale-105' : 'bg-white dark:bg-gray-800 text-gray-500 border dark:border-gray-800'}`}
                             >
                                 {cat.name.toUpperCase()}
                             </button>
@@ -238,39 +261,39 @@ export default function CustomerView() {
                     </div>
                 </div>
 
-                {/* 4. Product Grid (Professional Cards) */}
-                <div className="px-4 py-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Cuadrícula de Productos Premium */}
+                <div className="px-6 py-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
                     {filteredProducts.map((product, idx) => {
                         const { price, promotion } = getDiscountedPrice(product, allPromotions);
                         return (
-                            <div key={product.id} onClick={() => setSelectedProduct(product)} className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm hover:shadow-xl border dark:border-gray-800 overflow-hidden cursor-pointer transition-all duration-300 flex flex-col group active:scale-95">
-                                <div className="h-48 relative overflow-hidden">
+                            <div key={product.id} onClick={() => setSelectedProduct(product)} className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-sm hover:shadow-2xl border dark:border-gray-800 overflow-hidden cursor-pointer transition-all duration-500 flex flex-col group active:scale-[0.98]">
+                                <div className="h-56 relative overflow-hidden">
                                     <img 
                                         src={product.imageUrl} 
                                         alt={product.name} 
-                                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
                                         loading={idx < 4 ? "eager" : "lazy"}
                                     />
                                     {promotion && (
-                                        <div className="absolute top-4 left-4 bg-emerald-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg border border-white/20">
+                                        <div className="absolute top-5 left-5 bg-emerald-500 text-white text-[10px] font-black px-4 py-2 rounded-full shadow-2xl border border-white/20 animate-pulse">
                                             {promotion.discountType === DiscountType.Percentage ? `-${promotion.discountValue}%` : 'OFERTA'}
                                         </div>
                                     )}
                                 </div>
-                                <div className="p-5 flex-1 flex flex-col">
+                                <div className="p-8 flex-1 flex flex-col">
                                     <div className="flex-1">
-                                        <h3 className="font-black text-gray-900 dark:text-white text-lg leading-tight mb-2 group-hover:text-emerald-500 transition-colors">{product.name}</h3>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed">{product.description}</p>
+                                        <h3 className="font-black text-gray-900 dark:text-white text-xl leading-tight mb-3 group-hover:text-emerald-500 transition-colors tracking-tighter">{product.name}</h3>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed font-medium">{product.description}</p>
                                     </div>
-                                    <div className="flex justify-between items-center mt-5 pt-4 border-t dark:border-gray-700">
+                                    <div className="flex justify-between items-center mt-8 pt-6 border-t dark:border-gray-700">
                                         <div className="flex flex-col">
-                                            <span className="text-xs text-gray-400 font-bold uppercase tracking-tighter">Desde</span>
+                                            <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Precio</span>
                                             <div className="flex items-baseline gap-2">
-                                                <span className="font-black text-emerald-600 dark:text-emerald-400 text-2xl tracking-tighter">${price.toFixed(2)}</span>
+                                                <span className="font-black text-emerald-600 dark:text-emerald-400 text-3xl tracking-tighter">${price.toFixed(2)}</span>
                                                 {promotion && <span className="text-sm text-gray-400 line-through font-bold">${product.price.toFixed(2)}</span>}
                                             </div>
                                         </div>
-                                        <button className="bg-emerald-500 hover:bg-emerald-600 text-white p-3 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all group-hover:rotate-90">
+                                        <button className="bg-emerald-500 hover:bg-emerald-600 text-white p-4 rounded-[1.5rem] shadow-xl shadow-emerald-500/20 transition-all group-hover:rotate-90 active:scale-90">
                                             <IconPlus className="h-6 w-6"/>
                                         </button>
                                     </div>
@@ -280,47 +303,27 @@ export default function CustomerView() {
                     })}
                 </div>
 
-                {/* Floating Bottom Bar (Professional) */}
+                {/* Barra de Pedido Flotante */}
                 {itemCount > 0 && (
-                    <div className="fixed bottom-6 left-6 right-6 z-50 max-w-xl mx-auto">
+                    <div className="fixed bottom-8 left-6 right-6 z-50 max-w-xl mx-auto">
                         <button 
                             onClick={() => setView('cart')} 
-                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white p-5 rounded-[2rem] font-black shadow-2xl flex justify-between items-center px-8 transition-all active:scale-95 group"
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white p-6 rounded-[2.5rem] font-black shadow-2xl flex justify-between items-center px-10 transition-all active:scale-95 group border-4 border-emerald-500/20"
                         >
-                            <div className="flex items-center gap-4">
-                                <div className="bg-white/20 px-3 py-1 rounded-full text-sm">{itemCount}</div>
-                                <span className="tracking-tighter uppercase">Ver mi pedido</span>
+                            <div className="flex items-center gap-5">
+                                <div className="bg-white text-emerald-600 h-8 w-8 flex items-center justify-center rounded-full text-sm font-black shadow-inner">{itemCount}</div>
+                                <span className="tracking-tighter uppercase text-sm">Ver mi carrito</span>
                             </div>
-                            <span className="text-xl font-black tracking-tighter group-hover:translate-x-1 transition-transform">${cartTotal.toFixed(2)}</span>
+                            <span className="text-2xl font-black tracking-tighter group-hover:translate-x-1 transition-transform">${cartTotal.toFixed(2)}</span>
                         </button>
                     </div>
                 )}
                 
-                {/* Modals */}
-                {selectedProduct && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
-                        <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[2.5rem] overflow-hidden relative shadow-2xl animate-in slide-in-from-bottom-10 duration-500">
-                             <img src={selectedProduct.imageUrl} className="w-full h-72 object-cover" />
-                             <button onClick={() => setSelectedProduct(null)} className="absolute top-6 right-6 bg-black/40 backdrop-blur-md p-2 rounded-full text-white hover:bg-black/60 transition-colors"><IconX className="h-6 w-6"/></button>
-                             <div className="p-8">
-                                <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-3 tracking-tighter">{selectedProduct.name}</h2>
-                                <p className="text-gray-500 dark:text-gray-400 mb-8 leading-relaxed font-medium">{selectedProduct.description}</p>
-                                <button 
-                                    onClick={() => { addToCart(selectedProduct, 1); setSelectedProduct(null); }}
-                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-emerald-500/20 transition-all uppercase tracking-tighter"
-                                >
-                                    Agregar al Pedido
-                                </button>
-                             </div>
-                        </div>
-                    </div>
-                )}
-
                 {showInfo && settings && <StoreInfoModal settings={settings} onClose={() => setShowInfo(false)} />}
                 <Chatbot />
             </div>
         );
     }
 
-    return <div className="p-10 text-center font-black text-gray-400 uppercase tracking-widest">Vista en construcción</div>;
+    return <div className="flex items-center justify-center h-screen font-black text-gray-300 uppercase tracking-[0.3em]">Cargando vista...</div>;
 }
