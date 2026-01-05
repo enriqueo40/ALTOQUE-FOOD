@@ -3,36 +3,34 @@ import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabas
 import { Product, Category, Personalization, Promotion, PersonalizationOption, Zone, Table, AppSettings, Order } from '../types';
 import { INITIAL_SETTINGS } from '../constants';
 
-/**
- * Función robusta para obtener valores de entorno o retornar cadena vacía si es inválido.
- */
-const getEnvValue = (val: string | undefined): string => {
-    if (!val || val === 'undefined' || val === 'null' || val === '') return '';
-    return val;
-};
-
-// Credenciales proporcionadas por el usuario
-const DEFAULT_URL = 'https://cnbntnnhxlvkvallumdg.supabase.co';
-const DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuYm50bm5oeGx2a3ZhbGx1bWRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwNjQ1MjksImV4cCI6MjA3ODY0MDUyOX0.TuovcK2Ao2tb3GM0I2j5n2BpL5DIVLSl-yjdoCHS9pM';
-
-const supabaseUrl = getEnvValue(process.env.SUPABASE_URL) || DEFAULT_URL;
-const supabaseAnonKey = getEnvValue(process.env.SUPABASE_ANON_KEY) || DEFAULT_KEY;
+// Las credenciales se obtienen de las variables de entorno inyectadas o definidas en vite.config.ts
+const supabaseUrl = process.env.SUPABASE_URL || '';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
 
 let supabase: SupabaseClient | null = null;
 let ordersChannel: RealtimeChannel | null = null;
 let menuChannel: RealtimeChannel | null = null;
 
 /**
- * Obtiene o inicializa la instancia del cliente de Supabase.
+ * Singleton pattern for getClient to ensure we use one instance.
+ * Handles missing environment variables gracefully to prevent application crash.
  */
 export const getClient = (): SupabaseClient => {
     if (supabase) return supabase;
-    
-    // Asegurar que siempre haya una URL y Key válidas para evitar errores del SDK
-    const validUrl = supabaseUrl || 'https://placeholder.supabase.co';
-    const validKey = supabaseAnonKey || 'placeholder';
-    
-    supabase = createClient(validUrl, validKey);
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+        console.error("CRITICAL: Supabase credentials missing (SUPABASE_URL or SUPABASE_ANON_KEY). " +
+                      "Please ensure these are configured in your environment variables.");
+        // We use dummy strings that satisfy the Supabase SDK's string requirements 
+        // to prevent the 'supabaseUrl is required' exception during initialization.
+        // The app will still fail on network requests, but won't crash on load.
+        return createClient(
+            supabaseUrl || 'https://placeholder-project.supabase.co', 
+            supabaseAnonKey || 'placeholder-anon-key'
+        );
+    }
+
+    supabase = createClient(supabaseUrl, supabaseAnonKey);
     return supabase;
 };
 
@@ -48,7 +46,7 @@ export const getAppSettings = async (): Promise<AppSettings> => {
             return { ...JSON.parse(JSON.stringify(INITIAL_SETTINGS)), ...data.settings };
         }
     } catch (err) {
-        console.warn("Failed to fetch settings, using defaults.");
+        console.warn("Failed to fetch settings from DB, using defaults:", err);
     }
 
     try {
@@ -211,7 +209,9 @@ export const savePromotion = async (promotion: Omit<Promotion, 'id' | 'created_a
         .upsert({
             id: promoData.id,
             name: promoData.name,
+            // Fix: Changed promoData.discount_type to promoData.discountType to match Promotion interface
             discount_type: promoData.discountType,
+            // Fix: Changed promoData.discount_value to promoData.discountValue to match Promotion interface
             discount_value: promoData.discountValue,
             applies_to: promoData.appliesTo,
             start_date: promoData.startDate || null,
@@ -293,6 +293,7 @@ export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created
         order_type: order.orderType || null,      
         table_id: order.tableId || null,          
         general_comments: order.generalComments || null, 
+        // Fix: Removed invalid order.payment_status (was a typo, should use order.paymentStatus)
         payment_status: order.paymentStatus || 'pending' 
     };
     const { error } = await getClient().from('orders').insert(dbOrderPayload);
