@@ -2,26 +2,38 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Product, Category, AppSettings, OrderType, Promotion, DiscountType, PromotionAppliesTo, Schedule, DaySchedule, PaymentMethod, Customer, Personalization, PersonalizationOption, OrderStatus, Order, ShippingCostType } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconClock, IconShare, IconX, IconLocationMarker, IconExternalLink, IconMinus, IconCheck, IconStore, IconDelivery, IconArrowLeft, IconSearch } from '../constants';
+import { IconPlus, IconClock, IconShare, IconX, IconLocationMarker, IconExternalLink, IconMinus, IconCheck, IconStore, IconDelivery, IconArrowLeft, IconSearch, IconMap, IconInfo } from '../constants';
 import { getProducts, getCategories, getAppSettings, getPromotions, getPersonalizations, saveOrder, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
-// --- Lógica de Apertura ---
+// --- Lógica de Apertura Refinada ---
 const checkIfOpen = (schedules: Schedule[]) => {
     if (!schedules || schedules.length === 0) return true;
     const now = new Date();
     const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     const currentDayName = days[now.getDay()];
-    const currentTime = now.getHours() * 60 + now.getMinutes();
+    
+    // Buscamos el horario general o el primero disponible
     const schedule = schedules.find(s => s.id === 'general') || schedules[0];
     const today = schedule.days.find(d => d.day === currentDayName);
+
     if (!today || !today.isOpen) return false;
+    
+    // Si está marcado como abierto pero no tiene turnos específicos, asumimos 24h
     if (!today.shifts || today.shifts.length === 0) return true;
+
+    const currentTime = now.getHours() * 60 + now.getMinutes();
+    
     return today.shifts.some(shift => {
         const [hStart, mStart] = shift.start.split(':').map(Number);
         const [hEnd, mEnd] = shift.end.split(':').map(Number);
         const start = hStart * 60 + mStart;
         const end = hEnd * 60 + mEnd;
+        
+        // Manejo de turnos que cruzan la medianoche (ej: 20:00 - 02:00)
+        if (end < start) {
+            return currentTime >= start || currentTime <= end;
+        }
         return currentTime >= start && currentTime <= end;
     });
 };
@@ -33,25 +45,33 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]) => {
     return { price: Math.max(0, product.price - discount), promotion: promo };
 };
 
-// --- Modales Estilo Referencia ---
+// --- Sub-componentes Visuales ---
+
+const StatusBadge: React.FC<{ isOpen: boolean }> = ({ isOpen }) => (
+    <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider transition-colors duration-500 ${isOpen ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
+        <span className={`w-2 h-2 rounded-full ${isOpen ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
+        {isOpen ? 'Abierto ahora' : 'Cerrado'}
+    </div>
+);
+
 const ReferenceModal: React.FC<{ title: string; isOpen: boolean; onClose: () => void; children: React.ReactNode }> = ({ title, isOpen, onClose, children }) => {
     if (!isOpen) return null;
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white rounded-[2.5rem] w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
-                <div className="p-6 flex items-center relative border-b border-gray-50">
-                    <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 transition-colors">
-                        <IconX className="h-6 w-6" />
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+            <div className="bg-white rounded-[2.5rem] w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 border border-gray-100">
+                <div className="p-6 flex items-center relative border-b border-gray-50 bg-gray-50/30">
+                    <button onClick={onClose} className="p-2 bg-white shadow-sm border border-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors">
+                        <IconX className="h-5 w-5" />
                     </button>
-                    <h3 className="absolute left-1/2 -translate-x-1/2 text-xl font-bold text-gray-800">{title}</h3>
+                    <h3 className="absolute left-1/2 -translate-x-1/2 text-xl font-black text-gray-900 tracking-tight">{title}</h3>
                 </div>
                 <div className="p-8">
                     {children}
                     <button 
                         onClick={onClose} 
-                        className="w-full mt-6 py-4 border border-gray-200 rounded-2xl font-bold text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
+                        className="w-full mt-8 py-4.5 bg-gray-900 text-white rounded-2xl font-black text-sm hover:bg-gray-800 transition-all shadow-xl shadow-gray-200 active:scale-95"
                     >
-                        Cerrar
+                        Entendido
                     </button>
                 </div>
             </div>
@@ -99,113 +119,139 @@ export default function CustomerView() {
 
     const isOpenNow = useMemo(() => settings ? checkIfOpen(settings.schedules) : true, [settings]);
 
-    if (isLoading) return <div className="h-screen flex items-center justify-center bg-white"><div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div></div>;
+    if (isLoading) return <div className="h-screen flex items-center justify-center bg-white"><div className="w-10 h-10 border-4 border-[#5EC278] border-t-transparent rounded-full animate-spin"></div></div>;
 
     return (
-        <div className="min-h-screen bg-[#FDFDFD] pb-32 font-sans selection:bg-green-100">
-            {/* 1. PORTADA Y BOTONES FLOTANTES (IMAGEN 1) */}
+        <div className="min-h-screen bg-[#FDFDFD] pb-32 font-sans selection:bg-green-100 overflow-x-hidden">
+            {/* 1. PORTADA Y BOTONES PREMIUM */}
             <div className="relative">
-                <div className="h-[22rem] w-full overflow-hidden rounded-b-[3.5rem] shadow-md">
+                <div className="h-[24rem] w-full overflow-hidden rounded-b-[4rem] shadow-2xl relative">
                     <img 
                         src={settings?.branch.coverImageUrl || 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1200&q=80'} 
-                        className="w-full h-full object-cover" 
+                        className="w-full h-full object-cover brightness-[0.85]" 
                         alt="Portada"
                     />
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40"></div>
                 </div>
                 
-                {/* Botones Acceso Rápido */}
-                <div className="absolute top-6 right-6 flex gap-2.5 z-20">
-                    <button onClick={() => setActiveModal('hours')} className="p-3 bg-white shadow-xl rounded-full text-gray-800 hover:scale-110 transition-transform active:scale-95">
-                        <IconClock className="h-5 w-5"/>
+                {/* Botones Flotantes en Portada */}
+                <div className="absolute top-8 right-6 flex flex-col gap-3 z-20">
+                    <button onClick={() => setActiveModal('hours')} className="p-3.5 bg-white/90 backdrop-blur-md shadow-2xl rounded-full text-gray-900 hover:scale-110 hover:bg-white transition-all active:scale-95 border border-white/50">
+                        <IconInfo className="h-6 w-6"/>
                     </button>
-                    <button onClick={() => setActiveModal('location')} className="p-3 bg-white shadow-xl rounded-full text-gray-800 hover:scale-110 transition-transform active:scale-95">
-                        <IconLocationMarker className="h-5 w-5"/>
+                    <button onClick={() => setActiveModal('location')} className="p-3.5 bg-white/90 backdrop-blur-md shadow-2xl rounded-full text-gray-900 hover:scale-110 hover:bg-white transition-all active:scale-95 border border-white/50">
+                        <IconMap className="h-6 w-6"/>
                     </button>
-                    <button className="p-3 bg-white shadow-xl rounded-full text-gray-800 hover:scale-110 transition-transform active:scale-95">
-                        <IconShare className="h-5 w-5"/>
+                    <button className="p-3.5 bg-white/90 backdrop-blur-md shadow-2xl rounded-full text-gray-900 hover:scale-110 hover:bg-white transition-all active:scale-95 border border-white/50">
+                        <IconShare className="h-6 w-6"/>
                     </button>
                 </div>
 
-                {/* Logo Central */}
-                <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 z-10">
-                    <div className="w-28 h-28 rounded-full border-[6px] border-white bg-white shadow-2xl overflow-hidden flex items-center justify-center">
+                {/* Logo Central con Sombra Suave */}
+                <div className="absolute -bottom-14 left-1/2 -translate-x-1/2 z-10">
+                    <div className="w-32 h-32 rounded-full border-[8px] border-white bg-white shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden flex items-center justify-center">
                         {settings?.branch.logoUrl ? (
                             <img src={settings.branch.logoUrl} className="w-full h-full object-cover" alt="Logo" />
                         ) : (
-                            <span className="text-5xl font-black text-[#5EC278]">{settings?.company.name.charAt(0)}</span>
+                            <span className="text-6xl font-black text-[#5EC278]">{settings?.company.name.charAt(0)}</span>
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* 2. INFO LOCAL Y SELECTOR (IMAGEN 1) */}
-            <div className="mt-16 text-center px-6">
-                <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{settings?.company.name || 'Menú de Ejemplo'}</h1>
+            {/* 2. CABECERA: TÍTULO, ESTADO Y UBICACIÓN */}
+            <div className="mt-20 text-center px-6">
+                <div className="flex flex-col items-center gap-3">
+                    <StatusBadge isOpen={isOpenNow} />
+                    <h1 className="text-3xl font-black text-gray-900 tracking-tight leading-tight">{settings?.company.name || 'ALTOQUE FOOD'}</h1>
+                    
+                    {/* Ubicación Premium Directa */}
+                    <div 
+                        className="flex items-center justify-center gap-1.5 text-gray-500 hover:text-[#5EC278] transition-colors cursor-pointer group"
+                        onClick={() => setActiveModal('location')}
+                    >
+                        <IconMap className="h-4 w-4 shrink-0" />
+                        <span className="text-[13px] font-bold leading-tight max-w-[280px] truncate border-b border-transparent group-hover:border-[#5EC278]">
+                            {settings?.branch.fullAddress || 'Haz clic para ver nuestra ubicación'}
+                        </span>
+                    </div>
+                </div>
                 
-                {/* Selector A domicilio / Para recoger */}
-                <div className="inline-flex bg-gray-100 p-1.5 rounded-full mt-5 border border-gray-200/40">
-                    <button 
-                        onClick={() => setOrderType(OrderType.Delivery)}
-                        className={`px-7 py-2 rounded-full text-[13px] font-bold transition-all duration-300 ${orderType === OrderType.Delivery ? 'bg-white text-green-600 shadow-sm' : 'text-gray-400'}`}
-                    >
-                        A domicilio
-                    </button>
-                    <button 
-                        onClick={() => setOrderType(OrderType.TakeAway)}
-                        className={`px-7 py-2 rounded-full text-[13px] font-bold transition-all duration-300 ${orderType === OrderType.TakeAway ? 'bg-white text-green-600 shadow-sm' : 'text-gray-400'}`}
-                    >
-                        Para recoger
-                    </button>
+                {/* Selector de Tipo de Pedido Refinado */}
+                <div className="flex justify-center mt-8">
+                    <div className="inline-flex bg-gray-100/80 p-1.5 rounded-2xl border border-gray-200/30 backdrop-blur-sm">
+                        <button 
+                            onClick={() => setOrderType(OrderType.Delivery)}
+                            className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-[14px] font-black transition-all duration-500 ${orderType === OrderType.Delivery ? 'bg-white text-[#5EC278] shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+                        >
+                            <IconDelivery className="h-4 w-4" /> Domicilio
+                        </button>
+                        <button 
+                            onClick={() => setOrderType(OrderType.TakeAway)}
+                            className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-[14px] font-black transition-all duration-500 ${orderType === OrderType.TakeAway ? 'bg-white text-[#5EC278] shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+                        >
+                            <IconStore className="h-4 w-4" /> Recoger
+                        </button>
+                    </div>
                 </div>
 
-                {/* Stats */}
-                <div className="flex justify-center items-center gap-12 mt-8">
-                    <div className="text-center">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.1em] mb-1">Tiempo envío</p>
-                        <p className="text-[15px] font-bold text-gray-800">{settings?.shipping.deliveryTime.min} - {settings?.shipping.deliveryTime.max} mins</p>
+                {/* Stats de Negocio */}
+                <div className="flex justify-center items-center gap-10 mt-10 px-4">
+                    <div className="flex flex-col items-center">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Entrega</p>
+                        <div className="flex items-center gap-1.5">
+                            <IconClock className="h-4 w-4 text-[#5EC278]" />
+                            <p className="text-[16px] font-black text-gray-800">{settings?.shipping.deliveryTime.min}-{settings?.shipping.deliveryTime.max}m</p>
+                        </div>
                     </div>
-                    <div className="w-[1px] h-10 bg-gray-200"></div>
-                    <div className="text-center">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.1em] mb-1">Costo envío</p>
-                        <p className="text-[15px] font-bold text-gray-800">Desde ${settings?.shipping.fixedCost || '20'}</p>
+                    <div className="w-[1.5px] h-12 bg-gray-100 rounded-full"></div>
+                    <div className="flex flex-col items-center">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Costo Envío</p>
+                        <div className="flex items-center gap-1.5">
+                            <IconDelivery className="h-4 w-4 text-[#5EC278]" />
+                            <p className="text-[16px] font-black text-gray-800">${settings?.shipping.fixedCost || '0'}</p>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* 3. BANNER 2X1 AMARILLO (IMAGEN 1) */}
+            {/* 3. BANNER PROMOCIONAL TIPO "IMAGEN 2" */}
             {promotions.length > 0 && (
-                <div className="px-6 mt-10">
-                    <div className="bg-[#FFFDE7] border-2 border-[#FFF9C4]/80 rounded-[1.75rem] p-5 flex items-center justify-between relative overflow-hidden shadow-sm active:scale-[0.99] transition-transform cursor-pointer group">
-                        <div className="z-10 flex flex-col gap-0.5">
-                            <h3 className="font-bold text-gray-800 text-lg">2×1 en Hamburguesas</h3>
-                            <p className="text-xs text-gray-500 font-medium">Haz clic para ver más detalles...</p>
+                <div className="px-6 mt-12">
+                    <div className="bg-gradient-to-br from-[#FFFDE7] to-[#FFF9C4] border border-[#FBC02D]/20 rounded-[2.5rem] p-6 flex items-center justify-between relative overflow-hidden shadow-[0_15px_30px_-5px_rgba(251,192,45,0.15)] group cursor-pointer active:scale-[0.98] transition-all">
+                        <div className="z-10">
+                            <div className="flex items-center gap-2 mb-1">
+                                <span className="bg-[#FBC02D] text-white text-[10px] font-black px-2 py-0.5 rounded-lg uppercase tracking-tighter">Oferta Top</span>
+                                <h3 className="font-black text-gray-900 text-xl tracking-tight">{promotions[0].name}</h3>
+                            </div>
+                            <p className="text-xs text-yellow-800/60 font-bold uppercase tracking-widest">¡Solo por tiempo limitado!</p>
                         </div>
-                        {/* Texto 2x1 gigante de fondo */}
-                        <div className="absolute right-[-1.5rem] top-1/2 -translate-y-1/2 select-none opacity-[0.08] pointer-events-none rotate-12">
-                             <span className="text-[7rem] font-black text-yellow-600">2×1</span>
+                        <div className="z-10 flex flex-col items-end">
+                            <span className="text-[3.2rem] font-black text-[#FBC02D] leading-none tracking-tighter group-hover:scale-110 transition-transform">
+                                {promotions[0].discountValue}{promotions[0].discountType === DiscountType.Percentage ? '%' : '$'}
+                            </span>
+                            <span className="text-[10px] font-black text-yellow-700/50 uppercase tracking-widest -mt-1">Desc.</span>
                         </div>
-                        {/* Texto 2x1 destacado a la derecha */}
-                        <div className="z-10 text-[2.75rem] font-black text-[#FBC02D] leading-none drop-shadow-sm group-hover:scale-110 transition-transform">
-                            2×1
-                        </div>
+                        {/* Decoración de fondo */}
+                        <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-yellow-400/10 rounded-full blur-2xl"></div>
                     </div>
                 </div>
             )}
 
-            {/* 4. CATEGORÍAS HORIZONTAL */}
-            <div className="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-gray-100 mt-8">
-                <div className="flex overflow-x-auto px-6 py-4 gap-3 no-scrollbar">
+            {/* 4. SELECTOR DE CATEGORÍAS (STICKY) */}
+            <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-2xl border-b border-gray-100 mt-10">
+                <div className="flex overflow-x-auto px-6 py-5 gap-3 no-scrollbar scroll-smooth">
                     <button
                         onClick={() => setSelectedCategory('all')}
-                        className={`px-7 py-2.5 rounded-2xl text-[14px] font-bold transition-all whitespace-nowrap ${selectedCategory === 'all' ? 'bg-[#5EC278] text-white shadow-lg shadow-green-100' : 'bg-white text-gray-500 border border-gray-200'}`}
+                        className={`px-8 py-3 rounded-[1.25rem] text-[14px] font-black transition-all duration-300 whitespace-nowrap border ${selectedCategory === 'all' ? 'bg-[#5EC278] text-white border-[#5EC278] shadow-xl shadow-green-200' : 'bg-white text-gray-400 border-gray-100 hover:border-gray-200 shadow-sm'}`}
                     >
-                        Todo
+                        Todo el menú
                     </button>
                     {categories.map(cat => (
                         <button
                             key={cat.id}
                             onClick={() => setSelectedCategory(cat.id)}
-                            className={`px-7 py-2.5 rounded-2xl text-[14px] font-bold transition-all whitespace-nowrap ${selectedCategory === cat.id ? 'bg-[#5EC278] text-white shadow-lg shadow-green-100' : 'bg-white text-gray-500 border border-gray-200'}`}
+                            className={`px-8 py-3 rounded-[1.25rem] text-[14px] font-black transition-all duration-300 whitespace-nowrap border ${selectedCategory === cat.id ? 'bg-[#5EC278] text-white border-[#5EC278] shadow-xl shadow-green-200' : 'bg-white text-gray-400 border-gray-100 hover:border-gray-200 shadow-sm'}`}
                         >
                             {cat.name}
                         </button>
@@ -213,91 +259,139 @@ export default function CustomerView() {
                 </div>
             </div>
 
-            {/* 5. LISTA DE PRODUCTOS (ESTILO CARTA IMAGEN 1) */}
-            <div className="px-6 py-8">
-                <h2 className="text-2xl font-black text-gray-900 mb-6 tracking-tight">Combos</h2>
-                <div className="grid grid-cols-1 gap-6">
+            {/* 5. GRID DE PRODUCTOS (REFINADO) */}
+            <div className="px-6 py-10">
+                <div className="flex items-center justify-between mb-8">
+                    <h2 className="text-2xl font-black text-gray-900 tracking-tighter">Nuestros Favoritos</h2>
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{filteredProducts.length} items</span>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-8">
                     {filteredProducts.map(product => {
                         const { price, promotion } = getDiscountedPrice(product, promotions);
                         return (
                             <div 
                                 key={product.id} 
-                                className="bg-white rounded-[2rem] border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-5 flex items-center gap-5 hover:shadow-lg transition-all active:scale-[0.98] relative"
+                                className="group bg-white rounded-[2.5rem] border border-gray-100 shadow-[0_10px_40px_rgba(0,0,0,0.03)] p-6 flex items-center gap-6 hover:shadow-2xl hover:shadow-gray-200/50 transition-all duration-500 relative overflow-hidden"
                             >
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="font-bold text-gray-900 text-lg leading-tight truncate mb-1">{product.name}</h3>
-                                    <p className="text-[13px] text-gray-400 line-clamp-2 leading-relaxed mb-4">
-                                        {product.description}
+                                <div className="flex-1 min-w-0 z-10">
+                                    <h3 className="font-black text-gray-900 text-xl tracking-tight mb-2 group-hover:text-[#5EC278] transition-colors">{product.name}</h3>
+                                    <p className="text-[13px] text-gray-400 font-medium line-clamp-2 leading-relaxed mb-5">
+                                        {product.description || 'Delicioso platillo preparado al momento con los mejores ingredientes.'}
                                     </p>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-gray-900 font-bold text-xl">${price.toFixed(0)}</span>
-                                        {promotion && <span className="text-gray-300 text-xs line-through decoration-red-400/30">${product.price.toFixed(0)}</span>}
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-[#F8FDF9] px-4 py-1.5 rounded-2xl border border-green-50 shadow-sm transition-transform group-hover:scale-105">
+                                            <span className="text-[#5EC278] font-black text-xl">${price.toFixed(0)}</span>
+                                        </div>
+                                        {promotion && (
+                                            <span className="text-gray-300 text-sm line-through font-bold decoration-rose-400/40 opacity-70">
+                                                ${product.price.toFixed(0)}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
-                                <div className="w-[7.5rem] h-[7.5rem] rounded-[1.75rem] overflow-hidden relative shrink-0 bg-gray-50 shadow-sm border border-gray-100">
+                                <div className="w-[8.5rem] h-[8.5rem] rounded-[2rem] overflow-hidden relative shrink-0 shadow-lg border border-gray-50 transform group-hover:rotate-2 transition-all duration-500">
                                     <img src={product.imageUrl} className="w-full h-full object-cover" alt={product.name}/>
-                                    {/* Botón PLUS flotante sobre la imagen (IMAGEN 1) */}
+                                    {/* Botón de Acción Directa Premium */}
                                     <button 
                                         onClick={(e) => { e.stopPropagation(); addToCart(product, 1); }}
-                                        className="absolute bottom-1.5 right-1.5 bg-white p-2 rounded-full shadow-xl text-[#5EC278] hover:scale-110 active:scale-90 transition-transform border border-gray-50"
+                                        className="absolute bottom-2 right-2 bg-[#5EC278] p-3 rounded-2xl shadow-xl text-white hover:scale-110 active:scale-90 transition-all border-2 border-white"
                                     >
-                                        <IconPlus className="h-7 w-7"/>
+                                        <IconPlus className="h-6 w-6"/>
                                     </button>
                                 </div>
+                                
+                                {/* Decoración de fondo de la tarjeta */}
+                                <div className="absolute right-0 top-0 w-24 h-24 bg-green-50/20 blur-3xl rounded-full -z-0"></div>
                             </div>
                         );
                     })}
                 </div>
             </div>
 
-            {/* BOTÓN "VER PEDIDO" FLOTANTE (IMAGEN 1) */}
+            {/* BARRA DE CARRITO FLOTANTE (ESTILO MODERNO) */}
             {itemCount > 0 && (
-                <div className="fixed bottom-8 left-6 right-6 z-50 max-w-lg mx-auto">
+                <div className="fixed bottom-10 left-6 right-6 z-50 max-w-lg mx-auto">
                     <button 
                         onClick={() => setView('cart')}
-                        className="w-full bg-[#5EC278] hover:bg-green-600 text-white py-5 rounded-[1.75rem] font-black text-lg shadow-2xl shadow-green-200/50 flex items-center justify-between px-8 transition-all active:scale-[0.97] animate-in slide-in-from-bottom-8"
+                        className="w-full bg-gray-900 hover:bg-black text-white py-5.5 rounded-[2.25rem] font-black text-lg shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex items-center justify-between px-10 transition-all active:scale-[0.96] animate-in slide-in-from-bottom-12 duration-500 group"
                     >
-                        <div className="flex items-center gap-3">
-                             <div className="bg-white/20 px-2.5 py-0.5 rounded-lg text-sm">{itemCount}</div>
-                             <span>Ver pedido</span>
+                        <div className="flex items-center gap-4">
+                             <div className="bg-[#5EC278] px-3 py-1 rounded-xl text-xs font-black group-hover:scale-110 transition-transform">
+                                {itemCount}
+                             </div>
+                             <span className="tracking-tight uppercase text-sm font-black">Mi Orden</span>
                         </div>
-                        <span className="opacity-80 font-bold">${cartTotal.toFixed(0)}</span>
+                        <div className="flex items-center gap-2">
+                             <span className="text-gray-400 text-sm font-bold tracking-widest">TOTAL</span>
+                             <span className="font-black text-2xl tracking-tighter text-[#5EC278]">${cartTotal.toFixed(0)}</span>
+                        </div>
                     </button>
                 </div>
             )}
 
-            {/* MODAL HORARIO (IMAGEN 3) */}
-            <ReferenceModal title="Horario" isOpen={activeModal === 'hours'} onClose={() => setActiveModal('none')}>
-                <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1">
+            {/* MODAL HORARIO DETALLADO */}
+            <ReferenceModal title="Nuestros Horarios" isOpen={activeModal === 'hours'} onClose={() => setActiveModal('none')}>
+                <div className="space-y-5 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
                     {settings?.schedules[0].days.map(d => (
-                        <div key={d.day} className="flex flex-col gap-1 border-b border-gray-50 pb-3 last:border-0">
-                            <span className="font-bold text-gray-800 text-[15px]">{d.day}</span>
-                            <span className={`text-[13px] ${d.isOpen ? 'text-gray-400 font-medium' : 'text-red-400 font-bold uppercase'}`}>
-                                {d.isOpen ? (d.shifts.length > 0 ? d.shifts.map(s => `${s.start} - ${s.end}`).join(', ') : 'Abierto todo el día') : 'Cerrado'}
-                            </span>
+                        <div key={d.day} className="flex justify-between items-center border-b border-gray-50 pb-4 last:border-0 last:pb-0">
+                            <div>
+                                <span className="font-black text-gray-900 text-sm tracking-tight">{d.day}</span>
+                                <div className="mt-0.5">
+                                    <span className={`text-[12px] uppercase font-black tracking-widest ${d.isOpen ? 'text-[#5EC278]' : 'text-rose-500'}`}>
+                                        {d.isOpen ? 'Servicio Activo' : 'Cerrado'}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                {d.isOpen ? (
+                                    d.shifts.length > 0 ? (
+                                        d.shifts.map((s, idx) => (
+                                            <div key={idx} className="bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100 mt-1">
+                                                <span className="text-[13px] font-black text-gray-700 tracking-tighter">{s.start} — {s.end}</span>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <span className="text-[13px] font-black text-gray-500 tracking-tighter">24 Horas</span>
+                                    )
+                                ) : (
+                                    <IconX className="h-5 w-5 text-rose-200 ml-auto" />
+                                )}
+                            </div>
                         </div>
                     ))}
                 </div>
             </ReferenceModal>
 
-            {/* MODAL UBICACIÓN (IMAGEN 2) */}
+            {/* MODAL UBICACIÓN DETALLADA */}
             <ReferenceModal title="Ubicación" isOpen={activeModal === 'location'} onClose={() => setActiveModal('none')}>
                 <div className="text-center">
-                    <p className="text-gray-700 text-[15px] font-medium leading-relaxed mb-10 px-2">
-                        {settings?.branch.fullAddress || 'Calle 44 #398, Los Pinos, Mérida, Yucatán (Frente a la escuela secundaria ESFER)'}
+                    <div className="w-16 h-16 bg-green-50 text-[#5EC278] rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-sm border border-green-100">
+                        <IconMap className="h-8 w-8"/>
+                    </div>
+                    <p className="text-gray-800 text-[16px] font-black tracking-tight leading-relaxed mb-10 px-4">
+                        {settings?.branch.fullAddress || 'Nuestra sucursal se encuentra lista para recibirte con el mejor servicio.'}
                     </p>
                     <a 
-                        href={settings?.branch.googleMapsLink || '#'} 
+                        href={settings?.branch.googleMapsLink || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(settings?.branch.fullAddress || '')}`} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-2.5 w-full bg-[#5EC278] text-white py-4.5 rounded-2xl font-black shadow-lg shadow-green-100 hover:bg-green-600 transition-all mb-4 text-sm"
+                        className="flex items-center justify-center gap-3 w-full bg-[#5EC278] text-white py-5 rounded-2xl font-black shadow-xl shadow-green-100 hover:bg-green-600 hover:shadow-green-200 transition-all mb-4 text-sm uppercase tracking-widest active:scale-95"
                     >
-                        Ver la ubicación en el mapa <IconExternalLink className="h-4.5 w-4.5"/>
+                        Abrir en Google Maps <IconExternalLink className="h-5 w-5"/>
                     </a>
                 </div>
             </ReferenceModal>
 
             <Chatbot />
+            
+            <style>{`
+                .no-scrollbar::-webkit-scrollbar { display: none; }
+                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+                .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; }
+            `}</style>
         </div>
     );
 }
