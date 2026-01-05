@@ -3,32 +3,49 @@ import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabas
 import { Product, Category, Personalization, Promotion, PersonalizationOption, Zone, Table, AppSettings, Order } from '../types';
 import { INITIAL_SETTINGS } from '../constants';
 
-// Las credenciales se obtienen exclusivamente de las variables de entorno inyectadas
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
+/**
+ * Robust detection of Supabase credentials. 
+ * Handles cases where environment variables might be undefined or 'undefined' string.
+ */
+const getEnvValue = (val: string | undefined): string => {
+    if (!val || val === 'undefined' || val === 'null' || val === '') return '';
+    return val;
+};
+
+const supabaseUrl = getEnvValue(process.env.SUPABASE_URL) || 'https://cnbntnnhxlvkvallumdg.supabase.co';
+const supabaseAnonKey = getEnvValue(process.env.SUPABASE_ANON_KEY) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuYm50bm5oeGx2a3ZhbGx1bWRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwNjQ1MjksImV4cCI6MjA3ODY0MDUyOX0.TuovcK2Ao2tb3GM0I2j5n2BpL5DIVLSl-yjdoCHS9pM';
 
 let supabase: SupabaseClient | null = null;
 let ordersChannel: RealtimeChannel | null = null;
 let menuChannel: RealtimeChannel | null = null;
 
+/**
+ * Obtiene la instancia del cliente de Supabase.
+ */
 export const getClient = (): SupabaseClient => {
     if (supabase) return supabase;
-    if (!supabaseUrl || !supabaseAnonKey) {
-        console.warn("Supabase credentials missing in environment variables.");
-    }
-    supabase = createClient(supabaseUrl, supabaseAnonKey);
+    
+    // Safety check to prevent library error "supabaseUrl is required"
+    const validUrl = supabaseUrl || 'https://placeholder.supabase.co';
+    const validKey = supabaseAnonKey || 'placeholder';
+    
+    supabase = createClient(validUrl, validKey);
     return supabase;
 };
 
 export const getAppSettings = async (): Promise<AppSettings> => {
-    const { data, error } = await getClient()
-        .from('app_settings')
-        .select('settings')
-        .eq('id', 1)
-        .single();
+    try {
+        const { data, error } = await getClient()
+            .from('app_settings')
+            .select('settings')
+            .eq('id', 1)
+            .single();
 
-    if (!error && data?.settings && Object.keys(data.settings).length > 0) {
-        return { ...JSON.parse(JSON.stringify(INITIAL_SETTINGS)), ...data.settings };
+        if (!error && data?.settings && Object.keys(data.settings).length > 0) {
+            return { ...JSON.parse(JSON.stringify(INITIAL_SETTINGS)), ...data.settings };
+        }
+    } catch (err) {
+        console.warn("Failed to fetch settings, using defaults.");
     }
 
     try {
@@ -76,7 +93,7 @@ export const deleteCategory = async (categoryId: string): Promise<void> => {
 export const getProducts = async (): Promise<Product[]> => {
     const { data, error } = await getClient()
         .from('products')
-        .select('id, name, description, price, imageUrl, available, categoryId, created_at')
+        .select('id, name, description, price, imageUrl, available, categoryId, created_at, personalizationIds')
         .order('name');
     if (error) throw error;
     return data || [];

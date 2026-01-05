@@ -1,32 +1,54 @@
+
 import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 import { Product, Category, Personalization, Promotion, PersonalizationOption, Zone, Table, AppSettings, Order } from '../types';
 import { INITIAL_SETTINGS } from '../constants';
 
-// Las credenciales se obtienen exclusivamente de las variables de entorno inyectadas
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
+/**
+ * Función robusta para obtener valores de entorno o retornar cadena vacía si es inválido.
+ */
+const getEnvValue = (val: string | undefined): string => {
+    if (!val || val === 'undefined' || val === 'null' || val === '') return '';
+    return val;
+};
+
+// Credenciales proporcionadas por el usuario
+const DEFAULT_URL = 'https://cnbntnnhxlvkvallumdg.supabase.co';
+const DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuYm50bm5oeGx2a3ZhbGx1bWRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwNjQ1MjksImV4cCI6MjA3ODY0MDUyOX0.TuovcK2Ao2tb3GM0I2j5n2BpL5DIVLSl-yjdoCHS9pM';
+
+const supabaseUrl = getEnvValue(process.env.SUPABASE_URL) || DEFAULT_URL;
+const supabaseAnonKey = getEnvValue(process.env.SUPABASE_ANON_KEY) || DEFAULT_KEY;
 
 let supabase: SupabaseClient | null = null;
 let ordersChannel: RealtimeChannel | null = null;
 let menuChannel: RealtimeChannel | null = null;
 
-// Fix: singleton pattern for getClient to ensure we use one instance
+/**
+ * Obtiene o inicializa la instancia del cliente de Supabase.
+ */
 export const getClient = (): SupabaseClient => {
     if (supabase) return supabase;
-    supabase = createClient(supabaseUrl, supabaseAnonKey);
+    
+    // Asegurar que siempre haya una URL y Key válidas para evitar errores del SDK
+    const validUrl = supabaseUrl || 'https://placeholder.supabase.co';
+    const validKey = supabaseAnonKey || 'placeholder';
+    
+    supabase = createClient(validUrl, validKey);
     return supabase;
 };
 
-// Fix: Added missing export getAppSettings
 export const getAppSettings = async (): Promise<AppSettings> => {
-    const { data, error } = await getClient()
-        .from('app_settings')
-        .select('settings')
-        .eq('id', 1)
-        .single();
+    try {
+        const { data, error } = await getClient()
+            .from('app_settings')
+            .select('settings')
+            .eq('id', 1)
+            .single();
 
-    if (!error && data?.settings && Object.keys(data.settings).length > 0) {
-        return { ...JSON.parse(JSON.stringify(INITIAL_SETTINGS)), ...data.settings };
+        if (!error && data?.settings && Object.keys(data.settings).length > 0) {
+            return { ...JSON.parse(JSON.stringify(INITIAL_SETTINGS)), ...data.settings };
+        }
+    } catch (err) {
+        console.warn("Failed to fetch settings, using defaults.");
     }
 
     try {
@@ -38,7 +60,6 @@ export const getAppSettings = async (): Promise<AppSettings> => {
     }
 };
 
-// Fix: Added missing export saveAppSettings
 export const saveAppSettings = async (settings: AppSettings): Promise<void> => {
     const { error } = await getClient()
         .from('app_settings')
@@ -47,7 +68,6 @@ export const saveAppSettings = async (settings: AppSettings): Promise<void> => {
     if (error) throw error;
 };
 
-// Fix: Added missing export getCategories
 export const getCategories = async (): Promise<Category[]> => {
     const { data, error } = await getClient()
         .from('categories')
@@ -57,7 +77,6 @@ export const getCategories = async (): Promise<Category[]> => {
     return data || [];
 };
 
-// Fix: Added missing export saveCategory
 export const saveCategory = async (category: Omit<Category, 'id' | 'created_at'> & { id?: string }): Promise<Category> => {
     const { id, ...categoryData } = category;
     const { data, error } = await getClient()
@@ -69,23 +88,20 @@ export const saveCategory = async (category: Omit<Category, 'id' | 'created_at'>
     return data[0];
 };
 
-// Fix: Added missing export deleteCategory
 export const deleteCategory = async (categoryId: string): Promise<void> => {
     const { error } = await getClient().from('categories').delete().eq('id', categoryId);
     if (error) throw error;
 };
 
-// Fix: Added missing export getProducts
 export const getProducts = async (): Promise<Product[]> => {
     const { data, error } = await getClient()
         .from('products')
-        .select('id, name, description, price, imageUrl, available, categoryId, created_at')
+        .select('id, name, description, price, imageUrl, available, categoryId, created_at, personalizationIds')
         .order('name');
     if (error) throw error;
     return data || [];
 };
 
-// Fix: Added missing export saveProduct
 export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & { id?: string }): Promise<Product> => {
     const { id, ...productData } = product;
     const { data, error } = await getClient()
@@ -97,7 +113,6 @@ export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & 
     return data[0];
 };
 
-// Fix: Added missing export updateProductAvailability
 export const updateProductAvailability = async (productId: string, available: boolean): Promise<Product> => {
     const { data, error } = await getClient()
         .from('products')
@@ -109,13 +124,11 @@ export const updateProductAvailability = async (productId: string, available: bo
     return data;
 };
 
-// Fix: Added missing export deleteProduct
 export const deleteProduct = async (productId: string): Promise<void> => {
     const { error } = await getClient().from('products').delete().eq('id', productId);
     if (error) throw error;
 };
 
-// Fix: Added missing export getPersonalizations
 export const getPersonalizations = async (): Promise<Personalization[]> => {
     const { data, error } = await getClient()
         .from('personalizations')
@@ -130,7 +143,6 @@ export const getPersonalizations = async (): Promise<Personalization[]> => {
     })) || []) as Personalization[];
 };
 
-// Fix: Added missing export updatePersonalizationOptionAvailability
 export const updatePersonalizationOptionAvailability = async (optionId: string, available: boolean): Promise<PersonalizationOption> => {
     const { data, error } = await getClient()
         .from('personalization_options')
@@ -142,7 +154,6 @@ export const updatePersonalizationOptionAvailability = async (optionId: string, 
     return data;
 };
 
-// Fix: Added missing export savePersonalization
 export const savePersonalization = async (personalization: Omit<Personalization, 'id' | 'created_at'> & { id?: string }): Promise<Personalization> => {
     const { options, ...personalizationData } = personalization;
     const { data: savedPersonalization, error: pError } = await getClient()
@@ -174,13 +185,11 @@ export const savePersonalization = async (personalization: Omit<Personalization,
     return finalData.find(p => p.id === savedPersonalization.id)!;
 };
 
-// Fix: Added missing export deletePersonalization
 export const deletePersonalization = async (personalizationId: string): Promise<void> => {
     const { error } = await getClient().from('personalizations').delete().eq('id', personalizationId);
     if (error) throw error;
 };
 
-// Fix: Added missing export getPromotions
 export const getPromotions = async (): Promise<Promotion[]> => {
     const { data, error } = await getClient().from('promotions').select('*, promotion_products(product_id)');
     if (error) throw error;
@@ -195,7 +204,6 @@ export const getPromotions = async (): Promise<Promotion[]> => {
     })) || [];
 };
 
-// Fix: Added missing export savePromotion
 export const savePromotion = async (promotion: Omit<Promotion, 'id' | 'created_at'> & { id?: string }): Promise<Promotion> => {
     const { productIds, ...promoData } = promotion;
     const { data: savedPromo, error: promoError } = await getClient()
@@ -222,13 +230,11 @@ export const savePromotion = async (promotion: Omit<Promotion, 'id' | 'created_a
     return { ...promotion, id: savedPromo.id };
 };
 
-// Fix: Added missing export deletePromotion
 export const deletePromotion = async (promotionId: string): Promise<void> => {
     const { error } = await getClient().from('promotions').delete().eq('id', promotionId);
     if (error) throw error;
 };
 
-// Fix: Added missing export getZones
 export const getZones = async (): Promise<Zone[]> => {
     const { data, error } = await getClient()
         .from('zones')
@@ -238,7 +244,6 @@ export const getZones = async (): Promise<Zone[]> => {
     return (data as Zone[]) || [];
 };
 
-// Fix: Added missing export saveZone
 export const saveZone = async (zone: Pick<Zone, 'name' | 'rows' | 'cols'> & { id?: string }): Promise<Zone> => {
     const { id, ...zoneData } = zone;
     const { data, error } = await getClient()
@@ -250,13 +255,11 @@ export const saveZone = async (zone: Pick<Zone, 'name' | 'rows' | 'cols'> & { id
     return data as Zone;
 };
 
-// Fix: Added missing export deleteZone
 export const deleteZone = async (zoneId: string): Promise<void> => {
     const { error } = await getClient().from('zones').delete().eq('id', zoneId);
     if (error) throw error;
 };
 
-// Fix: Added missing export saveZoneLayout
 export const saveZoneLayout = async (zone: Zone): Promise<void> => {
     const { tables, ...zoneData } = zone;
     const { error: zoneError } = await getClient().from('zones').update({ name: zoneData.name, rows: zoneData.rows, cols: zoneData.cols }).eq('id', zoneData.id);
@@ -280,7 +283,6 @@ export const saveZoneLayout = async (zone: Zone): Promise<void> => {
     }
 };
 
-// Fix: Added missing export saveOrder
 export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created_at'>): Promise<void> => {
     const dbOrderPayload = {
         customer: { ...order.customer, paymentProof: order.paymentProof },
@@ -297,7 +299,6 @@ export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created
     if (error) throw new Error(error.message);
 };
 
-// Fix: Added missing export getActiveOrders
 export const getActiveOrders = async (): Promise<Order[]> => {
     const { data, error } = await getClient()
         .from('orders')
@@ -323,7 +324,6 @@ export const getActiveOrders = async (): Promise<Order[]> => {
     })) as Order[];
 };
 
-// Fix: Added missing export updateOrder
 export const updateOrder = async (orderId: string, updates: Partial<Order>): Promise<void> => {
     const dbUpdates: any = { ...updates };
     if (updates.branchId) { dbUpdates.branch_id = updates.branchId; delete dbUpdates.branchId; }
@@ -335,7 +335,6 @@ export const updateOrder = async (orderId: string, updates: Partial<Order>): Pro
     if (error) throw new Error(error.message);
 };
 
-// Fix: Added missing export subscribeToNewOrders
 export const subscribeToNewOrders = (
     onInsert: (payload: any) => void, 
     onUpdate?: (payload: any) => void
@@ -386,7 +385,6 @@ export const subscribeToNewOrders = (
     return ordersChannel;
 }
 
-// Fix: Added missing export subscribeToMenuUpdates
 export const subscribeToMenuUpdates = (onUpdate: () => void) => {
     const client = getClient();
     if (menuChannel) {
@@ -403,7 +401,6 @@ export const subscribeToMenuUpdates = (onUpdate: () => void) => {
     return menuChannel;
 };
 
-// Fix: Added missing export unsubscribeFromChannel
 export const unsubscribeFromChannel = () => {
     const client = getClient();
     if (ordersChannel) client.removeChannel(ordersChannel);
