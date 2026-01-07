@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Product, Category, AppSettings, OrderType, Promotion, DiscountType, PromotionAppliesTo, Schedule, DaySchedule, PaymentMethod, Customer, Personalization, PersonalizationOption, OrderStatus, Order, ShippingCostType } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconClock, IconShare, IconX, IconLocationMarker, IconExternalLink, IconMinus, IconCheck, IconStore, IconDelivery, IconArrowLeft, IconSearch, IconUpload, IconInfo, IconReceipt } from '../constants';
+import { IconPlus, IconClock, IconShare, IconX, IconLocationMarker, IconExternalLink, IconMinus, IconCheck, IconStore, IconDelivery, IconArrowLeft, IconSearch, IconUpload, IconInfo, IconReceipt, IconMap } from '../constants';
 import { getProducts, getCategories, getAppSettings, getPromotions, getPersonalizations, saveOrder, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
@@ -505,7 +505,7 @@ export default function CustomerView() {
 
                 <ReferenceModal title="Nuestra Ubicación" isOpen={activeModal === 'location'} onClose={() => setActiveModal('none')}>
                     <div className="text-center">
-                        <div className="w-16 h-16 bg-green-50 text-[#5EC278] rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-sm"><IconLocationMarker className="h-8 w-8"/></div>
+                        <div className="w-16 h-16 bg-green-50 text-[#5EC278] rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-sm"><IconMap className="h-8 w-8"/></div>
                         <p className="text-gray-800 text-sm font-black tracking-tight leading-relaxed mb-10 px-4">{settings?.branch.fullAddress || 'Dirección no configurada.'}</p>
                         <a href={settings?.branch.googleMapsLink} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-3 w-full bg-[#5EC278] text-white py-5 rounded-2xl font-black shadow-2xl shadow-green-100 hover:bg-green-600 transition-all mb-4 text-xs uppercase tracking-widest active:scale-95">Abrir Google Maps <IconExternalLink className="h-4 w-4"/></a>
                     </div>
