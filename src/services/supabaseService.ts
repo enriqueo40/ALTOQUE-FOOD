@@ -5,7 +5,6 @@ import { INITIAL_SETTINGS } from '../constants';
 
 /**
  * Robust detection of Supabase credentials. 
- * Handles cases where environment variables might be undefined or 'undefined' string.
  */
 const getEnvValue = (val: string | undefined): string => {
     if (!val || val === 'undefined' || val === 'null' || val === '') return '';
@@ -19,16 +18,10 @@ let supabase: SupabaseClient | null = null;
 let ordersChannel: RealtimeChannel | null = null;
 let menuChannel: RealtimeChannel | null = null;
 
-/**
- * Obtiene la instancia del cliente de Supabase.
- */
 export const getClient = (): SupabaseClient => {
     if (supabase) return supabase;
-    
-    // Safety check to prevent library error "supabaseUrl is required"
     const validUrl = supabaseUrl || 'https://placeholder.supabase.co';
     const validKey = supabaseAnonKey || 'placeholder';
-    
     supabase = createClient(validUrl, validKey);
     return supabase;
 };
@@ -47,7 +40,6 @@ export const getAppSettings = async (): Promise<AppSettings> => {
     } catch (err) {
         console.warn("Failed to fetch settings, using defaults.");
     }
-
     try {
         const settingsToSave = JSON.parse(JSON.stringify(INITIAL_SETTINGS));
         await saveAppSettings(settingsToSave);
