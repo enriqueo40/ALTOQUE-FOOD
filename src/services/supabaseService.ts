@@ -20,7 +20,8 @@ let menuChannel: RealtimeChannel | null = null;
 
 export const getClient = (): SupabaseClient => {
     if (supabase) return supabase;
-    const validUrl = supabaseUrl || 'https://placeholder.supabase.co';
+    // Si no hay credenciales válidas, creamos un cliente dummy que fallará controladamente
+    const validUrl = supabaseUrl && supabaseUrl.startsWith('http') ? supabaseUrl : 'https://placeholder.supabase.co';
     const validKey = supabaseAnonKey || 'placeholder';
     supabase = createClient(validUrl, validKey);
     return supabase;
@@ -28,25 +29,26 @@ export const getClient = (): SupabaseClient => {
 
 export const getAppSettings = async (): Promise<AppSettings> => {
     try {
-        const { data, error } = await getClient()
+        const client = getClient();
+        const { data, error } = await client
             .from('app_settings')
             .select('settings')
             .eq('id', 1)
             .single();
 
-        if (!error && data?.settings && Object.keys(data.settings).length > 0) {
+        if (error) {
+            console.warn("Supabase fetch error (using defaults):", error.message);
+            return JSON.parse(JSON.stringify(INITIAL_SETTINGS));
+        }
+
+        if (data?.settings && Object.keys(data.settings).length > 0) {
             return { ...JSON.parse(JSON.stringify(INITIAL_SETTINGS)), ...data.settings };
         }
     } catch (err) {
-        console.warn("Failed to fetch settings, using defaults.");
+        console.warn("Failed to fetch settings (CORS/Network), using defaults.", err);
     }
-    try {
-        const settingsToSave = JSON.parse(JSON.stringify(INITIAL_SETTINGS));
-        await saveAppSettings(settingsToSave);
-        return settingsToSave;
-    } catch (saveError) {
-        return JSON.parse(JSON.stringify(INITIAL_SETTINGS));
-    }
+    // Fallback absoluto si todo falla
+    return JSON.parse(JSON.stringify(INITIAL_SETTINGS));
 };
 
 export const saveAppSettings = async (settings: AppSettings): Promise<void> => {
