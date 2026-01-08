@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Product, Category, Order, OrderStatus, Conversation, Personalization, Promotion, Zone, Customer, OrderType, DiscountType, PromotionAppliesTo, Table, Currency, AppSettings, ShippingCostType, PrintingMethod } from './types';
 
@@ -251,6 +252,18 @@ export const INITIAL_SETTINGS: AppSettings = {
         deliveryMethods: ['Efectivo'],
         pickupMethods: ['Efectivo'],
         showTipField: false,
+        // Added defaults to prevent crashes if DB fails
+        pagoMovil: {
+            bank: '',
+            phone: '',
+            idNumber: ''
+        },
+        transfer: {
+            bank: '',
+            accountNumber: '',
+            accountHolder: '',
+            idNumber: ''
+        }
     },
     schedules: [
         {

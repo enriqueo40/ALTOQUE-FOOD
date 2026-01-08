@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
 import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck, IconCalendar, IconDuplicate, IconMap, IconSparkles, IconChevronDown, IconInfo, IconUpload } from '../constants';
@@ -667,9 +667,9 @@ export default function CustomerView() {
 
                         {/* DATOS DE PAGO Y SUBIDA DE CAPTURE - SECCIÓN AGREGADA */}
                         {selectedPaymentMethod && (
-                            <div className="mt-6 animate-in slide-in-from-top-2 duration-300">
+                            <div className="mt-6 animate-in slide-in-from-top-2 duration-300 border-t dark:border-gray-700 pt-4">
                                 {selectedPaymentMethod === 'Pago Móvil' && settings?.payment.pagoMovil && (
-                                    <div className="bg-[#1C2128] border border-gray-800 rounded-xl p-4 space-y-3 shadow-xl">
+                                    <div className="bg-[#1C2128] border border-gray-800 rounded-xl p-4 space-y-3 shadow-xl mb-4">
                                         <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-widest border-b border-gray-800 pb-2">
                                             <IconInfo className="h-4 w-4"/> Datos para Pago Móvil
                                         </div>
@@ -682,7 +682,7 @@ export default function CustomerView() {
                                 )}
 
                                 {selectedPaymentMethod === 'Transferencia' && settings?.payment.transfer && (
-                                    <div className="bg-[#1C2128] border border-gray-800 rounded-xl p-4 space-y-3 shadow-xl">
+                                    <div className="bg-[#1C2128] border border-gray-800 rounded-xl p-4 space-y-3 shadow-xl mb-4">
                                         <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-widest border-b border-gray-800 pb-2">
                                             <IconInfo className="h-4 w-4"/> Datos para Transferencia
                                         </div>
@@ -697,7 +697,7 @@ export default function CustomerView() {
 
                                 {/* Capture Upload for Digital Payments */}
                                 {selectedPaymentMethod !== 'Efectivo' && selectedPaymentMethod !== 'Punto de Venta' && (
-                                    <div className="mt-4 pt-4 border-t dark:border-gray-700">
+                                    <div className="pt-2">
                                         <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Comprobante de pago</h3>
                                         {!paymentProof ? (
                                             <label className="flex flex-col items-center justify-center w-full h-32 bg-gray-50 dark:bg-gray-700/50 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl cursor-pointer hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-all group">
