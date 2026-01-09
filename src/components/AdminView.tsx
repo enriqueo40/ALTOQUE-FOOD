@@ -1,11 +1,11 @@
-
 import React, { useState, useMemo, useEffect, useRef, useCallback, memo } from 'react';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { useTheme } from '../hooks/useTheme';
 import { useCart } from '../hooks/useCart';
 import { Product, Category, Order, OrderStatus, Conversation, AdminChatMessage, OrderType, Personalization, PersonalizationOption, Promotion, DiscountType, PromotionAppliesTo, Zone, Table, AppSettings, Currency, BranchSettings, PaymentSettings, ShippingSettings, PaymentMethod, DaySchedule, Schedule, ShippingCostType, TimeRange, PrintingMethod, PaymentStatus, Customer } from '../types';
 import { getProducts, getCategories, getPersonalizations, getPromotions, getActiveOrders, subscribeToNewOrders, unsubscribeFromChannel, updateOrder, saveOrder, saveZoneLayout, getZones, getAppSettings } from '../services/supabaseService';
-import { IconHome, IconMenu, IconAvailability, IconShare, IconTutorials, IconOrders, IconAnalytics, IconSettings, IconExternalLink, IconMoon, IconSun, IconChevronDown, IconX, IconReceipt, IconMoreVertical, IconPencil, IconDuplicate, IconTrash, IconGripVertical, IconCheck, IconReceipt as IconOrderIcon } from '../constants';
+// Fix: Removed duplicate import of IconReceipt
+import { IconHome, IconMenu, IconAvailability, IconShare, IconTutorials, IconOrders, IconAnalytics, IconSettings, IconExternalLink, IconMoon, IconSun, IconChevronDown, IconX, IconReceipt, IconMoreVertical, IconPencil, IconDuplicate, IconTrash, IconGripVertical, IconCheck } from '../constants';
 
 type AdminViewPage = 'dashboard' | 'products' | 'orders' | 'analytics' | 'availability' | 'share' | 'tutorials';
 

@@ -635,17 +635,17 @@ export default function CustomerView() {
                     {/* Customer Info */}
                     <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
                         <h3 className="font-bold text-gray-900 dark:text-white">Tus datos</h3>
-                        <input type="text" placeholder="Tu Nombre" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border-none focus:ring-2 focus:ring-emerald-500" />
-                        <input type="tel" placeholder="Tu Teléfono" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border-none focus:ring-2 focus:ring-emerald-500" />
+                        <input type="text" placeholder="Tu Nombre" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border-none focus:ring-2 focus:ring-emerald-500 placeholder-gray-400 dark:text-white" />
+                        <input type="tel" placeholder="Tu Teléfono" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border-none focus:ring-2 focus:ring-emerald-500 placeholder-gray-400 dark:text-white" />
                         
                         {orderType === OrderType.Delivery && (
                             <>
                                 <div className="grid grid-cols-3 gap-3">
-                                    <input type="text" placeholder="Calle" value={customerAddress.calle} onChange={e => setCustomerAddress({...customerAddress, calle: e.target.value})} className="col-span-2 w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border-none focus:ring-2 focus:ring-emerald-500" />
-                                    <input type="text" placeholder="No." value={customerAddress.numero} onChange={e => setCustomerAddress({...customerAddress, numero: e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border-none focus:ring-2 focus:ring-emerald-500" />
+                                    <input type="text" placeholder="Calle" value={customerAddress.calle} onChange={e => setCustomerAddress({...customerAddress, calle: e.target.value})} className="col-span-2 w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border-none focus:ring-2 focus:ring-emerald-500 placeholder-gray-400 dark:text-white" />
+                                    <input type="text" placeholder="No." value={customerAddress.numero} onChange={e => setCustomerAddress({...customerAddress, numero: e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border-none focus:ring-2 focus:ring-emerald-500 placeholder-gray-400 dark:text-white" />
                                 </div>
-                                <input type="text" placeholder="Colonia / Sector" value={customerAddress.colonia} onChange={e => setCustomerAddress({...customerAddress, colonia: e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border-none focus:ring-2 focus:ring-emerald-500" />
-                                <input type="text" placeholder="Referencia (Color casa, frente a...)" value={customerAddress.referencias} onChange={e => setCustomerAddress({...customerAddress, referencias: e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border-none focus:ring-2 focus:ring-emerald-500" />
+                                <input type="text" placeholder="Colonia / Sector" value={customerAddress.colonia} onChange={e => setCustomerAddress({...customerAddress, colonia: e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border-none focus:ring-2 focus:ring-emerald-500 placeholder-gray-400 dark:text-white" />
+                                <input type="text" placeholder="Referencia (Color casa, frente a...)" value={customerAddress.referencias} onChange={e => setCustomerAddress({...customerAddress, referencias: e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border-none focus:ring-2 focus:ring-emerald-500 placeholder-gray-400 dark:text-white" />
                             </>
                         )}
                     </div>
@@ -658,7 +658,7 @@ export default function CustomerView() {
                                 <button
                                     key={method}
                                     onClick={() => { setSelectedPaymentMethod(method); setPaymentProof(null); }}
-                                    className={`p-3 text-sm rounded-lg border text-center transition-all ${selectedPaymentMethod === method ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-gray-50 dark:bg-gray-700 border-transparent text-gray-600 dark:text-gray-300'}`}
+                                    className={`p-3 text-sm rounded-lg border text-center transition-all ${selectedPaymentMethod === method ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg' : 'bg-gray-50 dark:bg-gray-700 border-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'}`}
                                 >
                                     {method}
                                 </button>
@@ -667,57 +667,62 @@ export default function CustomerView() {
 
                         {/* DATOS DE PAGO Y SUBIDA DE CAPTURE - SECCIÓN AGREGADA */}
                         {selectedPaymentMethod && (
-                            <div className="mt-6 animate-in slide-in-from-top-2 duration-300 border-t dark:border-gray-700 pt-4">
+                            <div className="mt-6 animate-in slide-in-from-top-2 duration-300 border-t dark:border-gray-700 pt-6">
                                 {selectedPaymentMethod === 'Pago Móvil' && settings?.payment.pagoMovil && (
-                                    <div className="bg-[#1C2128] border border-gray-800 rounded-xl p-4 space-y-3 shadow-xl mb-4">
-                                        <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-widest border-b border-gray-800 pb-2">
+                                    <div className="bg-gray-100 dark:bg-gray-900/50 border dark:border-emerald-500/20 rounded-2xl p-5 space-y-4 shadow-inner mb-6">
+                                        <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-black text-xs uppercase tracking-widest border-b dark:border-gray-800 pb-3">
                                             <IconInfo className="h-4 w-4"/> Datos para Pago Móvil
                                         </div>
-                                        <div className="grid grid-cols-1 gap-1 text-sm text-gray-300">
-                                            <div className="flex justify-between"><span className="text-gray-500">Banco:</span> <span className="font-mono font-bold text-white">{settings.payment.pagoMovil.bank}</span></div>
-                                            <div className="flex justify-between"><span className="text-gray-500">Teléfono:</span> <span className="font-mono font-bold text-white">{settings.payment.pagoMovil.phone}</span></div>
-                                            <div className="flex justify-between"><span className="text-gray-500">Cédula:</span> <span className="font-mono font-bold text-white">{settings.payment.pagoMovil.idNumber}</span></div>
+                                        <div className="grid grid-cols-1 gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                            <div className="flex justify-between items-center"><span className="text-gray-500 font-medium">Banco:</span> <span className="font-black text-gray-900 dark:text-white">{settings.payment.pagoMovil.bank}</span></div>
+                                            <div className="flex justify-between items-center"><span className="text-gray-500 font-medium">Teléfono:</span> <span className="font-black text-gray-900 dark:text-white font-mono">{settings.payment.pagoMovil.phone}</span></div>
+                                            <div className="flex justify-between items-center"><span className="text-gray-500 font-medium">Cédula:</span> <span className="font-black text-gray-900 dark:text-white font-mono">{settings.payment.pagoMovil.idNumber}</span></div>
                                         </div>
                                     </div>
                                 )}
 
                                 {selectedPaymentMethod === 'Transferencia' && settings?.payment.transfer && (
-                                    <div className="bg-[#1C2128] border border-gray-800 rounded-xl p-4 space-y-3 shadow-xl mb-4">
-                                        <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-widest border-b border-gray-800 pb-2">
+                                    <div className="bg-gray-100 dark:bg-gray-900/50 border dark:border-emerald-500/20 rounded-2xl p-5 space-y-4 shadow-inner mb-6">
+                                        <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-black text-xs uppercase tracking-widest border-b dark:border-gray-800 pb-3">
                                             <IconInfo className="h-4 w-4"/> Datos para Transferencia
                                         </div>
-                                        <div className="grid grid-cols-1 gap-1 text-sm text-gray-300">
-                                            <div className="flex justify-between"><span className="text-gray-500">Banco:</span> <span className="font-bold text-white">{settings.payment.transfer.bank}</span></div>
-                                            <div className="flex flex-col gap-1 mt-1"><span className="text-gray-500">Cuenta:</span> <span className="font-mono text-xs bg-black/30 p-2 rounded text-white break-all">{settings.payment.transfer.accountNumber}</span></div>
-                                            <div className="flex justify-between mt-1"><span className="text-gray-500">Titular:</span> <span className="font-bold text-white">{settings.payment.transfer.accountHolder}</span></div>
-                                            <div className="flex justify-between"><span className="text-gray-500">Rif:</span> <span className="font-bold text-white">{settings.payment.transfer.idNumber}</span></div>
+                                        <div className="grid grid-cols-1 gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                            <div className="flex justify-between items-center"><span className="text-gray-500 font-medium">Banco:</span> <span className="font-black text-gray-900 dark:text-white">{settings.payment.transfer.bank}</span></div>
+                                            <div className="flex flex-col gap-1 mt-1"><span className="text-gray-500 font-medium">Cuenta:</span> <span className="font-mono text-xs bg-white dark:bg-black/30 p-3 rounded-xl text-gray-900 dark:text-white break-all border dark:border-gray-700">{settings.payment.transfer.accountNumber}</span></div>
+                                            <div className="flex justify-between items-center mt-1"><span className="text-gray-500 font-medium">Titular:</span> <span className="font-black text-gray-900 dark:text-white">{settings.payment.transfer.accountHolder}</span></div>
+                                            <div className="flex justify-between items-center"><span className="text-gray-500 font-medium">Rif:</span> <span className="font-black text-gray-900 dark:text-white font-mono">{settings.payment.transfer.idNumber}</span></div>
                                         </div>
                                     </div>
                                 )}
 
-                                {/* Capture Upload for Digital Payments */}
+                                {/* Capture Upload area for Digital Payments */}
                                 {selectedPaymentMethod !== 'Efectivo' && selectedPaymentMethod !== 'Punto de Venta' && (
                                     <div className="pt-2">
-                                        <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Comprobante de pago</h3>
+                                        <h3 className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Comprobante de pago</h3>
                                         {!paymentProof ? (
-                                            <label className="flex flex-col items-center justify-center w-full h-32 bg-gray-50 dark:bg-gray-700/50 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl cursor-pointer hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-all group">
+                                            <label className="flex flex-col items-center justify-center w-full h-40 bg-gray-50 dark:bg-gray-700/30 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-3xl cursor-pointer hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-all group overflow-hidden">
                                                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                                    <IconUpload className="h-8 w-8 text-gray-400 group-hover:text-emerald-500 mb-2 transition-colors"/>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400 group-hover:text-emerald-600">Subir captura</p>
+                                                    <div className="bg-white dark:bg-gray-700 p-3 rounded-full shadow-md mb-3 group-hover:scale-110 transition-transform">
+                                                        <IconUpload className="h-8 w-8 text-gray-400 group-hover:text-emerald-500 transition-colors"/>
+                                                    </div>
+                                                    <p className="text-sm font-bold text-gray-600 dark:text-gray-400 group-hover:text-emerald-600">Subir captura de pantalla</p>
+                                                    <p className="text-xs text-gray-400 mt-1">PNG, JPG o JPEG</p>
                                                 </div>
                                                 <input type="file" className="hidden" accept="image/*" onChange={handleProofUpload} />
                                             </label>
                                         ) : (
-                                            <div className="relative group rounded-xl overflow-hidden border border-emerald-500/50">
-                                                <img src={paymentProof} className="w-full h-40 object-cover" />
-                                                <button 
-                                                    onClick={() => setPaymentProof(null)}
-                                                    className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full shadow-lg hover:scale-110 transition-all"
-                                                >
-                                                    <IconX className="h-4 w-4"/>
-                                                </button>
-                                                <div className="absolute bottom-0 left-0 right-0 bg-emerald-600/90 text-white text-[10px] font-bold text-center py-1">
-                                                    COMPROBANTE CARGADO
+                                            <div className="relative group rounded-3xl overflow-hidden border-2 border-emerald-500/50 shadow-xl shadow-emerald-500/10 h-48 animate-in zoom-in-95 duration-300">
+                                                <img src={paymentProof} className="w-full h-full object-cover" alt="Comprobante" />
+                                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button 
+                                                        onClick={() => setPaymentProof(null)}
+                                                        className="p-4 bg-red-500 text-white rounded-full shadow-2xl hover:scale-110 transition-all"
+                                                    >
+                                                        <IconTrash className="h-6 w-6"/>
+                                                    </button>
+                                                </div>
+                                                <div className="absolute bottom-0 left-0 right-0 bg-emerald-600 text-white text-[10px] font-black uppercase tracking-tighter text-center py-2">
+                                                    Comprobante listo para enviar
                                                 </div>
                                             </div>
                                         )}
@@ -733,35 +738,35 @@ export default function CustomerView() {
                             value={generalComments} 
                             onChange={e => setGeneralComments(e.target.value)} 
                             placeholder="Ej. Servilletas extra, timbre no sirve..."
-                            className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border-none focus:ring-2 focus:ring-emerald-500 resize-none h-20"
+                            className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border-none focus:ring-2 focus:ring-emerald-500 resize-none h-20 placeholder-gray-400 dark:text-white"
                         />
                     </div>
                 </div>
 
                 <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 safe-bottom space-y-3">
-                    <div className="flex justify-between text-sm text-gray-500">
+                    <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400">
                         <span>Subtotal</span>
-                        <span>${cartTotal.toFixed(2)}</span>
+                        <span className="font-medium">${cartTotal.toFixed(2)}</span>
                     </div>
                     {shippingCost > 0 && (
-                        <div className="flex justify-between text-sm text-gray-500">
+                        <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400">
                             <span>Envío</span>
-                            <span>${shippingCost.toFixed(2)}</span>
+                            <span className="font-medium">${shippingCost.toFixed(2)}</span>
                         </div>
                     )}
-                    <div className="flex justify-between text-xl font-bold text-gray-900 dark:text-white">
+                    <div className="flex justify-between text-2xl font-black text-gray-900 dark:text-white">
                         <span>Total</span>
-                        <span>${(cartTotal + shippingCost).toFixed(2)}</span>
+                        <span className="text-emerald-600 dark:text-emerald-400">${(cartTotal + shippingCost).toFixed(2)}</span>
                     </div>
                     <button 
                         onClick={handlePlaceOrder} 
                         disabled={isPlacingOrder}
-                        className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale"
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-2xl font-black shadow-xl shadow-emerald-500/20 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:grayscale transform active:scale-95"
                     >
                         {isPlacingOrder ? (
-                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
                         ) : (
-                            <>Confirmar Pedido por WhatsApp <IconWhatsapp className="h-5 w-5"/></>
+                            <>Confirmar Pedido por WhatsApp <IconWhatsapp className="h-6 w-6"/></>
                         )}
                     </button>
                 </div>
@@ -771,13 +776,13 @@ export default function CustomerView() {
 
     if (view === 'confirmation') {
         return (
-            <div className="min-h-screen bg-emerald-600 flex flex-col items-center justify-center p-6 text-white text-center">
-                <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mb-6 shadow-xl animate-bounce">
-                    <IconCheck className="h-10 w-10 text-emerald-600" />
+            <div className="min-h-screen bg-emerald-600 flex flex-col items-center justify-center p-6 text-white text-center animate-in fade-in duration-500">
+                <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-8 shadow-2xl animate-bounce">
+                    <IconCheck className="h-12 w-12 text-emerald-600" />
                 </div>
-                <h1 className="text-3xl font-bold mb-2">¡Pedido Enviado!</h1>
-                <p className="text-emerald-100 mb-8 max-w-xs mx-auto">Te hemos redirigido a WhatsApp para enviar los detalles. El restaurante confirmará tu pedido en breve.</p>
-                <button onClick={() => setView('menu')} className="bg-white text-emerald-600 px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-emerald-50 transition-colors">
+                <h1 className="text-4xl font-black mb-4 uppercase tracking-tighter">¡Pedido Enviado!</h1>
+                <p className="text-emerald-100 mb-10 max-w-xs mx-auto font-medium text-lg leading-tight">Te hemos redirigido a WhatsApp para enviar los detalles. El restaurante confirmará tu pedido en breve.</p>
+                <button onClick={() => setView('menu')} className="bg-white text-emerald-600 px-10 py-4 rounded-2xl font-black shadow-2xl hover:bg-emerald-50 transition-all transform active:scale-95 uppercase tracking-wide">
                     Hacer otro pedido
                 </button>
             </div>
