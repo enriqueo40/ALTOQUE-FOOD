@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { IconCheck, IconDuplicate, IconInfo, IconKey, IconExternalLink } from '../constants';
 
 const COMPLETE_SQL_SETUP = `-- ALTOQUE FOOD - SUPABASE SETUP SCRIPT
--- Actualizado para incluir personalizaciones y estados de pago
+-- Actualizado para incluir soporte explícito para comprobantes de pago
 
 DROP TABLE IF EXISTS public.app_settings CASCADE;
 DROP TABLE IF EXISTS public.orders CASCADE;
@@ -115,6 +115,7 @@ CREATE TABLE public.orders (
     table_id text NULL,
     general_comments text NULL,
     payment_status text NOT NULL DEFAULT 'pending',
+    payment_proof text NULL, -- COLUMNA PARA EL COMPROBANTE (BASE64)
     CONSTRAINT orders_pkey PRIMARY KEY (id)
 );
 
@@ -181,7 +182,7 @@ const SetupView: React.FC = () => {
                     <div>
                         <h4 className="font-bold text-emerald-800 dark:text-emerald-200 text-lg">Instrucciones Críticas</h4>
                         <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-2 leading-relaxed">
-                            Copia el código SQL de abajo y pégalo en el **SQL Editor** de tu panel de Supabase. Esto creará todas las tablas necesarias, incluyendo la columna de personalizaciones que faltaba.
+                            Copia el código SQL de abajo y pégalo en el **SQL Editor** de tu panel de Supabase. Esto habilitará la columna de comprobantes de pago.
                         </p>
                     </div>
                 </div>
