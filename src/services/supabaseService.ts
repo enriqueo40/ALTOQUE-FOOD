@@ -5,14 +5,20 @@ import { INITIAL_SETTINGS } from '../constants';
 
 /**
  * Robust detection of Supabase credentials. 
+ * Prioritizes Environment Variables, falls back to Hardcoded values for immediate Netlify fixes.
  */
-const getEnvValue = (val: string | undefined): string => {
-    if (!val || val === 'undefined' || val === 'null' || val === '') return '';
+const getEnvValue = (val: string | undefined, fallback: string): string => {
+    if (!val || val === 'undefined' || val === 'null' || val === '') return fallback;
     return val;
 };
 
-const supabaseUrl = getEnvValue(process.env.SUPABASE_URL) || 'https://cnbntnnhxlvkvallumdg.supabase.co';
-const supabaseAnonKey = getEnvValue(process.env.SUPABASE_ANON_KEY) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuYm50bm5oeGx2a3ZhbGx1bWRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwNjQ1MjksImV4cCI6MjA3ODY0MDUyOX0.TuovcK2Ao2tb3GM0I2j5n2BpL5DIVLSl-yjdoCHS9pM';
+// CREDENCIALES DE RESPLADO (FALLBACK) PARA NETLIFY/VERCEL
+// Esto asegura que la app funcione incluso si olvidas configurar las variables en el panel de hosting.
+const HARDCODED_URL = 'https://cnbntnnhxlvkvallumdg.supabase.co';
+const HARDCODED_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuYm50bm5oeGx2a3ZhbGx1bWRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwNjQ1MjksImV4cCI6MjA3ODY0MDUyOX0.TuovcK2Ao2tb3GM0I2j5n2BpL5DIVLSl-yjdoCHS9pM';
+
+const supabaseUrl = getEnvValue(process.env.SUPABASE_URL, HARDCODED_URL);
+const supabaseAnonKey = getEnvValue(process.env.SUPABASE_ANON_KEY, HARDCODED_KEY);
 
 let supabase: SupabaseClient | null = null;
 let ordersChannel: RealtimeChannel | null = null;
@@ -20,10 +26,12 @@ let menuChannel: RealtimeChannel | null = null;
 
 export const getClient = (): SupabaseClient => {
     if (supabase) return supabase;
-    // Si no hay credenciales válidas, creamos un cliente dummy que fallará controladamente
-    const validUrl = supabaseUrl && supabaseUrl.startsWith('http') ? supabaseUrl : 'https://placeholder.supabase.co';
-    const validKey = supabaseAnonKey || 'placeholder';
-    supabase = createClient(validUrl, validKey);
+    
+    // Validación final
+    const finalUrl = supabaseUrl && supabaseUrl.startsWith('http') ? supabaseUrl : HARDCODED_URL;
+    const finalKey = supabaseAnonKey || HARDCODED_KEY;
+
+    supabase = createClient(finalUrl, finalKey);
     return supabase;
 };
 

@@ -6,8 +6,8 @@ import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, Ico
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
-// VERSIÓN VISIBLE PARA DEPURACIÓN - TEMA MORADO
-const APP_VERSION = "V6.0_PURPLE_DEBUG";
+// VERSIÓN UNIFICADA
+const APP_VERSION = "V6.1_OMNI_PURPLE";
 
 export default function CustomerView() {
     const [view, setView] = useState<'menu' | 'cart' | 'checkout' | 'confirmation'>('menu');
@@ -107,7 +107,7 @@ export default function CustomerView() {
             });
             
             const methodText = isDigital ? '✅ Pago Adjunto (Verificar Foto)' : selectedPaymentMethod;
-            const message = encodeURIComponent(`*NUEVO PEDIDO V6.0*\n👤 ${customerName}\n💵 Total: $${total.toFixed(2)}\n💳 Método: ${methodText}\n📍 Tipo: ${orderType}`);
+            const message = encodeURIComponent(`*NUEVO PEDIDO ${APP_VERSION}*\n👤 ${customerName}\n💵 Total: $${total.toFixed(2)}\n💳 Método: ${methodText}\n📍 Tipo: ${orderType}`);
             
             window.open(`https://wa.me/${settings.branch.whatsappNumber.replace(/\D/g, '')}?text=${message}`, '_blank');
             clearCart();
@@ -123,7 +123,7 @@ export default function CustomerView() {
     if (isLoading) return (
         <div className="h-screen flex flex-col items-center justify-center bg-[#0a0b0d] text-purple-500 gap-4">
             <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="font-bold tracking-widest text-xs animate-pulse">CARGANDO V6.0...</p>
+            <p className="font-bold tracking-widest text-xs animate-pulse">CARGANDO MENÚ {APP_VERSION}...</p>
         </div>
     );
 
@@ -203,11 +203,11 @@ export default function CustomerView() {
 
         return (
             <div className="min-h-screen bg-[#07080a] text-gray-200">
-                {/* Header Estilo V6.0 PURPLE */}
+                {/* Header Estilo V6.1 PURPLE OMNI */}
                 <div className="bg-purple-700 p-6 flex items-center gap-5 border-b-4 border-purple-900 sticky top-0 z-[100] shadow-2xl">
                     <button onClick={() => setView('cart')} className="p-3 bg-black/20 rounded-2xl hover:bg-black/30 transition-all text-white backdrop-blur-sm"><IconArrowLeft className="h-6 w-6"/></button>
                     <div className="flex flex-col">
-                        <h1 className="font-black text-white uppercase tracking-tighter text-2xl leading-none">CHECKOUT V6.0</h1>
+                        <h1 className="font-black text-white uppercase tracking-tighter text-2xl leading-none">CHECKOUT V6.1</h1>
                         <span className="text-[10px] font-bold text-purple-200 mt-1 uppercase tracking-[0.3em]">{APP_VERSION}</span>
                     </div>
                 </div>

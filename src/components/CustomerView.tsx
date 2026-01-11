@@ -6,8 +6,8 @@ import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, Ico
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
-// VERSIÓN SRC VISIBLE PARA DEPURACIÓN
-const APP_VERSION = "V6.0_SRC_PURPLE_DEBUG";
+// VERSIÓN SRC UNIFICADA
+const APP_VERSION = "V6.1_SRC_PURPLE_OMNI";
 
 export default function CustomerView() {
     const [view, setView] = useState<'menu' | 'cart' | 'checkout' | 'confirmation'>('menu');
@@ -87,7 +87,7 @@ export default function CustomerView() {
                 paymentProof: paymentProof || undefined,
             });
             const methodText = isDigital ? '✅ Pago adjunto' : selectedPaymentMethod;
-            const message = encodeURIComponent(`*NUEVO PEDIDO V6.0*\n👤 ${customerName}\n💵 Total: $${total.toFixed(2)}\n💳 Método: ${methodText}`);
+            const message = encodeURIComponent(`*NUEVO PEDIDO V6.1*\n👤 ${customerName}\n💵 Total: $${total.toFixed(2)}\n💳 Método: ${methodText}`);
             window.open(`https://wa.me/${settings.branch.whatsappNumber.replace(/\D/g, '')}?text=${message}`, '_blank');
             clearCart();
             setView('confirmation');
@@ -144,7 +144,7 @@ export default function CustomerView() {
                 <div className="bg-purple-700 p-6 flex items-center gap-4 border-b-4 border-purple-900 sticky top-0 z-[100] shadow-2xl">
                     <button onClick={() => setView('cart')} className="p-3 bg-black/20 rounded-2xl text-white backdrop-blur-sm"><IconArrowLeft className="h-6 w-6"/></button>
                     <div className="flex flex-col">
-                        <h1 className="font-black text-white uppercase tracking-tighter text-2xl leading-none">CHECKOUT V6.0</h1>
+                        <h1 className="font-black text-white uppercase tracking-tighter text-2xl leading-none">CHECKOUT V6.1</h1>
                         <span className="text-[10px] font-bold text-purple-200 mt-1 uppercase tracking-widest">{APP_VERSION}</span>
                     </div>
                 </div>
