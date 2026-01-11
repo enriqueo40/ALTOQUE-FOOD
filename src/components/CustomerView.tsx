@@ -6,6 +6,9 @@ import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, Ico
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
+// MARCADOR DE VERSIÓN PARA VERIFICAR DESPLIEGUE EN VERCEL
+const APP_BUILD_ID = "BUILD_2024_05_PAY_FIX_V2";
+
 export default function CustomerView() {
     const [view, setView] = useState<'menu' | 'cart' | 'checkout' | 'confirmation'>('menu');
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -34,12 +37,18 @@ export default function CustomerView() {
             const [appSettings, fetchedPromotions, fetchedPersonalizations, fetchedProducts, fetchedCategories] = await Promise.all([
                 getAppSettings(), getPromotions(), getPersonalizations(), getProducts(), getCategories()
             ]);
+            
+            // Verificación de integridad de settings para evitar fallos de renderizado
+            if (appSettings && !appSettings.shipping.deliveryTime) {
+                appSettings.shipping.deliveryTime = { min: 25, max: 45 };
+            }
+            
             setSettings(appSettings);
             setAllPromotions(fetchedPromotions);
             setAllPersonalizations(fetchedPersonalizations);
             setAllProducts(fetchedProducts);
             setAllCategories(fetchedCategories);
-        } catch (error) { console.error(error); } finally { setIsLoading(false); }
+        } catch (error) { console.error("Data Fetch Error:", error); } finally { setIsLoading(false); }
     };
 
     useEffect(() => {
@@ -99,10 +108,10 @@ export default function CustomerView() {
         } catch(e) { alert("Error al procesar el pedido."); } finally { setIsPlacingOrder(false); }
     };
 
-    if (isLoading) return <div className="h-screen flex items-center justify-center dark:bg-gray-900"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>;
+    if (isLoading) return <div className="h-screen flex items-center justify-center dark:bg-[#0f1115]"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>;
 
     if (view === 'menu') return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
+        <div className="min-h-screen bg-gray-50 dark:bg-[#0f1115] pb-24">
             <header className="bg-white dark:bg-[#1a1c23] p-4 sticky top-0 z-30 shadow-md border-b dark:border-gray-800">
                 <div className="flex justify-between items-center mb-4">
                     <h1 className="text-xl font-black dark:text-emerald-500 uppercase tracking-tighter">{settings?.branch.alias || 'ALTOQUE FOOD'}</h1>
@@ -213,7 +222,7 @@ export default function CustomerView() {
                             ))}
                         </div>
 
-                        {/* BLOQUE DIGITAL AUTOMÁTICO - SE MUESTRA SIEMPRE QUE NO SEA EFECTIVO/PUNTO */}
+                        {/* BLOQUE DIGITAL AUTOMÁTICO */}
                         {isDigital && (
                             <div className="mt-6 pt-6 border-t border-gray-800 space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
                                 <div className="p-5 bg-emerald-500/5 rounded-3xl border-2 border-emerald-500/20">
@@ -262,6 +271,9 @@ export default function CustomerView() {
                         <h3 className="font-black text-[10px] uppercase tracking-[0.2em] text-emerald-500">Nota para el restaurante</h3>
                         <textarea value={generalComments} onChange={(e) => setGeneralComments(e.target.value)} rows={2} className="w-full p-4 bg-[#0f1115] border border-gray-800 rounded-2xl outline-none focus:border-emerald-500 transition-all resize-none text-sm" placeholder="Ej. Sin cebolla, tocar timbre fuerte..." />
                     </div>
+                    
+                    {/* INDICADOR DE VERSIÓN PARA DEBUG (Opcional, borrar tras éxito) */}
+                    <p className="text-[8px] text-center text-gray-800 uppercase tracking-widest opacity-20">BUILD ID: {APP_BUILD_ID}</p>
                 </div>
 
                 {/* FOOTER FIJO */}
