@@ -295,6 +295,7 @@ export const savePromotion = async (promotion: Omit<Promotion, 'id' | 'created_a
     if (promoError) throw promoError;
     if (!savedPromo) throw new Error("Could not save promotion");
 
+    // Handle product links
     const { error: deleteError } = await getClient().from('promotion_products').delete().eq('promotion_id', savedPromo.id);
     if (deleteError) throw deleteError;
 

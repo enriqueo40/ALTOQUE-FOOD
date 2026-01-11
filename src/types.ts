@@ -61,7 +61,7 @@ export interface Order {
     items: CartItem[];
     customer: Customer;
     status: OrderStatus;
-    paymentStatus?: PaymentStatus; // Added this field
+    paymentStatus?: PaymentStatus; 
     paymentProof?: string; // Base64 string of the screenshot
     total: number;
     createdAt: Date;
@@ -134,15 +134,14 @@ export interface Promotion {
 
 export interface Table {
     id: string;
-    name: string; // The identifier shown on the table, e.g., "1", "2", "A1"
+    name: string; 
     zoneId: string;
-    row: number; // Top-left starting row
-    col: number; // Top-left starting column
-    width: number; // How many columns it spans
-    height: number; // How many rows it spans
+    row: number; 
+    col: number; 
+    width: number; 
+    height: number; 
     shape: 'square' | 'round';
     status: 'available' | 'occupied';
-    // Fix: Add created_at property to match the database schema and fix destructuring error.
     created_at?: string;
 }
 
@@ -173,6 +172,7 @@ export interface BranchSettings {
   whatsappNumber: string;
   logoUrl: string;
   coverImageUrl: string;
+  isOpen: boolean; // Global override for store status
 }
 
 export enum ShippingCostType {
@@ -195,7 +195,7 @@ export interface ShippingSettings {
   };
 }
 
-export type PaymentMethod = 'Efectivo' | 'Pago con tarjeta' | 'Transferencia' | 'Pago Móvil' | 'Zelle' | 'Punto de Venta';
+export type PaymentMethod = 'Efectivo' | 'Pago Móvil' | 'Transferencia' | 'Zelle' | 'Punto de Venta' | 'Pago con tarjeta';
 
 export interface PagoMovilDetails {
     bank: string;

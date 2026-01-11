@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { Product, Category, Order, OrderStatus, Conversation, Personalization, Promotion, Zone, Customer, OrderType, DiscountType, PromotionAppliesTo, Table, Currency, AppSettings, ShippingCostType, PrintingMethod } from './types';
 
@@ -77,198 +76,134 @@ export const IconUSB: React.FC<{ className?: string }> = ({ className }) => <Ico
 export const IconKey: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M12.75 16.5a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM12.75 16.5h-9v-1.5a3 3 0 013-3h1.5a3 3 0 013 3v1.5z" />;
 export const IconVolumeUp: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" className={className} />;
 export const IconVolumeOff: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" className={className} />;
-
+export const IconMap: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.875 1.875 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z" className={className} />;
 
 // Mock Data
 export const CATEGORIES: Category[] = [
-    { id: 'coffee', name: 'Artisanal Coffees' },
-    { id: 'pastries', name: 'Fresh Pastries' },
-    { id: 'savory', name: 'Savory Bites' },
-    { id: 'cold-brew', name: 'Cold Brews & Teas' },
-    { id: 'pollo', name: 'Pollo' }
+    { id: '1', name: 'Café', created_at: new Date().toISOString() },
+    { id: '2', name: 'Bebidas', created_at: new Date().toISOString() },
+    { id: '3', name: 'Postres', created_at: new Date().toISOString() },
+    { id: '4', name: 'Desayunos', created_at: new Date().toISOString() },
 ];
-
-export const PRODUCTS: Product[] = [
-    // Coffees
-    { id: 'prod-001', name: 'Classic Espresso', description: 'A rich and aromatic shot of pure coffee excellence.', price: 3.50, imageUrl: 'https://images.unsplash.com/photo-1579992305423-333c02b2a16d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80', categoryId: 'coffee', available: true },
-    { id: 'prod-002', name: 'Velvet Latte', description: 'Smooth espresso with perfectly steamed milk and a delicate layer of foam.', price: 5.00, imageUrl: 'https://images.unsplash.com/photo-1541167760496-1628856ab772?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80', categoryId: 'coffee', available: true },
-    { id: 'prod-003', name: 'Caramel Macchiato', description: 'Steamed milk, vanilla, espresso, and a buttery caramel drizzle.', price: 5.50, imageUrl: 'https://images.unsplash.com/photo-1596707328198-333c02b2a16d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80', categoryId: 'coffee', available: true },
-    { id: 'prod-004', name: 'Spiced Chai Latte', description: 'Aromatic spiced tea blended with steamed milk for a cozy embrace.', price: 5.25, imageUrl: 'https://images.unsplash.com/photo-1578899842593-9c173d1226a4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80', categoryId: 'coffee', available: false },
-    // Pastries
-    { id: 'prod-005', name: 'Almond Croissant', description: 'Flaky, buttery croissant with a sweet almond filling, topped with toasted almonds.', price: 4.50, imageUrl: 'https://images.unsplash.com/photo-1608198093002-ad4e005484ec?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80', categoryId: 'pastries', available: true },
-    { id: 'prod-006', name: 'Blueberry Scone', description: 'A tender, crumbly scone bursting with juicy blueberries and a hint of lemon.', price: 4.00, imageUrl: 'https://images.unsplash.com/photo-1621433940871-4355938d1505?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80', categoryId: 'pastries', available: true },
-    { id: 'prod-007', name: 'Chocolate Chip Cookie', description: 'The perfect cookie: crispy edges, a soft chewy center, and loaded with chocolate.', price: 3.00, imageUrl: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80', categoryId: 'pastries', available: true },
-    // Savory Bites
-    { id: 'prod-008', name: 'Avocado Toast', description: 'Smashed avocado on toasted sourdough, topped with chili flakes and microgreens.', price: 8.50, imageUrl: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80', categoryId: 'savory', available: true },
-    { id: 'prod-009', name: 'Quiche Lorraine', description: 'A classic French tart with a rich filling of bacon, eggs, and cream in a pastry crust.', price: 7.50, imageUrl: 'https://images.unsplash.com/photo-1563125992-423371626330?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80', categoryId: 'savory', available: true },
-    // Cold Brews & Teas
-    { id: 'prod-010', name: 'Classic Cold Brew', description: 'Steeped for 12 hours for a smooth, low-acid coffee experience.', price: 4.75, imageUrl: 'https://images.unsplash.com/photo-1517701559438-c38c28de08f6?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80', categoryId: 'cold-brew', available: true },
-    { id: 'prod-011', name: 'Iced Green Tea', description: 'Refreshing and antioxidant-rich green tea, lightly sweetened.', price: 4.00, imageUrl: 'https://images.unsplash.com/photo-1627435601361-ec25f2b74c28?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80', categoryId: 'cold-brew', available: false },
-     { id: 'prod-012', name: 'alitas de pollo agridulce', description: 'ricas alitas de pollo agridule', price: 2.00, imageUrl: 'https://images.unsplash.com/photo-1598511829631-778644883995?auto=format&fit=crop&w=800&q=80', categoryId: 'pollo', available: true },
-      { id: 'prod-013', name: 'papitas fritas', description: 'Aromatic spiced tea blended with steamed milk for a cozy embrace.', price: 5.25, imageUrl: 'https://images.unsplash.com/photo-1578899842593-9c173d1226a4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80', categoryId: 'pollo', available: false },
-];
-
-export const MOCK_CUSTOMER: Customer = {
-    name: 'Jane Doe',
-    phone: '555-123-4567',
-    address: {
-        colonia: 'GUANADITO SUR',
-        calle: 'STA ISABEL',
-        numero: '2',
-        entreCalles: 'STA ISABEL',
-        referencias: 'Casa amarilla'
-    }
-};
 
 export const MOCK_ORDERS: Order[] = [
-    // Fix: Added cartItemId to each item to satisfy the CartItem type.
-    { id: 'ORD-1234', items: [{...PRODUCTS[1], cartItemId: 'mock-ci-1', quantity: 1}, {...PRODUCTS[4], cartItemId: 'mock-ci-2', quantity: 2}], customer: MOCK_CUSTOMER, status: OrderStatus.Pending, total: 14.00, createdAt: new Date(Date.now() - 5 * 60 * 1000), branchId: 'main' },
-    { id: 'ORD-5678', items: [{...PRODUCTS[7], cartItemId: 'mock-ci-3', quantity: 1}], customer: MOCK_CUSTOMER, status: OrderStatus.Preparing, total: 8.50, createdAt: new Date(Date.now() - 15 * 60 * 1000), branchId: 'main' },
-    { id: 'ORD-9012', items: [{...PRODUCTS[10], cartItemId: 'mock-ci-4', quantity: 1}], customer: MOCK_CUSTOMER, status: OrderStatus.Ready, total: 4.75, createdAt: new Date(Date.now() - 30 * 60 * 1000), branchId: 'main' },
-    { id: 'ORD-3456', items: [{...PRODUCTS[6], cartItemId: 'mock-ci-5', quantity: 3}], customer: MOCK_CUSTOMER, status: OrderStatus.Completed, total: 9.00, createdAt: new Date(Date.now() - 60 * 60 * 1000), branchId: 'main' },
+    {
+        id: '123456',
+        items: [
+            { id: 'p1', name: 'Latte', price: 45, quantity: 2, cartItemId: 'c1', description: 'Delicious latte', imageUrl: '', categoryId: '1', available: true },
+            { id: 'p2', name: 'Croissant', price: 35, quantity: 1, cartItemId: 'c2', description: 'Butter croissant', imageUrl: '', categoryId: '3', available: true }
+        ],
+        customer: {
+            name: 'Juan Pérez',
+            phone: '5551234567',
+            address: { colonia: 'Centro', calle: 'Juárez', numero: '101' }
+        },
+        status: OrderStatus.Pending,
+        total: 125,
+        createdAt: new Date(Date.now() - 1000 * 60 * 5), // 5 mins ago
+        branchId: 'main',
+        orderType: OrderType.Delivery,
+        paymentStatus: 'pending'
+    },
+    {
+        id: '789012',
+        items: [
+            { id: 'p3', name: 'Cappuccino', price: 50, quantity: 1, cartItemId: 'c3', description: 'Strong cappuccino', imageUrl: '', categoryId: '1', available: true }
+        ],
+        customer: {
+            name: 'Maria Lopez',
+            phone: '5559876543',
+            address: { colonia: 'Roma', calle: 'Orizaba', numero: '22' }
+        },
+        status: OrderStatus.Confirmed,
+        total: 50,
+        createdAt: new Date(Date.now() - 1000 * 60 * 30), // 30 mins ago
+        branchId: 'main',
+        orderType: OrderType.TakeAway,
+        paymentStatus: 'paid'
+    }
 ];
 
 export const MOCK_CONVERSATIONS: Conversation[] = [
     {
-        id: 'conv-1',
-        customerName: 'Alice Johnson',
-        lastMessage: 'Perfect, thank you!',
-        lastMessageTimestamp: new Date(Date.now() - 10 * 60 * 1000),
-        unreadCount: 0,
-        messages: [
-            { id: 'msg-1-1', sender: 'customer', text: 'Hi, do you have any gluten-free options?', timestamp: new Date(Date.now() - 12 * 60 * 1000) },
-            { id: 'msg-1-2', sender: 'admin', text: 'Hello! Yes, our Avocado Toast can be made on gluten-free bread. The Chocolate Chip Cookies are also gluten-free.', timestamp: new Date(Date.now() - 11 * 60 * 1000) },
-            { id: 'msg-1-3', sender: 'customer', text: 'Perfect, thank you!', timestamp: new Date(Date.now() - 10 * 60 * 1000) },
-        ]
-    },
-    {
-        id: 'conv-2',
-        customerName: 'Bob Williams',
-        lastMessage: 'Can I place an order for pickup?',
-        lastMessageTimestamp: new Date(Date.now() - 2 * 60 * 1000),
+        id: '1',
+        customerName: 'Juan Pérez',
+        lastMessage: '¿Tienen servicio a domicilio?',
+        lastMessageTimestamp: new Date(),
         unreadCount: 1,
         messages: [
-            { id: 'msg-2-1', sender: 'customer', text: 'Can I place an order for pickup?', timestamp: new Date(Date.now() - 2 * 60 * 1000) },
+            { id: 'm1', sender: 'customer', text: 'Hola', timestamp: new Date(Date.now() - 100000) },
+            { id: 'm2', sender: 'customer', text: '¿Tienen servicio a domicilio?', timestamp: new Date() }
         ]
     }
-];
-
-export const MOCK_PERSONALIZATIONS: Personalization[] = [
-    {
-        id: 'pers-milk',
-        name: 'Elige tu tipo de leche',
-        label: 'Tipo de Leche',
-        allowRepetition: false,
-        minSelection: 1,
-        maxSelection: 1,
-        options: [
-            { id: 'opt-milk-whole', name: 'Entera', price: 0, available: true },
-            { id: 'opt-milk-skim', name: 'Descremada', price: 0, available: true },
-            { id: 'opt-milk-oat', name: 'Avena', price: 0.75, available: true },
-            { id: 'opt-milk-almond', name: 'Almendra', price: 0.75, available: false },
-        ]
-    },
-    {
-        id: 'pers-syrup',
-        name: 'Añade un sirope',
-        label: 'Sirope Extra',
-        allowRepetition: true,
-        maxSelection: null,
-        minSelection: 0,
-        options: [
-            { id: 'opt-syrup-vanilla', name: 'Vainilla', price: 0.50, available: true },
-            { id: 'opt-syrup-caramel', name: 'Caramelo', price: 0.50, available: true },
-            { id: 'opt-syrup-hazelnut', name: 'Avellana', price: 0.50, available: false },
-        ]
-    }
-];
-
-export const MOCK_PROMOTIONS: Promotion[] = [
-    {
-      id: 'promo-1',
-      name: 'Happy Hour de Café',
-      discountType: DiscountType.Percentage,
-      discountValue: 20,
-      appliesTo: PromotionAppliesTo.SpecificProducts,
-      productIds: ['prod-001', 'prod-002'],
-      startDate: '2024-01-01',
-      endDate: '2024-12-31'
-    }
-];
-
-const MOCK_TABLES_TERRACE: Table[] = [
-    { id: 't-t-1', zoneId: 'zone-terrace', name: 'T1', row: 1, col: 1, width: 1, height: 1, shape: 'square', status: 'available' },
-    { id: 't-t-2', zoneId: 'zone-terrace', name: 'T2', row: 1, col: 2, width: 1, height: 1, shape: 'square', status: 'occupied' },
-    { id: 't-t-3', zoneId: 'zone-terrace', name: 'T3', row: 2, col: 1, width: 2, height: 1, shape: 'square', status: 'available' },
-];
-const MOCK_TABLES_MAIN: Table[] = [
-    { id: 't-m-1', zoneId: 'zone-main', name: 'M1', row: 1, col: 1, width: 1, height: 1, shape: 'round', status: 'available' },
-    { id: 't-m-2', zoneId: 'zone-main', name: 'M2', row: 2, col: 2, width: 1, height: 1, shape: 'round', status: 'available' },
-    { id: 't-m-3', zoneId: 'zone-main', name: 'M3', row: 3, col: 3, width: 1, height: 1, shape: 'round', status: 'occupied' },
-    { id: 't-m-4', zoneId: 'zone-main', name: 'M4', row: 4, col: 4, width: 1, height: 1, shape: 'round', status: 'available' },
-];
-
-export const MOCK_ZONES: Zone[] = [
-    { id: 'zone-terrace', name: 'Terraza', rows: 4, cols: 5, tables: MOCK_TABLES_TERRACE },
-    { id: 'zone-main', name: 'Salón Principal', rows: 5, cols: 5, tables: MOCK_TABLES_MAIN },
-    { id: 'zone-sala', name: 'sala', rows: 6, cols: 6, tables: [] },
 ];
 
 export const CURRENCIES: Currency[] = [
-    { code: 'USD', name: 'Dólar Estadounidense (USD $)' },
-    { code: 'MXN', name: 'Peso Mexicano (MXN $)' },
-    { code: 'EUR', name: 'Euro (EUR €)' },
-    { code: 'ARS', name: 'Peso Argentino (ARS $)' },
-    { code: 'PAB', name: 'Balboa Panameño (PAB B/.)' },
-    { code: 'BOB', name: 'Boliviano (BOB Bs)' },
-    { code: 'CRC', name: 'Colón Costarricense (CRC ₡)' },
-    { code: 'NIO', name: 'Córdoba Nicaragüense (NIO C$)' },
-    { code: 'PYG', name: 'Guaraní Paraguayo (PYG Gs)' },
-    { code: 'HNL', name: 'Lempira Hondureño (HNL L)' },
+    { code: 'MXN', name: 'Peso Mexicano ($)' },
+    { code: 'USD', name: 'Dólar Estadounidense ($)' },
+    { code: 'EUR', name: 'Euro (€)' },
+    { code: 'VES', name: 'Bolívar Venezolano (Bs.)' },
 ];
 
 export const INITIAL_SETTINGS: AppSettings = {
-    company: {
-        name: 'ANYVAL PARK',
-        currency: { code: 'MXN', name: 'Peso Mexicano (MXN $)' },
+  company: {
+    name: 'Mi Restaurante',
+    currency: CURRENCIES[0],
+  },
+  branch: {
+    alias: 'Matriz',
+    fullAddress: '',
+    googleMapsLink: '',
+    whatsappNumber: '',
+    logoUrl: '',
+    coverImageUrl: '',
+    isOpen: true,
+  },
+  shipping: {
+    costType: ShippingCostType.Fixed,
+    fixedCost: 0,
+    freeShippingMinimum: 0,
+    enableShippingMinimum: 0,
+    deliveryTime: {
+      min: 30,
+      max: 45,
     },
-    branch: {
-        alias: 'ANYVAL PARK - Suc.',
-        fullAddress: '',
-        googleMapsLink: '',
-        whatsappNumber: '+58 4146945877',
-        logoUrl: '',
-        coverImageUrl: '',
+    pickupTime: {
+      min: 15,
     },
-    shipping: {
-        costType: ShippingCostType.ToBeQuoted,
-        fixedCost: null,
-        freeShippingMinimum: null,
-        enableShippingMinimum: null,
-        deliveryTime: { min: 25, max: 45 },
-        pickupTime: { min: 15 },
+  },
+  payment: {
+    deliveryMethods: ['Efectivo'],
+    pickupMethods: ['Efectivo'],
+    showTipField: false,
+    pagoMovil: {
+        bank: '',
+        phone: '',
+        idNumber: ''
     },
-    payment: {
-        deliveryMethods: ['Efectivo'],
-        pickupMethods: ['Efectivo'],
-        showTipField: false,
-    },
-    schedules: [
-        {
-            id: 'general',
-            name: 'Menú general',
-            days: [
-                { day: 'Lunes', shifts: [], isOpen: true },
-                { day: 'Martes', shifts: [], isOpen: true },
-                { day: 'Miércoles', shifts: [], isOpen: true },
-                { day: 'Jueves', shifts: [], isOpen: true },
-                { day: 'Viernes', shifts: [], isOpen: true },
-                { day: 'Sábado', shifts: [], isOpen: true },
-                { day: 'Domingo', shifts: [], isOpen: true },
-            ]
-        }
-    ],
-    printing: {
-        method: PrintingMethod.Native,
+    transfer: {
+        bank: '',
+        accountNumber: '',
+        accountHolder: '',
+        idNumber: ''
     }
+  },
+  schedules: [
+    {
+        id: 'default-schedule',
+        name: 'General',
+        days: [
+            { day: 'Lunes', shifts: [{start: '09:00', end: '21:00'}], isOpen: true },
+            { day: 'Martes', shifts: [{start: '09:00', end: '21:00'}], isOpen: true },
+            { day: 'Miércoles', shifts: [{start: '09:00', end: '21:00'}], isOpen: true },
+            { day: 'Jueves', shifts: [{start: '09:00', end: '21:00'}], isOpen: true },
+            { day: 'Viernes', shifts: [{start: '09:00', end: '22:00'}], isOpen: true },
+            { day: 'Sábado', shifts: [{start: '10:00', end: '22:00'}], isOpen: true },
+            { day: 'Domingo', shifts: [{start: '10:00', end: '20:00'}], isOpen: true },
+        ]
+    }
+  ],
+  printing: {
+      method: PrintingMethod.Native
+  }
 };
