@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconSearch, IconLocationMarker, IconStore, IconCheck, IconInfo, IconUpload } from '../constants';
+import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconSearch, IconLocationMarker, IconStore, IconCheck, IconInfo, IconUpload, IconClock } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
@@ -67,7 +67,6 @@ export default function CustomerView() {
     const isDigital = useMemo(() => {
         if (!selectedPaymentMethod) return false;
         const m = selectedPaymentMethod.toLowerCase();
-        // Si NO es efectivo y NO es punto, es digital (Transferencia, Pago Móvil, Zelle, etc)
         return !m.includes('efectivo') && !m.includes('punto');
     }, [selectedPaymentMethod]);
 
@@ -172,12 +171,48 @@ export default function CustomerView() {
                 </header>
                 
                 <div className="flex-1 p-4 space-y-6 overflow-y-auto">
+                    {/* SELECTOR DE TIPO DE PEDIDO CON TIEMPOS ESTIMADOS */}
+                    <div className="bg-[#1a1c23] p-5 rounded-[2rem] border border-gray-800 shadow-xl space-y-4">
+                        <h3 className="font-black text-[10px] uppercase tracking-[0.2em] text-emerald-500">¿Cómo recibes tu pedido?</h3>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button 
+                                onClick={() => setOrderType(OrderType.Delivery)} 
+                                className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all duration-300 gap-1 ${orderType === OrderType.Delivery ? 'bg-emerald-600/10 border-emerald-500 shadow-[0_0_15px_-5px_rgba(16,185,129,0.4)]' : 'bg-[#0f1115] border-gray-800 opacity-60'}`}
+                            >
+                                <IconStore className={`h-6 w-6 ${orderType === OrderType.Delivery ? 'text-emerald-400' : 'text-gray-500'}`} />
+                                <span className={`text-[10px] font-black uppercase tracking-widest ${orderType === OrderType.Delivery ? 'text-white' : 'text-gray-500'}`}>Domicilio</span>
+                                {settings && (
+                                    <span className="text-[8px] font-bold text-emerald-500/80 flex items-center gap-1 mt-1">
+                                        <IconClock className="h-2.5 w-2.5" />
+                                        {settings.shipping.deliveryTime.min}-{settings.shipping.deliveryTime.max} min
+                                    </span>
+                                )}
+                            </button>
+                            <button 
+                                onClick={() => setOrderType(OrderType.TakeAway)} 
+                                className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all duration-300 gap-1 ${orderType === OrderType.TakeAway ? 'bg-emerald-600/10 border-emerald-500 shadow-[0_0_15px_-5px_rgba(16,185,129,0.4)]' : 'bg-[#0f1115] border-gray-800 opacity-60'}`}
+                            >
+                                <IconLocationMarker className={`h-6 w-6 ${orderType === OrderType.TakeAway ? 'text-emerald-400' : 'text-gray-500'}`} />
+                                <span className={`text-[10px] font-black uppercase tracking-widest ${orderType === OrderType.TakeAway ? 'text-white' : 'text-gray-500'}`}>Para llevar</span>
+                                {settings && (
+                                    <span className="text-[8px] font-bold text-emerald-500/80 flex items-center gap-1 mt-1">
+                                        <IconClock className="h-2.5 w-2.5" />
+                                        {settings.shipping.pickupTime.min} min
+                                    </span>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+
                     {/* TUS DATOS */}
                     <div className="bg-[#1a1c23] p-5 rounded-[2rem] border border-gray-800 shadow-xl space-y-4">
                         <h3 className="font-black text-[10px] uppercase tracking-[0.2em] text-emerald-500">Tus Datos</h3>
                         <div className="space-y-3">
                             <input type="text" placeholder="Tu Nombre Completo" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full p-4 bg-[#0f1115] border border-gray-800 rounded-2xl outline-none focus:border-emerald-500 transition-all text-sm" />
                             <input type="tel" placeholder="WhatsApp (Ej. 0414-0000000)" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full p-4 bg-[#0f1115] border border-gray-800 rounded-2xl outline-none focus:border-emerald-500 transition-all font-mono text-sm" />
+                            {orderType === OrderType.Delivery && (
+                                <textarea placeholder="Dirección exacta para la entrega..." value={customerAddress.calle} onChange={e => setCustomerAddress({...customerAddress, calle: e.target.value})} className="w-full p-4 bg-[#0f1115] border border-gray-800 rounded-2xl outline-none focus:border-emerald-500 transition-all text-sm resize-none" rows={2} />
+                            )}
                         </div>
                     </div>
 
