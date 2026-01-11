@@ -4,6 +4,9 @@ import { HashRouter, Routes, Route } from 'react-router-dom';
 import CustomerView from './components/CustomerView';
 import AdminView from './components/AdminView';
 
+// ETIQUETA GLOBAL DE VERIFICACIÓN - SI NO VES ESTO EN LA CONSOLA, EL CÓDIGO NO SE HA ACTUALIZADO
+console.log("%c ALTOQUE FOOD SYSTEM v3.0 - ACTIVADO", "color: #10b981; font-weight: bold; font-size: 20px;");
+
 function App() {
     return (
         <HashRouter>
@@ -32,6 +35,5 @@ const NotFound: React.FC = () => (
         </div>
     </div>
 );
-
 
 export default App;
