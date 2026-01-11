@@ -1,10 +1,21 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { ChatMessage, Order, Product } from '../types';
 
-// Fix: Correct initialization using direct process.env.API_KEY
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// IMPORTANT: In a real application, the API key would be handled securely
+// and not exposed in the client-side code. It's assumed to be available
+// in the environment variables.
+const API_KEY = process.env.API_KEY;
+
+if (!API_KEY) {
+  console.warn("API_KEY for Gemini is not set. AI features will be disabled.");
+}
+
+const ai = new GoogleGenAI({ apiKey: API_KEY! });
+
 
 export const generateProductDescription = async (productName: string, categoryName: string, currentDescription: string): Promise<string> => {
+    if (!API_KEY) return "AI service is unavailable.";
     try {
         const prompt = `Generate a chic, minimalist, and enticing one-sentence description for a cafe menu item.
         Item Name: ${productName}
@@ -13,14 +24,12 @@ export const generateProductDescription = async (productName: string, categoryNa
         
         Focus on fresh ingredients, taste, and experience. Keep it under 15 words.`;
 
-        // Fix: Use preferred model 'gemini-3-flash-preview' and ai.models.generateContent
         const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
+            model: 'gemini-2.5-flash',
             contents: prompt,
         });
 
-        // Fix: Use .text property directly
-        return response.text?.trim() || "Delicious choice prepared with fresh ingredients.";
+        return response.text.trim();
     } catch (error) {
         console.error("Error generating product description:", error);
         return "Failed to generate description.";
@@ -28,6 +37,8 @@ export const generateProductDescription = async (productName: string, categoryNa
 };
 
 export const getChatbotResponse = async (history: ChatMessage[], newMessage: string): Promise<string> => {
+    if (!API_KEY) return "I'm sorry, my AI brain is taking a little coffee break. Please try again later.";
+    
     const systemInstruction = `You are "OrdoBot", a friendly and helpful AI assistant for a chic cafe. 
     Your personality is warm, professional, and slightly witty.
     You can answer questions about the menu, store hours (8 AM - 8 PM daily), and general inquiries.
@@ -39,18 +50,17 @@ export const getChatbotResponse = async (history: ChatMessage[], newMessage: str
         role: msg.sender === 'user' ? 'user' : 'model',
         parts: [{ text: msg.text }]
     }));
+    contents.push({ role: 'user', parts: [{ text: newMessage }] });
 
     try {
-        // Fix: Use preferred model 'gemini-3-flash-preview' and initialize chat with history
         const chat = ai.chats.create({
-            model: 'gemini-3-flash-preview',
+            model: 'gemini-2.5-flash',
             config: { systemInstruction },
-            history: contents,
+            history: contents.slice(0, -1), // Send previous history
         });
 
         const response = await chat.sendMessage({ message: newMessage });
-        // Fix: Use .text property directly
-        return response.text?.trim() || "I'm here to help!";
+        return response.text.trim();
 
     } catch (error) {
         console.error("Error getting chatbot response:", error);
@@ -59,6 +69,8 @@ export const getChatbotResponse = async (history: ChatMessage[], newMessage: str
 };
 
 export const getAdvancedInsights = async (query: string, orders: Order[]): Promise<string> => {
+    if (!API_KEY) return "AI service is unavailable.";
+    
     const prompt = `As a world-class restaurant business analyst, analyze the following order data based on the user's query. Provide actionable insights, identify trends, and give specific, data-driven recommendations.
 
     **Order Data (JSON format):**
@@ -75,16 +87,14 @@ export const getAdvancedInsights = async (query: string, orders: Order[]): Promi
     `;
     
     try {
-        // Fix: Use preferred model 'gemini-3-pro-preview' and thinking budget for complex analysis
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-2.5-pro',
             contents: prompt,
             config: {
-                thinkingConfig: { thinkingBudget: 2048 }
+                thinkingConfig: { thinkingBudget: 32768 }
             }
         });
-        // Fix: Use .text property directly
-        return response.text || "No insights available for this dataset.";
+        return response.text;
     } catch (error) {
         console.error("Error getting advanced insights:", error);
         return `An error occurred while analyzing the data. ${error instanceof Error ? error.message : String(error)}`;

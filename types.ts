@@ -1,4 +1,3 @@
-
 export interface Product {
     id: string;
     name: string;
@@ -7,7 +6,6 @@ export interface Product {
     imageUrl: string;
     categoryId: string;
     available: boolean;
-    personalizationIds?: string[];
     created_at?: string;
 }
 
@@ -21,7 +19,6 @@ export interface CartItem extends Product {
     cartItemId: string;
     quantity: number;
     comments?: string;
-    selectedOptions?: PersonalizationOption[];
 }
 
 export enum OrderStatus {
@@ -40,15 +37,12 @@ export enum OrderType {
     Delivery = 'Domicilio',
 }
 
-export type PaymentStatus = 'paid' | 'pending';
-
 export interface Address {
     colonia: string;
     calle: string;
     numero: string;
     entreCalles?: string;
     referencias?: string;
-    googleMapsLink?: string;
 }
 
 export interface Customer {
@@ -62,8 +56,6 @@ export interface Order {
     items: CartItem[];
     customer: Customer;
     status: OrderStatus;
-    paymentStatus?: PaymentStatus;
-    paymentProof?: string;
     total: number;
     createdAt: Date;
     branchId: string;
@@ -121,6 +113,7 @@ export enum PromotionAppliesTo {
   SpecificProducts = 'specific_products',
 }
 
+
 export interface Promotion {
   id: string;
   name: string;
@@ -134,14 +127,15 @@ export interface Promotion {
 
 export interface Table {
     id: string;
-    name: string;
+    name: string; // The identifier shown on the table, e.g., "1", "2", "A1"
     zoneId: string;
-    row: number;
-    col: number;
-    width: number;
-    height: number;
+    row: number; // Top-left starting row
+    col: number; // Top-left starting column
+    width: number; // How many columns it spans
+    height: number; // How many rows it spans
     shape: 'square' | 'round';
     status: 'available' | 'occupied';
+    // Fix: Add created_at property to match the database schema and fix destructuring error.
     created_at?: string;
 }
 
@@ -152,6 +146,8 @@ export interface Zone {
     cols: number;
     tables: Table[];
 }
+
+// --- Settings Types ---
 
 export interface Currency {
   code: string;
@@ -169,7 +165,6 @@ export interface BranchSettings {
   googleMapsLink: string;
   whatsappNumber: string;
   logoUrl: string;
-  coverImageUrl: string;
 }
 
 export enum ShippingCostType {
@@ -180,7 +175,6 @@ export enum ShippingCostType {
 
 export interface ShippingSettings {
   costType: ShippingCostType;
-  fixedCost: number | null;
   freeShippingMinimum: number | null;
   enableShippingMinimum: number | null;
   deliveryTime: {
@@ -192,27 +186,12 @@ export interface ShippingSettings {
   };
 }
 
-export type PaymentMethod = 'Efectivo' | 'Pago con tarjeta' | 'Transferencia' | 'Pago Móvil' | 'Zelle' | 'Punto de Venta';
-
-export interface PagoMovilDetails {
-    bank: string;
-    phone: string;
-    idNumber: string;
-}
-
-export interface TransferDetails {
-    bank: string;
-    accountNumber: string;
-    accountHolder: string;
-    idNumber: string;
-}
+export type PaymentMethod = 'Efectivo' | 'Pago con tarjeta' | 'Transferencia';
 
 export interface PaymentSettings {
   deliveryMethods: PaymentMethod[];
   pickupMethods: PaymentMethod[];
   showTipField: boolean;
-  pagoMovil?: PagoMovilDetails;
-  transfer?: TransferDetails;
 }
 
 export interface TimeRange {

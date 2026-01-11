@@ -1,3 +1,5 @@
+
+
 import React from 'react';
 import { Product, Category, Order, OrderStatus, Conversation, Personalization, Promotion, Zone, Customer, OrderType, DiscountType, PromotionAppliesTo, Table, Currency, AppSettings, ShippingCostType, PrintingMethod } from './types';
 
@@ -73,9 +75,6 @@ export const IconCheck: React.FC<{ className?: string }> = ({ className }) => <I
 export const IconBluetooth: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M6.75 8.25l9 9.75-4.5 3V3l4.5 3-9 9.75" className={className} />;
 export const IconUSB: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M10.5 6h3v6h-3V6zM9 12.75h6m-6 3h6m-4.5 3.75h3V21h-3v-2.25zM12 3v3m-2.25-1.5h4.5" className={className} />;
 export const IconKey: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M12.75 16.5a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM12.75 16.5h-9v-1.5a3 3 0 013-3h1.5a3 3 0 013 3v1.5z" />;
-export const IconVolumeUp: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" className={className} />;
-export const IconVolumeOff: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" className={className} />;
-export const IconMap: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.875 1.875 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z" className={className} />;
 
 
 // Mock Data
@@ -237,11 +236,9 @@ export const INITIAL_SETTINGS: AppSettings = {
         googleMapsLink: '',
         whatsappNumber: '+58 4146945877',
         logoUrl: '',
-        coverImageUrl: '',
     },
     shipping: {
         costType: ShippingCostType.ToBeQuoted,
-        fixedCost: null,
         freeShippingMinimum: null,
         enableShippingMinimum: null,
         deliveryTime: { min: 25, max: 45 },

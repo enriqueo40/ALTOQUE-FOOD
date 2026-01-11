@@ -1,14 +1,16 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { useTheme } from '../hooks/useTheme';
-import { useCart } from '../hooks/useCart';
-import { Product, Category, Order, OrderStatus, Conversation, AdminChatMessage, OrderType, Personalization, PersonalizationOption, Promotion, DiscountType, PromotionAppliesTo, Zone, Table, AppSettings, Currency, BranchSettings, PaymentSettings, ShippingSettings, PaymentMethod, DaySchedule, Schedule, ShippingCostType, TimeRange, PrintingMethod, PaymentStatus, Customer } from '../types';
-import { MOCK_CONVERSATIONS, CURRENCIES } from '../constants';
+// Fix: Moved ShippingCostType import from '../constants' to here to resolve export error.
+import { Product, Category, Order, OrderStatus, Conversation, AdminChatMessage, OrderType, Personalization, PersonalizationOption, Promotion, DiscountType, PromotionAppliesTo, Zone, Table, AppSettings, Currency, BranchSettings, PaymentSettings, ShippingSettings, PaymentMethod, DaySchedule, Schedule, ShippingCostType, TimeRange, PrintingMethod } from '../types';
+import { MOCK_ORDERS, MOCK_CONVERSATIONS, INITIAL_SETTINGS, CURRENCIES } from '../constants';
 import { generateProductDescription, getAdvancedInsights } from '../services/geminiService';
-import { getProducts, getCategories, saveProduct, deleteProduct, saveCategory, deleteCategory, getPersonalizations, savePersonalization, deletePersonalization, getPromotions, savePromotion, deletePromotion, updateProductAvailability, updatePersonalizationOptionAvailability, getZones, saveZone, deleteZone, saveZoneLayout, getAppSettings, saveAppSettings, subscribeToNewOrders, unsubscribeFromChannel, updateOrder, getActiveOrders, saveOrder } from '../services/supabaseService';
-import { IconComponent, IconHome, IconMenu, IconAvailability, IconShare, IconTutorials, IconOrders, IconAnalytics, IconChatAdmin, IconLogout, IconSearch, IconBell, IconEdit, IconPlus, IconTrash, IconSparkles, IconSend, IconMoreVertical, IconExternalLink, IconCalendar, IconChevronDown, IconX, IconReceipt, IconSettings, IconStore, IconDelivery, IconPayment, IconClock, IconTableLayout, IconPrinter, IconChevronUp, IconPencil, IconDuplicate, IconGripVertical, IconPercent, IconInfo, IconTag, IconLogoutAlt, IconSun, IconMoon, IconArrowLeft, IconWhatsapp, IconQR, IconLocationMarker, IconUpload, IconCheck, IconBluetooth, IconUSB, IconToggleOn, IconToggleOff } from '../constants';
+import { getProducts, getCategories, saveProduct, deleteProduct, saveCategory, deleteCategory, getPersonalizations, savePersonalization, deletePersonalization, getPromotions, savePromotion, deletePromotion, updateProductAvailability, updatePersonalizationOptionAvailability, getZones, saveZone, deleteZone, saveZoneLayout } from '../services/supabaseService';
+// Fix: Imported IconComponent to resolve usage error.
+import { IconComponent, IconHome, IconMenu, IconAvailability, IconShare, IconTutorials, IconProducts, IconOrders, IconAnalytics, IconChatAdmin, IconLogout, IconSearch, IconBell, IconEdit, IconPlus, IconTrash, IconSparkles, IconSend, IconMoreVertical, IconExternalLink, IconCalendar, IconChevronDown, IconX, IconReceipt, IconSettings, IconStore, IconDelivery, IconPayment, IconClock, IconTableLayout, IconPrinter, IconChevronUp, IconPencil, IconDuplicate, IconGripVertical, IconPercent, IconInfo, IconTag, IconLogoutAlt, IconSun, IconMoon, IconExpand, IconArrowLeft, IconWhatsapp, IconQR, IconPlayCircle, IconLocationMarker, IconUpload, IconCheck, IconBluetooth, IconUSB } from '../constants';
+import CustomerView from './CustomerView';
 
+// FIX: Moved IconEye definition to the top of the file to resolve 'Cannot find name' error in PromotionModal.
 const IconEye: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.432 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" className={className} />;
 
 type AdminViewPage = 'dashboard' | 'products' | 'orders' | 'analytics' | 'messages' | 'availability' | 'share' | 'tutorials';
@@ -39,7 +41,7 @@ const Sidebar: React.FC<{ currentPage: AdminViewPage; setCurrentPage: (page: Adm
         <aside className="w-64 bg-white dark:bg-gray-800 shadow-md flex flex-col">
             <div className="h-20 flex items-center justify-center border-b dark:border-gray-700">
                  <div className="flex items-center space-x-2">
-                    <h2 className="text-xl font-bold dark:text-gray-100">ALTOQUE FOOD</h2>
+                    <h2 className="text-xl font-bold dark:text-gray-100">anyvalpark</h2>
                     <IconChevronDown className="h-4 w-4" />
                 </div>
             </div>
@@ -48,7 +50,7 @@ const Sidebar: React.FC<{ currentPage: AdminViewPage; setCurrentPage: (page: Adm
                     <button
                         key={item.id}
                         onClick={() => setCurrentPage(item.id)}
-                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${currentPage === item.id ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${currentPage === item.id ? 'bg-green-50 text-green-700 dark:bg-green-900/50 dark:text-green-300' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                     >
                         {item.icon}
                         <span className="font-semibold">{item.name}</span>
@@ -85,6 +87,7 @@ const Header: React.FC<{ title: string; onSettingsClick: () => void; onPreviewCl
     </header>
 );
 
+// --- Dashboard Components ---
 const FeatureBanner: React.FC = () => {
     const [isVisible, setIsVisible] = useState(true);
     if (!isVisible) return null;
@@ -154,29 +157,19 @@ const DashboardStatCard: React.FC<{ title: string; value: string; secondaryValue
 );
 
 const Dashboard: React.FC = () => {
-    // Connected to Real Data from Supabase
-    const [orders, setOrders] = useState<Order[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    
-    useEffect(() => {
-        getActiveOrders().then(data => {
-            setOrders(data);
-            setIsLoading(false);
-        });
-    }, []);
+    const [orders] = usePersistentState<Order[]>('orders', MOCK_ORDERS);
 
     const totalSales = useMemo(() => orders.reduce((sum, order) => sum + order.total, 0), [orders]);
     const totalOrders = orders.length;
 
-    const previousDaySales = totalSales * 0.9; // Simulation for comparison
-    const previousDayOrders = Math.floor(totalOrders * 0.9); // Simulation for comparison
+    const previousDaySales = totalSales * 0.92; // Mock data
+    const previousDayOrders = totalOrders > 3 ? totalOrders - 3 : 0; // Mock data
     
-    const totalEnvios = orders.filter(o => o.orderType === OrderType.Delivery).length;
-    const totalPropinas = 0; // This would need extraction from order details if stored separately
-
-    if (isLoading) {
-        return <div className="p-10 text-center animate-pulse text-gray-500">Cargando estadísticas...</div>;
-    }
+    // Mock data for new cards
+    const totalEnvios = 0;
+    const previousDayEnvios = 0;
+    const totalPropinas = 0;
+    const previousDayPropinas = 0;
 
     return (
         <div className="space-y-6">
@@ -195,14 +188,14 @@ const Dashboard: React.FC = () => {
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <DashboardStatCard title="Ventas" value={`$${totalSales.toFixed(2)}`} secondaryValue={`$${previousDaySales.toFixed(2)}`} />
                 <DashboardStatCard title="Pedidos" value={totalOrders.toString()} secondaryValue={previousDayOrders.toString()} />
-                <DashboardStatCard title="Envíos" value={totalEnvios.toString()} secondaryValue={"0"} />
-                <DashboardStatCard title="Propinas" value={`$${totalPropinas.toFixed(2)}`} secondaryValue={"$0.00"} />
+                <DashboardStatCard title="Envíos" value={`$${totalEnvios.toFixed(2)}`} secondaryValue={`$${previousDayEnvios.toFixed(2)}`} />
+                <DashboardStatCard title="Propinas" value={`$${totalPropinas.toFixed(2)}`} secondaryValue={`$${previousDayPropinas.toFixed(2)}`} />
 
                 {/* Placeholder Cards */}
                 <div className="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 lg:col-span-2">
                     <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-4">Ticket promedio</h4>
                     <div className="h-48 flex items-center justify-center">
-                        <div className="text-4xl font-bold text-gray-300 dark:text-gray-600">${totalOrders > 0 ? (totalSales / totalOrders).toFixed(2) : '0.00'}</div>
+                        <div className="w-full h-full border dark:border-gray-700 rounded-md"></div>
                     </div>
                 </div>
                 <div className="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 lg:col-span-2">
@@ -222,6 +215,7 @@ const Dashboard: React.FC = () => {
     );
 };
 
+// --- Menu Management ---
 const ProductListItem: React.FC<{product: Product, onEdit: () => void, onDuplicate: () => void, onDelete: () => void}> = ({product, onEdit, onDuplicate, onDelete}) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -286,6 +280,7 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
+        
         let processedValue: string | number | boolean = value;
         if (type === 'number') {
             processedValue = parseFloat(value) || 0;
@@ -293,6 +288,7 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
         if (name === 'available') {
             processedValue = (e.target as HTMLInputElement).checked;
         }
+
         setFormData(prev => ({ ...prev, [name]: processedValue }));
     };
 
@@ -824,7 +820,7 @@ const PersonalizationModal: React.FC<{isOpen: boolean, onClose: () => void, onSa
                                     ))}
                                 </div>
                                 <button type="button" onClick={addOption} className="mt-4 text-emerald-600 font-semibold text-sm flex items-center gap-x-2 hover:text-emerald-800">
-                                    <IconPlus className="h-4 w-4" /> Agregar otro opción
+                                    <IconPlus className="h-4 w-4" /> Agregar otra opción
                                 </button>
                             </div>
                             <div className="border-t dark:border-gray-700 pt-6 space-y-6">
@@ -987,7 +983,7 @@ const PromotionModal: React.FC<{
         discountValue: 0,
         appliesTo: PromotionAppliesTo.SpecificProducts,
         productIds: [''],
-        startDate: new Date().toISOString().split('T')[0],
+        startDate: '',
         endDate: '',
     });
     
@@ -1063,12 +1059,13 @@ const PromotionModal: React.FC<{
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Valor del descuento</label>
                                 <div className="flex items-center mt-1">
-                                    <select name="discountType" value={formData.discountType} onChange={handleChange} className={`${lightInputClasses} w-1/3 rounded-r-none border-r-0`}>
-                                        <option value={DiscountType.Percentage}>Porcentaje (%)</option>
-                                        <option value={DiscountType.Fixed}>Monto fijo ($)</option>
+                                    <select name="discountType" value={formData.discountType} onChange={handleChange} className={`${lightInputClasses} w-1/3 rounded-r-none`}>
+                                        <option value={DiscountType.Percentage}>Porcentaje</option>
+                                        <option value={DiscountType.Fixed}>Monto fijo</option>
                                     </select>
                                     <div className="relative flex-1">
-                                        <input type="number" name="discountValue" value={formData.discountValue} onChange={handleChange} required className={`${lightInputClasses} rounded-l-none`}/>
+                                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500 dark:text-gray-400">{formData.discountType === DiscountType.Percentage ? '%' : '$'}</span>
+                                        <input type="number" name="discountValue" value={formData.discountValue} onChange={handleChange} required className={`${lightInputClasses} pl-7 rounded-l-none`}/>
                                     </div>
                                 </div>
                             </div>
@@ -1117,7 +1114,7 @@ const PromotionModal: React.FC<{
                     </form>
                     <div className="w-1/3 bg-gray-100 dark:bg-gray-900/50 p-6 border-l dark:border-gray-700 hidden lg:block">
                          <h3 className="font-semibold text-gray-800 dark:text-gray-200">Vista previa</h3>
-                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">Aparecerá una etiqueta de "Oferta" en los productos seleccionados dentro del rango de fechas.</p>
+                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">Productos con descuento</p>
                     </div>
                 </div>
             </div>
@@ -1214,60 +1211,20 @@ const PromotionsView: React.FC = () => {
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border dark:border-gray-700">
                         <h3 className="text-lg font-semibold mb-4">Promociones Activas</h3>
                         <div className="space-y-4">
-                            {promotions.map(promo => {
-                                const now = new Date();
-                                const startDate = promo.startDate ? new Date(promo.startDate) : null;
-                                const endDate = promo.endDate ? new Date(promo.endDate) : null;
-                                
-                                // Adjust end date to be end of day
-                                if (endDate) {
-                                    endDate.setHours(23, 59, 59, 999);
-                                }
-
-                                let statusColor = 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400';
-                                let statusText = 'Inactiva';
-
-                                if (startDate && startDate > now) {
-                                    statusColor = 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400';
-                                    statusText = 'Programada';
-                                } else if (endDate && endDate < now) {
-                                    statusColor = 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500';
-                                    statusText = 'Finalizada';
-                                } else {
-                                    statusColor = 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400';
-                                    statusText = 'Activa';
-                                }
-
-                                return (
-                                    <div key={promo.id} className="p-4 border dark:border-gray-700 rounded-md flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <p className="font-bold text-gray-800 dark:text-gray-200 text-lg">{promo.name}</p>
-                                                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${statusColor}`}>
-                                                    {statusText}
-                                                </span>
-                                            </div>
-                                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                                <span className="font-bold text-emerald-600">{promo.discountValue}{promo.discountType === DiscountType.Percentage ? '%' : '$'} OFF</span> en {promo.appliesTo === PromotionAppliesTo.SpecificProducts ? `${promo.productIds.length} producto(s)` : 'todos los productos'}
-                                            </p>
-                                            <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                                <div className="flex items-center gap-1">
-                                                    <span className="font-medium text-gray-400">Inicio:</span>
-                                                    <span>{promo.startDate || 'Inmediato'}</span>
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                    <span className="font-medium text-gray-400">Fin:</span>
-                                                    <span>{promo.endDate || 'Indefinido'}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center">
-                                            <button onClick={() => handleOpenModal(promo)} className="p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"><IconPencil/></button>
-                                            <button onClick={() => handleDeletePromotion(promo.id)} className="p-2 text-gray-500 hover:text-red-600 dark:hover:text-red-400"><IconTrash/></button>
-                                        </div>
+                            {promotions.map(promo => (
+                                <div key={promo.id} className="p-4 border dark:border-gray-700 rounded-md flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                    <div>
+                                        <p className="font-bold text-gray-800 dark:text-gray-200">{promo.name}</p>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                                            {promo.discountValue}{promo.discountType === DiscountType.Percentage ? '%' : '$'} de descuento en {promo.appliesTo === PromotionAppliesTo.SpecificProducts ? `${promo.productIds.length} producto(s)` : 'todos los productos'}
+                                        </p>
                                     </div>
-                                );
-                            })}
+                                    <div className="flex items-center">
+                                        <button onClick={() => handleOpenModal(promo)} className="p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"><IconPencil/></button>
+                                        <button onClick={() => handleDeletePromotion(promo.id)} className="p-2 text-gray-500 hover:text-red-600 dark:hover:text-red-400"><IconTrash/></button>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>
@@ -1322,721 +1279,188 @@ const MenuManagement: React.FC = () => {
 
 
 // --- Order Management Components ---
-
-const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onUpdateStatus: (id: string, status: OrderStatus) => void; onUpdatePayment: (id: string, status: PaymentStatus) => void }> = ({ order, onClose, onUpdateStatus, onUpdatePayment }) => {
-    const [isClosing, setIsClosing] = useState(false);
-
-    if (!order) return null;
-
-    const handleClose = () => {
-        setIsClosing(true);
-        setTimeout(() => {
-            setIsClosing(false);
-            onClose();
-        }, 300);
-    };
-
-    const handleCopyOrder = () => {
-         const text = `Pedido #${order.id.slice(0,5)}\nCliente: ${order.customer.name}\nTotal: $${order.total.toFixed(2)}\n\nItems:\n${order.items.map(i => `- ${i.quantity}x ${i.name}`).join('\n')}`;
-         navigator.clipboard.writeText(text).then(() => alert('Pedido copiado'));
-    };
-    
-    const handlePrint = () => {
-        window.print();
-    };
-
-    const handleAdvanceStatus = () => {
-        let nextStatus = OrderStatus.Pending;
-        if(order.status === OrderStatus.Pending) nextStatus = OrderStatus.Confirmed;
-        else if(order.status === OrderStatus.Confirmed) nextStatus = OrderStatus.Preparing;
-        else if(order.status === OrderStatus.Preparing) nextStatus = OrderStatus.Ready;
-        else if(order.status === OrderStatus.Ready) nextStatus = order.orderType === OrderType.Delivery ? OrderStatus.Delivering : OrderStatus.Completed;
-        else if(order.status === OrderStatus.Delivering) nextStatus = OrderStatus.Completed;
-        
-        onUpdateStatus(order.id, nextStatus);
-        handleClose();
-    };
-
-    const formattedDate = new Date(order.createdAt).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: 'numeric', minute: 'numeric', hour12: true });
-
-    return (
-        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${isClosing ? 'pointer-events-none' : ''}`}>
-            <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isClosing ? 'opacity-0' : 'opacity-100'}`} onClick={handleClose}></div>
-            <div className={`bg-white dark:bg-gray-800 w-full max-w-2xl rounded-xl shadow-2xl transform transition-all duration-300 flex flex-col max-h-[90vh] ${isClosing ? 'scale-95 opacity-0 translate-y-4' : 'scale-100 opacity-100 translate-y-0'}`}>
-                
-                {/* Header */}
-                <div className="p-6 border-b dark:border-gray-700 flex justify-between items-start bg-gray-50 dark:bg-gray-900/50 rounded-t-xl">
-                    <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded">#{order.id.slice(0, 6).toUpperCase()}</span>
-                            <span className="text-xs text-gray-500 dark:text-gray-400">{formattedDate}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                             <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{order.customer.name}</h2>
-                             <OrderStatusBadge status={order.status} />
-                        </div>
-                        <p className="text-gray-600 dark:text-gray-300 font-mono text-sm mt-1 flex items-center gap-1">
-                             <IconWhatsapp className="h-4 w-4 text-green-500"/> 
-                             <a href={`https://wa.me/${order.customer.phone.replace(/\D/g,'')}`} target="_blank" className="hover:underline">{order.customer.phone}</a>
-                        </p>
-                    </div>
-                    
-                     <div className="relative group">
-                        <button className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"><IconMoreVertical /></button>
-                        <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 shadow-xl rounded-lg border dark:border-gray-700 hidden group-hover:block z-10 overflow-hidden">
-                             <button onClick={handleCopyOrder} className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 text-sm"><IconDuplicate className="h-4 w-4"/> Copiar detalles</button>
-                             <button onClick={() => { onUpdateStatus(order.id, OrderStatus.Cancelled); handleClose(); }} className="w-full text-left px-4 py-3 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 flex items-center gap-2 text-sm border-t dark:border-gray-700"><IconX className="h-4 w-4"/> Cancelar pedido</button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6">
-                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                        <div className="md:col-span-2 space-y-4">
-                             <h3 className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2 border-b dark:border-gray-700 pb-2">
-                                 <IconReceipt className="h-5 w-5 text-gray-400"/> Detalle del pedido
-                             </h3>
-                             <div className="space-y-3">
-                                 {order.items.map((item, idx) => (
-                                     <div key={idx} className="flex justify-between items-start p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-                                         <div className="flex gap-3">
-                                             <span className="font-bold text-emerald-600 dark:text-emerald-400 text-lg">{item.quantity}x</span>
-                                             <div>
-                                                 <p className="font-medium text-gray-800 dark:text-gray-200">{item.name}</p>
-                                                 {item.comments && <p className="text-xs text-orange-600 dark:text-orange-300 italic mt-1 font-medium">Nota: {item.comments}</p>}
-                                             </div>
-                                         </div>
-                                         <span className="font-semibold text-gray-700 dark:text-gray-300">${(item.price * item.quantity).toFixed(2)}</span>
-                                     </div>
-                                 ))}
-                             </div>
-                             {order.generalComments && (
-                                 <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/50 rounded-lg text-sm text-yellow-800 dark:text-yellow-200">
-                                     <strong className="block mb-1">📝 Nota general del cliente:</strong> {order.generalComments}
-                                 </div>
-                             )}
-                             
-                             {/* Payment Proof Section */}
-                             {order.paymentProof && (
-                                 <div className="mt-4 border dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
-                                     <h4 className="font-bold text-gray-900 dark:text-gray-100 mb-2 flex items-center gap-2">
-                                         <IconCheck className="h-5 w-5 text-green-500"/> Comprobante de pago
-                                     </h4>
-                                     <div className="rounded-lg overflow-hidden border dark:border-gray-600">
-                                         <img src={order.paymentProof} alt="Comprobante" className="w-full h-auto object-contain max-h-64" />
-                                     </div>
-                                     <a href={order.paymentProof} download={`comprobante-${order.id}.png`} className="mt-2 inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline">
-                                         <IconUpload className="h-4 w-4 rotate-180"/> Descargar comprobante
-                                     </a>
-                                 </div>
-                             )}
-                        </div>
-                        
-                        <div className="space-y-6">
-                            <div>
-                                <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2 border-b dark:border-gray-700 pb-2">
-                                    <IconLocationMarker className="h-5 w-5 text-gray-400"/> Datos de entrega
-                                </h3>
-                                <div className="text-sm space-y-2 bg-gray-50 dark:bg-gray-700/30 p-3 rounded-lg">
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-500">Tipo:</span>
-                                        <span className="font-medium">{order.orderType}</span>
-                                    </div>
-                                    {order.tableId && (
-                                         <div className="flex justify-between">
-                                            <span className="text-gray-500">Mesa:</span>
-                                            <span className="font-bold text-emerald-600">{order.tableId}</span>
-                                        </div>
-                                    )}
-                                    {order.orderType === OrderType.Delivery && (
-                                        <div className="pt-2 border-t dark:border-gray-600 mt-2">
-                                            <p className="font-medium">{order.customer.address.calle} #{order.customer.address.numero}</p>
-                                            <p className="text-gray-500">{order.customer.address.colonia}</p>
-                                            {order.customer.address.referencias && <p className="text-xs mt-1 italic text-gray-500">"{order.customer.address.referencias}"</p>}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                             <div>
-                                <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2 border-b dark:border-gray-700 pb-2">
-                                    <IconPayment className="h-5 w-5 text-gray-400"/> Pago
-                                </h3>
-                                <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-lg text-center">
-                                    <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">${order.total.toFixed(2)}</p>
-                                    <div className="flex justify-center mt-2">
-                                         <button 
-                                            onClick={() => onUpdatePayment(order.id, order.paymentStatus === 'paid' ? 'pending' : 'paid')}
-                                            className={`text-xs font-bold px-3 py-1 rounded-full border transition-colors ${order.paymentStatus === 'paid' ? 'bg-green-200 text-green-800 border-green-300' : 'bg-yellow-100 text-yellow-800 border-yellow-300 hover:bg-green-100'}`}
-                                        >
-                                            {order.paymentStatus === 'paid' ? 'PAGADO' : 'MARCAR PAGADO'}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                     </div>
-                </div>
-
-                {/* Footer */}
-                <div className="p-4 bg-white dark:bg-gray-800 border-t dark:border-gray-700 flex gap-3 justify-end">
-                     <button onClick={handlePrint} className="px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
-                         <IconPrinter className="h-5 w-5"/>
-                     </button>
-                     
-                     {order.status !== OrderStatus.Completed && order.status !== OrderStatus.Cancelled && (
-                        <button onClick={handleAdvanceStatus} className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
-                            <IconCheck className="h-5 w-5"/>
-                            {order.status === OrderStatus.Pending ? 'Confirmar Pedido' : 
-                             order.status === OrderStatus.Confirmed ? 'Empezar Preparación' :
-                             order.status === OrderStatus.Preparing ? 'Marcar Listo' :
-                             order.status === OrderStatus.Ready ? (order.orderType === OrderType.Delivery ? 'Enviar Repartidor' : 'Entregar a Cliente') :
-                             'Completar Pedido'}
-                        </button>
-                     )}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const OrderStatusBadge: React.FC<{status: OrderStatus}> = ({status}) => {
-    const colors = {
-        [OrderStatus.Pending]: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800',
-        [OrderStatus.Confirmed]: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800',
-        [OrderStatus.Preparing]: 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800',
-        [OrderStatus.Ready]: 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800',
-        [OrderStatus.Delivering]: 'bg-cyan-100 text-cyan-800 border-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-300 dark:border-cyan-800',
-        [OrderStatus.Completed]: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800',
-        [OrderStatus.Cancelled]: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800',
-    };
-    
-    const labels = {
-        [OrderStatus.Pending]: 'Nuevo',
-        [OrderStatus.Confirmed]: 'Confirmado',
-        [OrderStatus.Preparing]: 'Preparando',
-        [OrderStatus.Ready]: 'Listo',
-        [OrderStatus.Delivering]: 'En camino',
-        [OrderStatus.Completed]: 'Completado',
-        [OrderStatus.Cancelled]: 'Cancelado',
-    };
-
-    return (
-        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${colors[status] || 'bg-gray-100 text-gray-800'}`}>
-            {labels[status]}
-        </span>
-    );
-};
-
-const TimeAgo: React.FC<{ date: Date; className?: string }> = ({ date, className }) => {
-    const [text, setText] = useState('');
-    const [isLate, setIsLate] = useState(false);
-
-    useEffect(() => {
-        const update = () => {
-            const now = new Date();
-            const diffInSeconds = Math.floor((now.getTime() - new Date(date).getTime()) / 1000);
-            
-            if (diffInSeconds < 60) setText('hace un momento');
-            else {
-                const mins = Math.floor(diffInSeconds / 60);
-                setText(`hace ${mins} min`);
-                setIsLate(mins > 15); // Mark as late after 15 mins
-            }
-        };
-        update();
-        const interval = setInterval(update, 60000);
-        return () => clearInterval(interval);
-    }, [date]);
-
-    return <span className={`${className} ${isLate ? 'text-red-500 font-bold' : 'text-gray-500'}`}>{text}</span>;
-};
-
-const OrderCard: React.FC<{ order: Order; onClick: () => void }> = ({ order, onClick }) => (
-    <div onClick={onClick} className={`group relative bg-white dark:bg-gray-800 rounded-xl shadow-sm border p-4 cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5 ${order.status === OrderStatus.Pending ? 'border-yellow-400 ring-1 ring-yellow-400/20' : 'border-gray-200 dark:border-gray-700'}`}>
-        <div className="flex justify-between items-start mb-3">
-            <div className="flex items-center gap-2">
-                 <span className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${order.orderType === OrderType.Delivery ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' : 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300'}`}>
-                    {order.orderType === OrderType.Delivery ? <IconDelivery className="h-4 w-4"/> : <IconStore className="h-4 w-4"/>}
-                 </span>
-                 <div>
-                     <p className="font-bold text-gray-900 dark:text-gray-100 leading-tight">{order.customer.name}</p>
-                     <p className="text-xs text-gray-500 dark:text-gray-400">#{order.id.slice(0, 4)}</p>
-                 </div>
-            </div>
-            <div className="text-right">
-                <p className="font-bold text-emerald-600 dark:text-emerald-400">${order.total.toFixed(2)}</p>
-                <TimeAgo date={order.createdAt} className="text-xs block"/>
-            </div>
-        </div>
-        
-        <div className="space-y-1 mb-4">
-            {order.items.slice(0, 3).map((item, i) => (
-                <div key={i} className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
-                    <span className="flex-1 truncate"><span className="font-bold text-gray-800 dark:text-gray-200">{item.quantity}x</span> {item.name}</span>
-                </div>
-            ))}
-            {order.items.length > 3 && <p className="text-xs text-gray-400 italic">+ {order.items.length - 3} más...</p>}
-        </div>
-
-        <div className="flex justify-between items-center pt-3 border-t dark:border-gray-700">
-             <span className={`text-xs font-semibold px-2 py-0.5 rounded ${order.paymentStatus === 'paid' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}`}>
-                 {order.paymentStatus === 'paid' ? 'PAGADO' : 'PENDIENTE'}
-             </span>
-             <button className="opacity-0 group-hover:opacity-100 transition-opacity text-emerald-600 text-sm font-bold flex items-center hover:underline">
-                 Ver detalles <IconArrowLeft className="h-3 w-3 rotate-180 ml-1"/>
-             </button>
-        </div>
-    </div>
-);
-
-const OrdersKanbanBoard: React.FC<{ orders: Order[], onOrderClick: (order: Order) => void }> = ({ orders, onOrderClick }) => {
-    const columns = [
-        { status: OrderStatus.Pending, title: 'Nuevos', color: 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/10' },
-        { status: OrderStatus.Confirmed, title: 'Confirmados', color: 'border-blue-400 bg-blue-50 dark:bg-blue-900/10' },
-        { status: OrderStatus.Preparing, title: 'Preparando', color: 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/10' },
-        { status: OrderStatus.Ready, title: 'Listos', color: 'border-purple-400 bg-purple-50 dark:bg-purple-900/10' },
-        { status: OrderStatus.Delivering, title: 'En Reparto', color: 'border-cyan-400 bg-cyan-50 dark:bg-cyan-900/10' },
-    ];
-
-    return (
-        <div className="flex space-x-4 overflow-x-auto pb-4 h-full px-2">
-            {columns.map(col => {
-                const colOrders = orders.filter(o => o.status === col.status);
-                return (
-                    <div key={col.status} className="w-80 flex-shrink-0 flex flex-col h-full">
-                        <div className={`flex justify-between items-center mb-3 px-4 py-2 rounded-lg border-l-4 bg-white dark:bg-gray-800 shadow-sm ${col.color}`}>
-                            <h3 className="font-bold text-gray-800 dark:text-gray-100 uppercase text-xs tracking-wider">{col.title}</h3>
-                            <span className="bg-gray-800 text-white text-xs font-bold px-2 py-0.5 rounded-full">{colOrders.length}</span>
-                        </div>
-                        <div className="space-y-3 flex-1 overflow-y-auto pr-2 pb-10 custom-scrollbar">
-                            {colOrders.map(order => (
-                                <OrderCard key={order.id} order={order} onClick={() => onOrderClick(order)} />
-                            ))}
-                            {colOrders.length === 0 && (
-                                <div className="text-center py-10 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50/50 dark:bg-gray-800/30">
-                                    <p className="text-sm text-gray-400">Sin pedidos</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                );
-            })}
-        </div>
-    );
-};
-
-const OrderListView: React.FC<{ orders: Order[], onOrderClick: (order: Order) => void }> = ({ orders, onOrderClick }) => {
-    return (
-        <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg border dark:border-gray-700 overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-900/50">
-                    <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pedido</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Nombre</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tipo</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tiempo</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pago</th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
-                    </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {orders.map(order => (
-                        <tr key={order.id} onClick={() => onOrderClick(order)} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors group">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-gray-100 group-hover:text-emerald-600">#{order.id.slice(0, 6)}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 font-medium">{order.customer.name}</td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-md ${order.orderType === OrderType.Delivery ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'}`}>
-                                    {order.orderType === OrderType.Delivery ? 'Domicilio' : 'Para llevar'}
-                                </span>
-                            </td>
-                             <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                <TimeAgo date={order.createdAt} />
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                                <OrderStatusBadge status={order.status} />
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                                 <span className={`px-2 py-1 rounded-md text-xs font-bold ${order.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                                    {order.paymentStatus === 'paid' ? 'Pagado' : 'Pendiente'}
-                                </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-emerald-600 dark:text-emerald-400 text-right">
-                                ${order.total.toFixed(2)}
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    );
-};
-
 const EmptyOrdersView: React.FC<{ onNewOrderClick: () => void }> = ({ onNewOrderClick }) => (
-    <div className="text-center py-20 px-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col items-center justify-center h-full">
-        <div className="bg-gray-50 dark:bg-gray-700 p-6 rounded-full mb-4 animate-pulse">
-            <IconReceipt className="h-12 w-12 text-gray-400"/>
+    <div className="text-center py-16 px-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="mx-auto h-16 w-16 text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+            <IconReceipt className="h-10 w-10"/>
         </div>
-        <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Esperando pedidos...</h3>
-        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">Los pedidos realizados desde el menú digital aparecerán aquí automáticamente en tiempo real.</p>
+        <h3 className="mt-4 text-lg font-semibold text-gray-800 dark:text-gray-200">Crea y recibe pedidos de tus clientes</h3>
+        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">Aquí estarán los pedidos creados desde el punto de venta y los que hagan tus clientes a través del menú digital.</p>
+        <div className="mt-6 flex justify-center items-center gap-x-4">
+            <button className="flex items-center space-x-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+                <IconShare className="h-5 w-5" />
+                <span>Compartir menú</span>
+            </button>
+            <button onClick={onNewOrderClick} className="flex items-center space-x-2 px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700">
+                <IconPlus className="h-5 w-5" />
+                <span>Nuevo pedido</span>
+            </button>
+        </div>
     </div>
 );
+
+const EmptyTablesView: React.FC<{ onConfigureClick: () => void }> = ({ onConfigureClick }) => (
+    <div className="text-center py-16 px-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="mx-auto h-16 w-16 text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+            <IconTableLayout className="h-10 w-10" />
+        </div>
+        <h3 className="mt-4 text-lg font-semibold text-gray-800 dark:text-gray-200">Permite que tus clientes realicen su pedido desde su mesa</h3>
+        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">Aquí llegarán las alertas de nuevas comandas, llamadas al mesero o solicitudes de cuenta.</p>
+        <div className="mt-6">
+            <button onClick={onConfigureClick} className="text-emerald-600 font-semibold text-sm hover:text-emerald-700">
+                Configurar zonas y mesas &rarr;
+            </button>
+        </div>
+    </div>
+);
+
+const OrderStatusColors: { [key in OrderStatus]: string } = {
+    [OrderStatus.Pending]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
+    [OrderStatus.Confirmed]: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
+    [OrderStatus.Preparing]: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300',
+    [OrderStatus.Ready]: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300',
+    [OrderStatus.Delivering]: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/50 dark:text-cyan-300',
+    [OrderStatus.Completed]: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300',
+    [OrderStatus.Cancelled]: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300',
+};
+
+const OrderStatusCardColors: { [key in OrderStatus]: string } = {
+    [OrderStatus.Pending]: 'bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 dark:border-yellow-500',
+    [OrderStatus.Confirmed]: 'bg-blue-100 border-l-4 border-blue-500 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 dark:border-blue-500',
+    [OrderStatus.Preparing]: 'bg-indigo-100 border-l-4 border-indigo-500 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300 dark:border-indigo-500',
+    [OrderStatus.Ready]: 'bg-purple-100 border-l-4 border-purple-500 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300 dark:border-purple-500',
+    [OrderStatus.Delivering]: 'bg-cyan-100 border-l-4 border-cyan-500 text-cyan-800 dark:bg-cyan-900/50 dark:text-cyan-300 dark:border-cyan-500',
+    [OrderStatus.Completed]: 'bg-green-100 border-l-4 border-green-500 text-green-800 dark:bg-green-900/50 dark:text-green-300 dark:border-green-500',
+    [OrderStatus.Cancelled]: 'bg-red-100 border-l-4 border-red-500 text-red-800 dark:bg-red-900/50 dark:text-red-300 dark:border-red-500',
+};
+
+const OrderCard: React.FC<{ order: Order; onUpdateStatus: (orderId: string, newStatus: OrderStatus) => void }> = ({ order, onUpdateStatus }) => (
+    <div className={`rounded-lg shadow-sm p-4 ${OrderStatusCardColors[order.status]}`}>
+        <div className="flex justify-between items-start">
+            <div>
+                <p className="font-bold">{order.customer.name}</p>
+                <p className="text-sm opacity-70">{order.id}</p>
+            </div>
+            <p className="font-bold">${order.total.toFixed(2)}</p>
+        </div>
+        <div className="mt-2 text-sm">
+            {order.items.map(item => <p key={item.id}>- {item.quantity}x {item.name}</p>)}
+        </div>
+        <div className="mt-4 flex space-x-2">
+            {order.status !== OrderStatus.Pending && <button onClick={() => onUpdateStatus(order.id, OrderStatus.Pending)} className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-600 dark:text-gray-200 rounded">◂ Pendiente</button>}
+            {order.status !== OrderStatus.Preparing && <button onClick={() => onUpdateStatus(order.id, OrderStatus.Preparing)} className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-600 dark:text-gray-200 rounded">Preparando ▸</button>}
+        </div>
+    </div>
+);
+
+const OrderColumn: React.FC<{ status: OrderStatus; orders: Order[]; onUpdateStatus: (orderId: string, newStatus: OrderStatus) => void }> = ({ status, orders, onUpdateStatus }) => (
+    <div className="w-80 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 flex-shrink-0">
+        <h3 className={`font-semibold mb-4 px-2 py-1 rounded text-center ${OrderStatusColors[status]}`}>{status} ({orders.length})</h3>
+        <div className="space-y-4">
+            {orders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateStatus} />)}
+        </div>
+    </div>
+);
+
+const OrdersKanbanBoard: React.FC<{ orders: Order[], setOrders: (value: Order[] | ((val: Order[]) => Order[])) => void }> = ({ orders, setOrders }) => {
+    const columns: OrderStatus[] = [OrderStatus.Pending, OrderStatus.Preparing, OrderStatus.Ready, OrderStatus.Completed];
+
+    const updateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+    };
+
+    return (
+        <div className="flex space-x-4 overflow-x-auto pb-4 -m-6 p-6">
+            {columns.map(status => (
+                <OrderColumn key={status} status={status} orders={orders.filter(o => o.status === status)} onUpdateStatus={updateOrderStatus} />
+            ))}
+        </div>
+    );
+};
 
 const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
-    const [products, setProducts] = useState<Product[]>([]);
-    const [categories, setCategories] = useState<Category[]>([]);
-    const [zones, setZones] = useState<Zone[]>([]);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [activeCategory, setActiveCategory] = useState('all');
-    const [orderType, setOrderType] = useState<OrderType>(OrderType.TakeAway);
-    const [selectedTable, setSelectedTable] = useState<string>('');
-    const [customerName, setCustomerName] = useState('');
-    const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('pending');
-    
-    // Cart logic
-    const { cartItems, addToCart, removeFromCart, updateQuantity, cartTotal, clearCart } = useCart();
+    const [orderType, setOrderType] = useState<OrderType>(OrderType.DineIn);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    const orderTypeDescriptions: { [key in OrderType]: string } = {
+        [OrderType.DineIn]: "Pedido para consumir en el local, sin una mesa asignada.",
+        [OrderType.TakeAway]: "Productos envueltos.",
+        [OrderType.Delivery]: "Servicio a domicilio propio o de terceros.",
+    };
+
+    const handleSelectType = (type: OrderType) => {
+        setOrderType(type);
+        setIsDropdownOpen(false);
+    };
 
     useEffect(() => {
-        if (isOpen) {
-            const loadData = async () => {
-                const [p, c, z] = await Promise.all([getProducts(), getCategories(), getZones()]);
-                setProducts(p);
-                setCategories(c);
-                setZones(z);
-            };
-            loadData();
-            clearCart();
-        }
-    }, [isOpen]);
-
-    const filteredProducts = useMemo(() => {
-        return products.filter(p => {
-            const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesCategory = activeCategory === 'all' || p.categoryId === activeCategory;
-            return matchesSearch && matchesCategory && p.available;
-        });
-    }, [products, searchTerm, activeCategory]);
-
-    const handleCreateOrder = async () => {
-        if (cartItems.length === 0) {
-            alert("El carrito está vacío");
-            return;
-        }
-        if (!customerName.trim()) {
-            alert("Ingresa el nombre del cliente");
-            return;
-        }
-
-        const newOrder: any = {
-            customer: {
-                name: customerName,
-                phone: '',
-                address: { colonia: '', calle: '', numero: '', entreCalles: '', referencias: '' }
-            },
-            items: cartItems,
-            total: cartTotal,
-            status: OrderStatus.Confirmed, // Manual orders start as Confirmed
-            branchId: 'main-branch', // Default
-            orderType: orderType,
-            tableId: orderType === OrderType.DineIn ? selectedTable : undefined,
-            paymentStatus: paymentStatus
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsDropdownOpen(false);
+            }
         };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
-        try {
-            await saveOrder(newOrder);
-            onClose();
-        } catch (error) {
-            alert("Error al crear pedido");
-        }
-    };
-    
     if (!isOpen) return null;
 
     return (
-         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-900 w-full max-w-6xl h-[90vh] rounded-2xl shadow-2xl flex overflow-hidden border dark:border-gray-700">
-                
-                {/* Left: Product Selection */}
-                <div className="w-3/5 flex flex-col border-r dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                    <div className="p-4 border-b dark:border-gray-700 bg-white dark:bg-gray-800 flex gap-3">
-                         <div className="relative flex-1">
-                            <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5"/>
-                            <input 
-                                type="text" 
-                                placeholder="Buscar producto..." 
-                                value={searchTerm}
-                                onChange={e => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2.5 rounded-lg border dark:border-gray-600 bg-gray-100 dark:bg-gray-700 focus:ring-2 focus:ring-emerald-500 outline-none"
-                            />
-                         </div>
-                    </div>
-                    
-                    {/* Categories */}
-                    <div className="flex gap-2 overflow-x-auto p-2 border-b dark:border-gray-700 bg-white dark:bg-gray-800">
-                        <button 
-                            onClick={() => setActiveCategory('all')}
-                            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${activeCategory === 'all' ? 'bg-emerald-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
-                        >
-                            Todo
-                        </button>
-                        {categories.map(cat => (
-                            <button 
-                                key={cat.id}
-                                onClick={() => setActiveCategory(cat.id)}
-                                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${activeCategory === cat.id ? 'bg-emerald-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-end">
+            <div className="bg-white dark:bg-gray-800 h-full w-full max-w-lg flex flex-col">
+                <div className="p-6 border-b dark:border-gray-700 flex justify-between items-center">
+                    <h2 className="text-xl font-semibold">Agrega un pedido</h2>
+                    <button onClick={onClose}><IconX /></button>
+                </div>
+                <div className="p-6 flex-1 flex flex-col">
+                    <div className="flex-grow">
+                        <label htmlFor="orderType" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Tipo de pedido</label>
+                        <div className="relative mt-1" ref={dropdownRef}>
+                            <button
+                                type="button"
+                                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm pl-3 pr-10 py-2 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
                             >
-                                {cat.name}
+                                <span className="block truncate">{orderType}</span>
+                                <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                    <IconChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                                </span>
                             </button>
-                        ))}
-                    </div>
-
-                    {/* Grid */}
-                    <div className="flex-1 overflow-y-auto p-4">
-                        <div className="grid grid-cols-3 gap-4">
-                            {filteredProducts.map(product => (
-                                <div 
-                                    key={product.id} 
-                                    onClick={() => addToCart(product, 1)}
-                                    className="bg-white dark:bg-gray-800 p-3 rounded-xl border dark:border-gray-700 cursor-pointer hover:border-emerald-500 hover:shadow-md transition-all group"
-                                >
-                                    <div className="h-28 w-full bg-gray-200 dark:bg-gray-700 rounded-lg mb-3 overflow-hidden">
-                                        <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
-                                    </div>
-                                    <h4 className="font-bold text-gray-800 dark:text-gray-100 text-sm line-clamp-2 leading-tight min-h-[2.5em]">{product.name}</h4>
-                                    <div className="flex justify-between items-center mt-2">
-                                        <span className="font-bold text-emerald-600 text-sm">${product.price.toFixed(2)}</span>
-                                        <div className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 p-1 rounded-md">
-                                            <IconPlus className="h-4 w-4"/>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
+                            {isDropdownOpen && (
+                                <ul className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-900 shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+                                    {Object.values(OrderType).map(type => (
+                                        <li
+                                            key={type}
+                                            onClick={() => handleSelectType(type)}
+                                            className="text-gray-900 dark:text-gray-200 cursor-default select-none relative py-2 pl-3 pr-9 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                        >
+                                            <span className="font-semibold block truncate">{type}</span>
+                                            <span className="text-gray-500 dark:text-gray-400 text-xs block">{orderTypeDescriptions[type]}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
                         </div>
+                    </div>
+                    <div className="bg-gray-100 dark:bg-gray-900/50 p-6 rounded-md">
+                        <h3 className="font-semibold">Vista previa</h3>
+                        {/* Preview content will go here */}
                     </div>
                 </div>
-
-                {/* Right: Order Details */}
-                <div className="w-2/5 flex flex-col bg-white dark:bg-gray-900 h-full relative">
-                    <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800">
-                        <h3 className="font-bold text-lg">Nuevo Pedido</h3>
-                        <button onClick={onClose} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full"><IconX/></button>
-                    </div>
-
-                    <div className="p-4 space-y-4 border-b dark:border-gray-700">
-                        {/* Customer */}
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Cliente</label>
-                            <input 
-                                type="text" 
-                                placeholder="Nombre del cliente" 
-                                value={customerName}
-                                onChange={e => setCustomerName(e.target.value)}
-                                className="w-full p-2 border dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none"
-                            />
-                        </div>
-
-                        {/* Type */}
-                        <div className="grid grid-cols-2 gap-3">
-                            <button 
-                                onClick={() => setOrderType(OrderType.TakeAway)}
-                                className={`p-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-2 ${orderType === OrderType.TakeAway ? 'bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'dark:border-gray-700'}`}
-                            >
-                                <IconStore className="h-4 w-4"/> Para Llevar
-                            </button>
-                            <button 
-                                onClick={() => setOrderType(OrderType.DineIn)}
-                                className={`p-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-2 ${orderType === OrderType.DineIn ? 'bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'dark:border-gray-700'}`}
-                            >
-                                <IconTableLayout className="h-4 w-4"/> Comer Aquí
-                            </button>
-                        </div>
-
-                        {orderType === OrderType.DineIn && (
-                            <select 
-                                value={selectedTable}
-                                onChange={e => setSelectedTable(e.target.value)}
-                                className="w-full p-2 border dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-800 outline-none text-sm"
-                            >
-                                <option value="">Seleccionar Mesa...</option>
-                                {zones.map(z => (
-                                    <optgroup key={z.id} label={z.name}>
-                                        {z.tables.map(t => (
-                                            <option key={t.id} value={`${z.name} - ${t.name}`}>Mesa {t.name}</option>
-                                        ))}
-                                    </optgroup>
-                                ))}
-                            </select>
-                        )}
-                    </div>
-
-                    {/* Cart Items */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                        {cartItems.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-2">
-                                <IconReceipt className="h-12 w-12 opacity-50"/>
-                                <p>Carrito vacío</p>
-                            </div>
-                        ) : (
-                            cartItems.map(item => (
-                                <div key={item.cartItemId} className="flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 p-2 rounded-lg border dark:border-gray-700">
-                                    <div className="flex items-center gap-3">
-                                        <div className="bg-white dark:bg-gray-700 h-10 w-10 rounded-md flex items-center justify-center text-sm font-bold border dark:border-gray-600">
-                                            {item.quantity}x
-                                        </div>
-                                        <div className="flex-1">
-                                            <p className="font-bold text-sm line-clamp-1">{item.name}</p>
-                                            <p className="text-xs text-gray-500">${item.price.toFixed(2)}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <p className="font-bold text-sm">${(item.price * item.quantity).toFixed(2)}</p>
-                                        <div className="flex flex-col gap-1">
-                                             <button onClick={() => updateQuantity(item.cartItemId, item.quantity + 1)} className="text-gray-400 hover:text-emerald-500"><IconChevronUp className="h-4 w-4"/></button>
-                                             <button onClick={() => item.quantity > 1 ? updateQuantity(item.cartItemId, item.quantity - 1) : removeFromCart(item.cartItemId)} className="text-gray-400 hover:text-red-500"><IconChevronDown className="h-4 w-4"/></button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-
-                    {/* Footer / Checkout */}
-                    <div className="p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-                        <div className="flex justify-between mb-4">
-                            <span className="text-gray-500">Subtotal</span>
-                            <span className="font-bold text-lg">${cartTotal.toFixed(2)}</span>
-                        </div>
-
-                        <div className="flex items-center justify-between mb-4 p-3 bg-white dark:bg-gray-700 rounded-lg border dark:border-gray-600">
-                            <span className="text-sm font-medium">Estado del pago:</span>
-                            <button 
-                                onClick={() => setPaymentStatus(s => s === 'paid' ? 'pending' : 'paid')}
-                                className={`px-3 py-1 rounded-full text-xs font-bold uppercase transition-colors ${paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}
-                            >
-                                {paymentStatus === 'paid' ? 'Pagado' : 'Pendiente'}
-                            </button>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <button onClick={() => {clearCart(); onClose();}} className="px-4 py-3 border dark:border-gray-600 rounded-xl font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">
-                                Cancelar
-                            </button>
-                            <button onClick={handleCreateOrder} className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-lg shadow-emerald-900/20">
-                                Confirmar (${cartTotal.toFixed(2)})
-                            </button>
-                        </div>
-                    </div>
+                <div className="p-6 border-t dark:border-gray-700 bg-white dark:bg-gray-800 flex justify-end items-center space-x-3">
+                    <button onClick={onClose} className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">Cancelar</button>
+                    <button className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700">Continuar</button>
                 </div>
             </div>
-         </div>
-    )
-}
+        </div>
+    );
+};
 
 const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettingsClick }) => {
-    const [orders, setOrders] = useState<Order[]>([]);
+    const [orders, setOrders] = usePersistentState<Order[]>('orders', MOCK_ORDERS);
     const [activeTab, setActiveTab] = useState('panel-pedidos');
     const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
-    const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-    const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
-    const [storeOpen, setStoreOpen] = useState(true);
-    const [isLoading, setIsLoading] = useState(true);
-    
-    // State for Table Panel
-    const [zones, setZones] = useState<Zone[]>([]);
-    const [activeZoneId, setActiveZoneId] = useState<string>('');
-
-
-    // Initial Load
-    useEffect(() => {
-        const load = async () => {
-            // Fetch orders and zones
-            const [activeOrders, fetchedZones] = await Promise.all([
-                getActiveOrders(),
-                getZones()
-            ]);
-            
-            setOrders(activeOrders);
-            setZones(fetchedZones);
-            if(fetchedZones.length > 0) {
-                setActiveZoneId(fetchedZones[0].id);
-            }
-            setIsLoading(false);
-        };
-        load();
-
-        // Realtime Subscription
-        const channel = subscribeToNewOrders(
-            (newOrder) => {
-                // Play simple notification sound if possible (browser policy permitting)
-                try { const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); audio.volume=0.5; audio.play().catch(e=>{}); } catch(e){}
-                setOrders(prev => [newOrder, ...prev]);
-            },
-            (updatedOrder) => {
-                 setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
-            }
-        );
-
-        return () => {
-            unsubscribeFromChannel();
-        };
-    }, []);
-
-    const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
-        // Optimistic update
-        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
-        try {
-            await updateOrder(orderId, { status: newStatus });
-        } catch (e: any) {
-            console.error(e);
-            // Fix: Robust error handling to avoid [object Object]
-            const errorMsg = e instanceof Error ? e.message : JSON.stringify(e);
-            alert(`Error updating order status: ${errorMsg}`);
-            // Revert if failed (could be implemented by re-fetching)
-        }
-    };
-    
-    const updatePaymentStatus = async (orderId: string, newStatus: PaymentStatus) => {
-        // Optimistic update
-        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, paymentStatus: newStatus } : o));
-        try {
-             await updateOrder(orderId, { paymentStatus: newStatus });
-        } catch (e: any) {
-            console.error(e);
-             // Fix: Robust error handling to avoid [object Object]
-             const errorMsg = e instanceof Error ? e.message : JSON.stringify(e);
-             alert(`Error updating payment status: ${errorMsg}`);
-        }
-    }
-    
-    const activeZone = useMemo(() => zones.find(z => z.id === activeZoneId), [zones, activeZoneId]);
-    
-    // Calculate Table Status
-    const getTableStatus = (zoneName: string, tableName: string) => {
-        const tableIdentifier = `${zoneName} - ${tableName}`;
-        const activeOrder = orders.find(o => 
-            o.tableId === tableIdentifier && 
-            o.status !== OrderStatus.Completed && 
-            o.status !== OrderStatus.Cancelled
-        );
-        
-        return activeOrder ? { status: 'occupied', order: activeOrder } : { status: 'free', order: null };
-    };
-    
-    const tableStats = useMemo(() => {
-         // Simple stats calculation based on current orders
-         const activeTables = orders.filter(o => o.tableId && o.status !== OrderStatus.Completed && o.status !== OrderStatus.Cancelled).length;
-         // Mocking specific "Requesting Bill" states since backend doesn't support it yet, using PaymentStatus 'pending' + 'Ready' status as a proxy
-         const requestingBill = orders.filter(o => o.tableId && o.status === OrderStatus.Ready && o.paymentStatus === 'pending').length;
-         
-         return {
-             requestingBill: requestingBill,
-             requestingWaiter: 0, // Feature not yet implemented in backend
-             pendingOrders: orders.filter(o => o.tableId && o.status === OrderStatus.Pending).length,
-             activeTables: activeTables
-         }
-    }, [orders]);
 
     const tabs = [
         { id: 'panel-pedidos', title: 'Panel de pedidos' },
@@ -2045,209 +1469,15 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
     ];
     
     const renderContent = () => {
-        if (isLoading) return <div className="p-10 text-center text-gray-500 animate-pulse">Cargando tablero de control...</div>;
-
         switch (activeTab) {
             case 'panel-pedidos':
-                return (
-                    <div className="h-[calc(100vh-220px)] flex flex-col">
-                         <div className="flex justify-between items-center mb-4 px-1">
-                            <div className="flex items-center space-x-2 bg-white dark:bg-gray-800 p-1 rounded-lg border dark:border-gray-700 shadow-sm">
-                                <button onClick={() => setViewMode('board')} className={`p-2 rounded-md transition-all ${viewMode === 'board' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`} title="Vista Tablero"><IconTableLayout className="h-5 w-5"/></button>
-                                <button onClick={() => setViewMode('list')} className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`} title="Vista Lista"><IconMenu className="h-5 w-5"/></button>
-                            </div>
-                            
-                            {/* Updated Header Buttons matching screenshot */}
-                            <div className="flex items-center gap-3">
-                                <div className="relative group">
-                                     <button className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors shadow-sm ${storeOpen ? 'border-green-900/30 bg-green-900/20 text-green-400' : 'border-red-900/30 bg-red-900/20 text-red-400'}`}>
-                                        <div className={`w-2 h-2 rounded-full ${storeOpen ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                                        {storeOpen ? 'Tienda Abierta' : 'Tienda Cerrada'}
-                                        <IconChevronDown className="h-4 w-4 opacity-50 ml-2"/>
-                                    </button>
-                                    <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 shadow-lg rounded-lg border dark:border-gray-700 hidden group-hover:block z-10 p-1">
-                                        <button onClick={() => setStoreOpen(o => !o)} className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 rounded flex items-center gap-2 text-gray-300">
-                                             <IconToggleOff className="h-4 w-4"/> {storeOpen ? 'Cerrar Tienda' : 'Abrir Tienda'}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <button onClick={() => setIsNewOrderModalOpen(true)} className="bg-white text-gray-900 hover:bg-gray-100 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow transition-all">
-                                    <IconPlus className="h-4 w-4 text-gray-900" /> Pedido Manual
-                                </button>
-                            </div>
-                         </div>
-                        
-                        {orders.length === 0 ? (
-                             <EmptyOrdersView onNewOrderClick={() => setIsNewOrderModalOpen(true)} />
-                        ) : (
-                            viewMode === 'board' ? (
-                                <OrdersKanbanBoard orders={orders} onOrderClick={setSelectedOrder} />
-                            ) : (
-                                <div className="flex-1 overflow-auto rounded-lg border dark:border-gray-700">
-                                    <OrderListView orders={orders} onOrderClick={setSelectedOrder} />
-                                </div>
-                            )
-                        )}
-                    </div>
-                );
+                if (orders.length === 0) {
+                    return <EmptyOrdersView onNewOrderClick={() => setIsNewOrderModalOpen(true)} />;
+                }
+                return <OrdersKanbanBoard orders={orders} setOrders={setOrders} />;
 
             case 'panel-mesas':
-                return (
-                    <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900 p-4">
-                        {/* Header Actions */}
-                        <div className="flex justify-end gap-3 mb-4">
-                            <button className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
-                                Ver uso de suscripción
-                            </button>
-                            <button className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
-                                Ver historial <IconClock className="h-4 w-4 text-gray-400"/>
-                            </button>
-                        </div>
-
-                        {/* Stats Bar */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 mb-6 flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-gray-200 dark:divide-gray-700">
-                            <div className="p-4 flex items-center justify-center md:justify-start md:w-48">
-                                <button className="flex items-center gap-2 text-gray-700 dark:text-gray-200 font-medium px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                                    <IconCalendar className="h-5 w-5 text-gray-500"/>
-                                    Hoy
-                                </button>
-                            </div>
-                            <div className="flex-1 grid grid-cols-2 md:grid-cols-4 divide-x divide-gray-200 dark:divide-gray-700">
-                                <div className="p-4 text-center">
-                                    <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{tableStats.requestingBill}</p>
-                                    <p className="text-xs text-gray-500 uppercase tracking-wide mt-1">mesas solicitando cuenta</p>
-                                </div>
-                                <div className="p-4 text-center">
-                                    <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{tableStats.requestingWaiter}</p>
-                                    <p className="text-xs text-gray-500 uppercase tracking-wide mt-1">mesas solicitando mesero</p>
-                                </div>
-                                <div className="p-4 text-center">
-                                    <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{tableStats.pendingOrders}</p>
-                                    <p className="text-xs text-gray-500 uppercase tracking-wide mt-1">mesas con comandas pendientes</p>
-                                </div>
-                                <div className="p-4 text-center">
-                                    <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{tableStats.activeTables}</p>
-                                    <p className="text-xs text-gray-500 uppercase tracking-wide mt-1">mesas activas</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Zone Selector */}
-                        <div className="mb-6">
-                            <div className="flex gap-2 overflow-x-auto pb-2">
-                                {zones.map(zone => (
-                                    <button
-                                        key={zone.id}
-                                        onClick={() => setActiveZoneId(zone.id)}
-                                        className={`px-6 py-2 rounded-lg border font-medium text-sm transition-all whitespace-nowrap ${
-                                            activeZoneId === zone.id
-                                            ? 'border-green-500 text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-400'
-                                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
-                                        }`}
-                                    >
-                                        {zone.name}
-                                    </button>
-                                ))}
-                                {zones.length === 0 && (
-                                     <div className="text-sm text-gray-500 p-2">No hay zonas configuradas. Ve a Configuración &gt; Zonas y mesas.</div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Tables Grid */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex-1 p-8 overflow-auto relative min-h-[400px]">
-                            {activeZone ? (
-                                <div 
-                                    className="grid gap-6"
-                                    style={{
-                                        gridTemplateColumns: `repeat(${activeZone.cols}, minmax(80px, 1fr))`,
-                                        gridTemplateRows: `repeat(${activeZone.rows}, minmax(80px, 1fr))`
-                                    }}
-                                >
-                                    {/* Render Tables */}
-                                    {activeZone.tables.map(table => {
-                                        const { status, order } = getTableStatus(activeZone.name, table.name);
-                                        const isOccupied = status === 'occupied';
-                                        
-                                        return (
-                                            <div
-                                                key={table.id}
-                                                onClick={() => isOccupied && order ? setSelectedOrder(order) : null}
-                                                style={{
-                                                    gridRow: `${table.row} / span ${table.height}`,
-                                                    gridColumn: `${table.col} / span ${table.width}`,
-                                                }}
-                                                className={`
-                                                    relative rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer border-2
-                                                    ${table.shape === 'round' ? 'rounded-full aspect-square' : 'rounded-xl'}
-                                                    ${isOccupied 
-                                                        ? 'bg-red-50 border-red-400 dark:bg-red-900/20 dark:border-red-500/50 shadow-md' 
-                                                        : 'bg-gray-50 border-gray-200 dark:bg-gray-700/50 dark:border-gray-600 hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'
-                                                    }
-                                                `}
-                                            >
-                                                <span className={`text-2xl font-bold ${isOccupied ? 'text-red-500 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`}>
-                                                    {table.name}
-                                                </span>
-                                                
-                                                {isOccupied && order && (
-                                                    <div className="absolute -top-2 -right-2">
-                                                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold shadow-sm">
-                                                            {order.items.reduce((acc, i) => acc + i.quantity, 0)}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                                
-                                                {isOccupied && (
-                                                    <div className="mt-1 px-2 py-0.5 bg-white dark:bg-gray-800 rounded text-[10px] font-medium text-gray-600 dark:text-gray-300 shadow-sm border border-gray-100 dark:border-gray-700 truncate max-w-[90%]">
-                                                        Ocupada
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                    
-                                    {/* Render Grid Dots for Empty Spaces */}
-                                    {Array.from({ length: activeZone.rows * activeZone.cols }).map((_, index) => {
-                                        const row = Math.floor(index / activeZone.cols) + 1;
-                                        const col = (index % activeZone.cols) + 1;
-                                        
-                                        // Check if cell is occupied by any table
-                                        const isOccupied = activeZone.tables.some(t => 
-                                            row >= t.row && row < t.row + t.height &&
-                                            col >= t.col && col < t.col + t.width
-                                        );
-                                        
-                                        if (isOccupied) return null;
-                                        
-                                        return (
-                                            <div 
-                                                key={`dot-${row}-${col}`}
-                                                style={{ gridRow: row, gridColumn: col }}
-                                                className="flex items-center justify-center pointer-events-none"
-                                            >
-                                                <div className="w-1.5 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700"></div>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                            ) : (
-                                <div className="flex items-center justify-center h-full text-gray-400">
-                                    Selecciona una zona para ver las mesas
-                                </div>
-                            )}
-                            
-                             {/* Floating Status Badge */}
-                            <div className="absolute bottom-4 right-4">
-                                <div className="bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2 cursor-pointer hover:bg-gray-800">
-                                    Estás en tu periodo de prueba
-                                    <IconChevronUp className="h-4 w-4 text-gray-400"/>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
+                return <EmptyTablesView onConfigureClick={onSettingsClick} />;
             case 'comandas-digitales':
                  return <div className="text-center p-10 text-gray-500 bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700">Comandas digitales (próximamente)</div>;
             default:
@@ -2256,8 +1486,8 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
     };
     
     return (
-        <div className="h-full flex flex-col">
-            <div className="border-b border-gray-200 dark:border-gray-700 shrink-0">
+        <div>
+            <div className="border-b border-gray-200 dark:border-gray-700">
                 <nav className="-mb-px flex space-x-8" aria-label="Tabs">
                     {tabs.map(tab => (
                         <button
@@ -2274,27 +1504,17 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                     ))}
                 </nav>
             </div>
-             <div className="mt-6 flex-1">
+             <div className="mt-6">
                 {renderContent()}
             </div>
             <NewOrderModal isOpen={isNewOrderModalOpen} onClose={() => setIsNewOrderModalOpen(false)} />
-            <OrderDetailModal 
-                order={selectedOrder} 
-                onClose={() => setSelectedOrder(null)} 
-                onUpdateStatus={updateOrderStatus}
-                onUpdatePayment={updatePaymentStatus}
-            />
         </div>
     );
 };
 
-// ... (Analytics, Messages, AvailabilityView, etc. remain unchanged) ...
-
 // --- Analytics Components ---
 const Analytics: React.FC = () => {
-    const [orders] = usePersistentState<Order[]>('orders', []); // Keeping mock logic here for now as requested, or can be switched
-    // For full consistency, this should also be switched, but user asked for "Dashboard" specifically.
-    // Let's keep Analytics simple for now as it uses AI analysis on mock data in the original code.
+    const [orders] = usePersistentState<Order[]>('orders', MOCK_ORDERS);
     const [query, setQuery] = useState('');
     const [insights, setInsights] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -2427,7 +1647,7 @@ const Messages: React.FC = () => {
     );
 };
 
-// ... (AvailabilityView, Settings Components remain unchanged) ...
+// --- Availability Components ---
 const AvailabilityView: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -2663,8 +1883,7 @@ const AvailabilityView: React.FC = () => {
     );
 };
 
-// --- Settings Components, QR Modal, Share View and Main export remain...
-// (Including all settings components as they were, no logic change there)
+// --- Settings Components ---
 const SettingsCard: React.FC<{ title: string; description?: string; children: React.ReactNode; onSave?: () => void; onCancel?: () => void; noActions?: boolean }> = ({ title, description, children, onSave, onCancel, noActions }) => (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
         <div className="p-6">
@@ -2683,8 +1902,6 @@ const SettingsCard: React.FC<{ title: string; description?: string; children: Re
     </div>
 );
 
-// ... Include all remaining settings components (SearchableDropdown, GeneralSettings, BranchSettingsView, ShippingSettingsView, PaymentSettingsView, HoursSettings, ZonesAndTablesSettings, PrintingSettingsView, ZoneEditor, SettingsModal, QRModal, ShareView) ...
-// Re-adding necessary components for full functionality
 const SearchableDropdown: React.FC<{ options: Currency[], selected: Currency, onSelect: (option: Currency) => void }> = ({ options, selected, onSelect }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -2746,172 +1963,120 @@ const SearchableDropdown: React.FC<{ options: Currency[], selected: Currency, on
 };
 
 
-const GeneralSettings: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
-    const [originalSettings, setOriginalSettings] = useState(settings.company);
+const GeneralSettings: React.FC<{ settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ settings, setSettings }) => {
+    const [localSettings, setLocalSettings] = useState(settings.company);
 
+    const handleSave = () => {
+        setSettings(prev => ({ ...prev, company: localSettings }));
+        alert("¡Guardado!"); // Placeholder for a toast notification
+    };
+    
     useEffect(() => {
-        setOriginalSettings(settings.company)
+        setLocalSettings(settings.company)
     }, [settings.company])
-
-    const handleCancel = () => {
-        setSettings(prev => ({...prev, company: originalSettings}));
-    }
 
     return (
         <div className="space-y-6">
-             <SettingsCard title="Datos de empresa" onSave={onSave} onCancel={handleCancel}>
+             <SettingsCard title="Datos de empresa" onSave={handleSave}>
                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre de empresa</label>
-                 <input type="text" value={settings.company.name} onChange={e => setSettings(p => ({...p, company: {...p.company, name: e.target.value}}))} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"/>
+                 <input type="text" value={localSettings.name} onChange={e => setLocalSettings(p => ({...p, name: e.target.value}))} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"/>
 
                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">Divisa</label>
                  <p className="text-xs text-gray-500 dark:text-gray-400">Escoge la divisa que tus clientes verán en el menú.</p>
-                 <SearchableDropdown options={CURRENCIES} selected={settings.company.currency} onSelect={currency => setSettings(p => ({...p, company: {...p.company, currency}}))} />
+                 <SearchableDropdown options={CURRENCIES} selected={localSettings.currency} onSelect={currency => setLocalSettings(p => ({...p, currency}))} />
             </SettingsCard>
         </div>
     );
 };
 
-const BranchSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
-    const [originalSettings, setOriginalSettings] = useState(settings.branch);
+const BranchSettingsView: React.FC<{ settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ settings, setSettings }) => {
+    const [localSettings, setLocalSettings] = useState(settings.branch);
     
-    useEffect(() => {
-        setOriginalSettings(settings.branch)
-    }, [settings.branch]);
-    
-    const handleCancel = () => {
-        setSettings(prev => ({...prev, branch: originalSettings}));
+    const handleSave = () => {
+        setSettings(prev => ({ ...prev, branch: localSettings }));
+        alert("¡Guardado!");
     };
-
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'logoUrl' | 'coverImageUrl') => {
+    
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
             const reader = new FileReader();
             reader.onloadend = () => {
-                const imageUrl = reader.result as string;
-                setSettings(prev => {
-                    const newSettings = {...prev, branch: {...prev.branch, [field]: imageUrl}};
-                    // Auto-save on image upload
-                    saveAppSettings(newSettings).then(() => {
-                        alert("Imagen cargada y guardada.");
-                    }).catch(() => {
-                        alert("Error al guardar la imagen.");
-                    });
-                    return newSettings;
-                });
+                setLocalSettings(p => ({...p, logoUrl: reader.result as string}));
             };
             reader.readAsDataURL(file);
         }
     };
     
-    const handleGetLocation = () => {
-        if (!navigator.geolocation) {
-            alert("La geolocalización no es compatible con este navegador.");
-            return;
-        }
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
-                const link = `https://www.google.com/maps?q=${latitude},${longitude}`;
-                setSettings(p => ({ ...p, branch: {...p.branch, googleMapsLink: link} }));
-                alert("Ubicación obtenida. No olvides guardar los cambios.");
-            },
-            () => {
-                alert("No se pudo obtener la ubicación. Asegúrate de haber concedido los permisos.");
-            }
-        );
-    };
+    useEffect(() => {
+        setLocalSettings(settings.branch)
+    }, [settings.branch])
     
     const inputClasses = "mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm";
 
     return (
         <div className="space-y-6">
-            <SettingsCard title="Datos de sucursal" onSave={onSave} onCancel={handleCancel}>
+            <SettingsCard title="Datos de sucursal" onSave={handleSave}>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Alias de sucursal</label>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Visible para tus clientes, nombre corto o distintivo para identificar esta sucursal entre las demás.</p>
-                <input 
-                    type="text" 
-                    value={settings.branch.alias} 
-                    onChange={e => setSettings(p => ({...p, branch: {...p.branch, alias: e.target.value}}))} 
-                    className={inputClasses}
-                    placeholder="ANYVAL PARK - Suc."
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Algunos ejemplos son: Centro, Las américas, Del valle.</p>
+                <input type="text" value={localSettings.alias} onChange={e => setLocalSettings(p => ({...p, alias: e.target.value}))} className={inputClasses}/>
 
                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">Dirección completa</label>
-                <input 
-                    type="text" 
-                    value={settings.branch.fullAddress} 
-                    onChange={e => setSettings(p => ({...p, branch: {...p.branch, fullAddress: e.target.value}}))} 
-                    className={inputClasses}
-                />
+                <input type="text" value={localSettings.fullAddress} onChange={e => setLocalSettings(p => ({...p, fullAddress: e.target.value}))} className={inputClasses}/>
 
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">Ubicación en Google Maps</label>
-                {settings.branch.googleMapsLink ? (
-                    <div className="flex items-center gap-2 mt-1">
-                        <a href={settings.branch.googleMapsLink} target="_blank" rel="noopener noreferrer" className="text-green-600 dark:text-green-400 text-sm underline truncate">{settings.branch.googleMapsLink}</a>
-                        <button onClick={() => setSettings(p => ({...p, branch: {...p.branch, googleMapsLink: ''}}))} className="text-red-500"><IconTrash className="h-4 w-4"/></button>
-                    </div>
-                ) : (
-                    <button type="button" onClick={handleGetLocation} className="mt-1 flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                        <IconLocationMarker className="h-5 w-5"/>
-                        Agregar ubicación
-                    </button>
-                )}
+                <button type="button" className="mt-1 w-full flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <IconLocationMarker className="h-5 w-5"/>
+                    Agregar ubicación
+                </button>
             </SettingsCard>
 
-            <SettingsCard title="Número de WhatsApp para pedidos" noActions>
+            <SettingsCard title="Número de WhatsApp para pedidos" onSave={handleSave}>
                 <p className="text-sm text-gray-500 dark:text-gray-400">El número al que llegarán las comandas de los pedidos a domicilio</p>
                 <div className="flex justify-between items-center mt-2">
-                    <span className="font-mono text-gray-800 dark:text-gray-200">{settings.branch.whatsappNumber}</span>
+                    <span className="font-mono text-gray-800 dark:text-gray-200">{localSettings.whatsappNumber}</span>
                     <button type="button" className="px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-600">Cambiar número</button>
                 </div>
             </SettingsCard>
             
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6">
-                 <div className="flex justify-between items-center">
-                    <span className="font-medium text-gray-900 dark:text-gray-100">Logotipo de la tienda</span>
+            <SettingsCard title="Logotipo de la tienda" onSave={handleSave}>
+                 <div className="flex items-center gap-4">
+                     {localSettings.logoUrl ? (
+                        <img src={localSettings.logoUrl} alt="Logo preview" className="w-20 h-20 rounded-full object-cover"/>
+                     ) : (
+                        <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                            <IconStore className="h-10 w-10 text-gray-400"/>
+                        </div>
+                     )}
                     <label htmlFor="logo-upload" className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-600">
                         <IconUpload className="h-5 w-5"/>
-                        Cargar imagen
+                        {localSettings.logoUrl ? 'Cambiar imagen' : 'Cargar imagen'}
                     </label>
-                    <input id="logo-upload" type="file" className="sr-only" accept="image/*" onChange={(e) => handleImageUpload(e, 'logoUrl')}/>
+                    <input id="logo-upload" type="file" className="sr-only" accept="image/*" onChange={handleImageUpload}/>
                  </div>
-                 {settings.branch.logoUrl && <img src={settings.branch.logoUrl} alt="Logo preview" className="w-20 h-20 rounded-full object-cover mt-4"/>}
-            </div>
-
-             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6">
-                 <div className="flex justify-between items-center">
-                    <span className="font-medium text-gray-900 dark:text-gray-100">Portada de la tienda</span>
-                    <label htmlFor="cover-upload" className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-600">
-                        <IconUpload className="h-5 w-5"/>
-                        Cargar imagen
-                    </label>
-                    <input id="cover-upload" type="file" className="sr-only" accept="image/*" onChange={(e) => handleImageUpload(e, 'coverImageUrl')}/>
-                 </div>
-                  {settings.branch.coverImageUrl && <img src={settings.branch.coverImageUrl} alt="Cover preview" className="w-full h-32 object-cover rounded-md mt-4"/>}
-            </div>
+            </SettingsCard>
         </div>
     );
 };
 
-const ShippingSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
-    
-    const [originalSettings, setOriginalSettings] = useState(settings.shipping);
-    
-    useEffect(() => {
-        setOriginalSettings(settings.shipping)
-    }, [settings.shipping])
+const ShippingSettingsView: React.FC<{ settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ settings, setSettings }) => {
+    const [localSettings, setLocalSettings] = useState(settings.shipping);
 
-    const handleCancel = () => {
-        setSettings(prev => ({...prev, shipping: originalSettings}));
+    const handleSave = () => {
+        setSettings(prev => ({...prev, shipping: localSettings}));
+        alert("¡Guardado!");
     };
+
+    useEffect(() => {
+        setLocalSettings(settings.shipping)
+    }, [settings.shipping])
 
     const inputClasses = "w-24 text-center px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm";
     
     return (
         <div className="space-y-6">
-            <SettingsCard title="Tipo de costo de envío" onSave={onSave} onCancel={handleCancel}>
-                <select value={settings.shipping.costType} onChange={e => setSettings(p => ({...p, shipping: {...p.shipping, costType: e.target.value as ShippingCostType}}))} className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
+            <SettingsCard title="Tipo de costo de envío" onSave={handleSave}>
+                <select value={localSettings.costType} onChange={e => setLocalSettings(p => ({...p, costType: e.target.value as ShippingCostType}))} className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
                    {Object.values(ShippingCostType).map(type => <option key={type} value={type}>{type}</option>)}
                 </select>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">El precio de envío no será calculado automáticamente.</p>
@@ -2928,23 +2093,23 @@ const ShippingSettingsView: React.FC<{ onSave: () => Promise<void>; settings: Ap
                 </div>
             </SettingsCard>
 
-             <SettingsCard title="Tiempo para pedidos a domicilio" onSave={onSave} onCancel={handleCancel}>
+             <SettingsCard title="Tiempo para pedidos a domicilio" onSave={handleSave}>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Desde que el cliente hace su pedido.</p>
                 <div className="flex items-center gap-4 mt-2">
                     <div className="flex items-center gap-2">
-                         <input type="number" value={settings.shipping.deliveryTime.min} onChange={e => setSettings(p => ({...p, shipping: {...p.shipping, deliveryTime: {...p.shipping.deliveryTime, min: Number(e.target.value)}} }))} className={inputClasses}/>
+                         <input type="number" value={localSettings.deliveryTime.min} onChange={e => setLocalSettings(p => ({...p, deliveryTime: {...p.deliveryTime, min: Number(e.target.value)}}))} className={inputClasses}/>
                          <span>mins</span>
                     </div>
                      <span className="text-gray-500">Máximo</span>
                     <div className="flex items-center gap-2">
-                         <input type="number" value={settings.shipping.deliveryTime.max} onChange={e => setSettings(p => ({...p, shipping: {...p.shipping, deliveryTime: {...p.shipping.deliveryTime, max: Number(e.target.value)}} }))} className={inputClasses}/>
+                         <input type="number" value={localSettings.deliveryTime.max} onChange={e => setLocalSettings(p => ({...p, deliveryTime: {...p.deliveryTime, max: Number(e.target.value)}}))} className={inputClasses}/>
                          <span>mins</span>
                     </div>
                 </div>
                  <h4 className="font-bold mt-6">Tiempo para pedidos para recoger</h4>
                  <p className="text-sm text-gray-500 dark:text-gray-400">Desde que el cliente hace su pedido.</p>
                  <div className="flex items-center gap-2 mt-2">
-                    <input type="number" value={settings.shipping.pickupTime.min} onChange={e => setSettings(p => ({...p, shipping: {...p.shipping, pickupTime: {min: Number(e.target.value)}}}))} className={inputClasses}/>
+                    <input type="number" value={localSettings.pickupTime.min} onChange={e => setLocalSettings(p => ({...p, pickupTime: {min: Number(e.target.value)}}))} className={inputClasses}/>
                     <span>mins</span>
                  </div>
              </SettingsCard>
@@ -2952,34 +2117,33 @@ const ShippingSettingsView: React.FC<{ onSave: () => Promise<void>; settings: Ap
     );
 };
 
-const PaymentSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
-    const [originalSettings, setOriginalSettings] = useState(settings.payment);
-    const availableMethods: PaymentMethod[] = ['Efectivo', 'Pago Móvil', 'Transferencia', 'Zelle', 'Punto de Venta', 'Pago con tarjeta'];
+const PaymentSettingsView: React.FC<{ settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ settings, setSettings }) => {
+    const [localSettings, setLocalSettings] = useState(settings.payment);
+    const availableMethods: PaymentMethod[] = ['Efectivo', 'Pago con tarjeta', 'Transferencia'];
 
+    const handleSave = () => {
+        setSettings(prev => ({...prev, payment: localSettings}));
+        alert("¡Guardado!");
+    };
+    
     useEffect(() => {
-        setOriginalSettings(settings.payment)
-    }, [settings.payment]);
-
-    const handleCancel = () => {
-        setSettings(prev => ({...prev, payment: originalSettings}));
-    }
+        setLocalSettings(settings.payment)
+    }, [settings.payment])
 
     const handleCheckboxChange = (group: 'deliveryMethods' | 'pickupMethods', method: PaymentMethod, checked: boolean) => {
-        setSettings(prev => {
-            const currentMethods = prev.payment[group];
+        setLocalSettings(prev => {
+            const currentMethods = prev[group];
             if (checked) {
-                return {...prev, payment: {...prev.payment, [group]: [...currentMethods, method]}};
+                return {...prev, [group]: [...currentMethods, method]};
             } else {
-                return {...prev, payment: {...prev.payment, [group]: currentMethods.filter(m => m !== method)}};
+                return {...prev, [group]: currentMethods.filter(m => m !== method)};
             }
         });
     };
     
-    const inputClasses = "mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm text-gray-900 dark:text-white placeholder-gray-400";
-
     return (
         <div className="space-y-6">
-            <SettingsCard title="Métodos de pago para los clientes" onSave={onSave} onCancel={handleCancel}>
+            <SettingsCard title="Métodos de pago para los clientes" onSave={handleSave}>
                 <div className="grid grid-cols-2 gap-6">
                     <div>
                         <h4 className="font-semibold">Envíos a domicilio</h4>
@@ -2987,7 +2151,7 @@ const PaymentSettingsView: React.FC<{ onSave: () => Promise<void>; settings: App
                         <div className="mt-3 space-y-2">
                             {availableMethods.map(method => (
                                 <label key={method} className="flex items-center">
-                                    <input type="checkbox" checked={settings.payment.deliveryMethods.includes(method)} onChange={(e) => handleCheckboxChange('deliveryMethods', method, e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"/>
+                                    <input type="checkbox" checked={localSettings.deliveryMethods.includes(method)} onChange={(e) => handleCheckboxChange('deliveryMethods', method, e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"/>
                                     <span className="ml-2 text-sm">{method}</span>
                                 </label>
                             ))}
@@ -2999,7 +2163,7 @@ const PaymentSettingsView: React.FC<{ onSave: () => Promise<void>; settings: App
                         <div className="mt-3 space-y-2">
                              {availableMethods.map(method => (
                                 <label key={method} className="flex items-center">
-                                    <input type="checkbox" checked={settings.payment.pickupMethods.includes(method)} onChange={(e) => handleCheckboxChange('pickupMethods', method, e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"/>
+                                    <input type="checkbox" checked={localSettings.pickupMethods.includes(method)} onChange={(e) => handleCheckboxChange('pickupMethods', method, e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"/>
                                     <span className="ml-2 text-sm">{method}</span>
                                 </label>
                             ))}
@@ -3008,49 +2172,9 @@ const PaymentSettingsView: React.FC<{ onSave: () => Promise<void>; settings: App
                 </div>
             </SettingsCard>
 
-            <SettingsCard title="Configuración de Pago Móvil" description="Datos para que tus clientes realicen el pago." onSave={onSave} onCancel={handleCancel}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Banco</label>
-                        <input type="text" value={settings.payment.pagoMovil?.bank || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, pagoMovil: {...p.payment.pagoMovil, bank: e.target.value} as any}}))} className={inputClasses} placeholder="Ej. Banesco"/>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Teléfono</label>
-                        <input type="text" value={settings.payment.pagoMovil?.phone || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, pagoMovil: {...p.payment.pagoMovil, phone: e.target.value} as any}}))} className={inputClasses} placeholder="Ej. 0414-1234567"/>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Cédula / RIF</label>
-                        <input type="text" value={settings.payment.pagoMovil?.idNumber || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, pagoMovil: {...p.payment.pagoMovil, idNumber: e.target.value} as any}}))} className={inputClasses} placeholder="Ej. V-12345678"/>
-                    </div>
-                </div>
-            </SettingsCard>
-
-            <SettingsCard title="Configuración de Transferencia Bancaria" description="Datos de la cuenta bancaria." onSave={onSave} onCancel={handleCancel}>
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Banco</label>
-                        <input type="text" value={settings.payment.transfer?.bank || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, bank: e.target.value} as any}}))} className={inputClasses} placeholder="Ej. Mercantil"/>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Número de Cuenta</label>
-                        <input type="text" value={settings.payment.transfer?.accountNumber || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, accountNumber: e.target.value} as any}}))} className={inputClasses} placeholder="0105..."/>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Titular</label>
-                            <input type="text" value={settings.payment.transfer?.accountHolder || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, accountHolder: e.target.value} as any}}))} className={inputClasses} placeholder="Nombre del titular"/>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Cédula / RIF</label>
-                            <input type="text" value={settings.payment.transfer?.idNumber || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, idNumber: e.target.value} as any}}))} className={inputClasses} placeholder="V-12345678"/>
-                        </div>
-                    </div>
-                </div>
-            </SettingsCard>
-
-             <SettingsCard title="Campo de propinas" description="Permite a los clientes introducir propinas." onSave={onSave} onCancel={handleCancel}>
+             <SettingsCard title="Campo de propinas" description="Permite a los clientes introducir propinas." onSave={handleSave}>
                 <label className="flex items-center">
-                    <input type="checkbox" checked={settings.payment.showTipField} onChange={e => setSettings(p => ({...p, payment: {...p.payment, showTipField: e.target.checked}}))} className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"/>
+                    <input type="checkbox" checked={localSettings.showTipField} onChange={e => setLocalSettings(p => ({...p, showTipField: e.target.checked}))} className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"/>
                     <span className="ml-2 text-sm">Mostrar campo para agregar propina</span>
                 </label>
             </SettingsCard>
@@ -3135,7 +2259,7 @@ const ScheduleModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: (n
     );
 };
 
-const HoursSettings: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
+const HoursSettings: React.FC<{ settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ settings, setSettings }) => {
     const [activeScheduleId, setActiveScheduleId] = useState(settings.schedules[0]?.id || '');
     const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
     const [selectedDay, setSelectedDay] = useState<DaySchedule['day'] | null>(null);
@@ -3156,47 +2280,39 @@ const HoursSettings: React.FC<{ onSave: () => Promise<void>; settings: AppSettin
     
     const handleSaveShift = (shift: TimeRange) => {
         if (!selectedDay || !activeScheduleId) return;
-        setSettings(prev => {
-            const newSettings = {
-                ...prev,
-                schedules: prev.schedules.map(schedule => 
-                    schedule.id === activeScheduleId
-                    ? {
-                        ...schedule,
-                        days: schedule.days.map(day => 
-                            day.day === selectedDay
-                            ? {...day, shifts: [...day.shifts, shift]}
-                            : day
-                        )
-                      }
-                    : schedule
-                )
-            };
-            saveAppSettings(newSettings); // Auto-save on change
-            return newSettings;
-        });
+        setSettings(prev => ({
+            ...prev,
+            schedules: prev.schedules.map(schedule => 
+                schedule.id === activeScheduleId
+                ? {
+                    ...schedule,
+                    days: schedule.days.map(day => 
+                        day.day === selectedDay
+                        ? {...day, shifts: [...day.shifts, shift]}
+                        : day
+                    )
+                  }
+                : schedule
+            )
+        }));
     };
 
     const handleRemoveShift = (dayName: DaySchedule['day'], shiftIndex: number) => {
-         setSettings(prev => {
-            const newSettings = {
-                ...prev,
-                schedules: prev.schedules.map(schedule => 
-                    schedule.id === activeScheduleId
-                    ? {
-                        ...schedule,
-                        days: schedule.days.map(day => 
-                            day.day === dayName
-                            ? {...day, shifts: day.shifts.filter((_, i) => i !== shiftIndex)}
-                            : day
-                        )
-                      }
-                    : schedule
-                )
-            };
-            saveAppSettings(newSettings); // Auto-save on change
-            return newSettings;
-        });
+         setSettings(prev => ({
+            ...prev,
+            schedules: prev.schedules.map(schedule => 
+                schedule.id === activeScheduleId
+                ? {
+                    ...schedule,
+                    days: schedule.days.map(day => 
+                        day.day === dayName
+                        ? {...day, shifts: day.shifts.filter((_, i) => i !== shiftIndex)}
+                        : day
+                    )
+                  }
+                : schedule
+            )
+        }));
     };
     
     const handleSaveSchedule = (name: string) => {
@@ -3213,11 +2329,7 @@ const HoursSettings: React.FC<{ onSave: () => Promise<void>; settings: AppSettin
                 { day: 'Domingo', shifts: [], isOpen: true },
             ]
         };
-        setSettings(prev => {
-            const newSettings = { ...prev, schedules: [...prev.schedules, newSchedule]};
-            saveAppSettings(newSettings); // Auto-save on change
-            return newSettings;
-        });
+        setSettings(prev => ({ ...prev, schedules: [...prev.schedules, newSchedule]}));
         setActiveScheduleId(newSchedule.id);
     };
     
@@ -3303,7 +2415,7 @@ const ZonesAndTablesSettings: React.FC<{
                     <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-gray-900 rounded-md shadow-lg z-10 border dark:border-gray-700">
                         <div className="p-1">
                              <p className="px-3 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Acciones</p>
-                            <button onClick={() => { onEditZoneLayout(zone); setIsOpen(false); }} className="w-full text-left flex items-center gap-x-2 px-3 py-1.5 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"> <IconEdit className="h-4 w-4" /> Editar distribución</button>
+                            <button onClick={() => { onEditZoneLayout(zone); setIsOpen(false); }} className="w-full text-left flex items-center gap-x-2 px-3 py-1.5 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"> <IconEdit className="h-4 w-4" /> Editar</button>
                             <button onClick={() => { onDeleteZone(zone.id); setIsOpen(false); }} className="w-full text-left flex items-center gap-x-2 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-900/50"><IconTrash className="h-4 w-4" /> Borrar</button>
                         </div>
                     </div>
@@ -3351,16 +2463,17 @@ const ZonesAndTablesSettings: React.FC<{
     );
 };
 
-const PrintingSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
-    const [originalSettings, setOriginalSettings] = useState(settings.printing);
+const PrintingSettingsView: React.FC<{ settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ settings, setSettings }) => {
+    const [localSettings, setLocalSettings] = useState(settings.printing);
+    
+    const handleSave = () => {
+        setSettings(prev => ({ ...prev, printing: localSettings }));
+        alert("¡Guardado!");
+    };
     
     useEffect(() => {
-        setOriginalSettings(settings.printing)
+        setLocalSettings(settings.printing)
     }, [settings.printing]);
-
-    const handleCancel = () => {
-        setSettings(prev => ({...prev, printing: originalSettings}));
-    }
 
     const methods = [
         { id: PrintingMethod.Native, icon: <IconPrinter/>, description: "Impresión nativa y por defecto del navegador, sin configuración adicional.", tag: null },
@@ -3370,11 +2483,11 @@ const PrintingSettingsView: React.FC<{ onSave: () => Promise<void>; settings: Ap
     
     return (
         <div className="space-y-6">
-            <SettingsCard title="Método de impresión" onSave={onSave} onCancel={handleCancel}>
+            <SettingsCard title="Método de impresión" onSave={handleSave}>
                 <div className="space-y-3">
                     {methods.map(method => (
-                        <button key={method.id} onClick={() => setSettings(p => ({...p, printing: { method: method.id } }))} className={`w-full text-left p-4 border-2 rounded-lg flex items-start gap-4 transition-all ${settings.printing.method === method.id ? 'border-green-500 bg-green-50 dark:bg-green-900/30' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}`}>
-                            <div className={`flex-shrink-0 ${settings.printing.method === method.id ? 'text-green-600' : 'text-gray-500'}`}>{method.icon}</div>
+                        <button key={method.id} onClick={() => setLocalSettings({ method: method.id })} className={`w-full text-left p-4 border-2 rounded-lg flex items-start gap-4 transition-all ${localSettings.method === method.id ? 'border-green-500 bg-green-50 dark:bg-green-900/30' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}`}>
+                            <div className={`flex-shrink-0 ${localSettings.method === method.id ? 'text-green-600' : 'text-gray-500'}`}>{method.icon}</div>
                             <div className="flex-grow">
                                 <div className="flex items-center gap-2">
                                     <h4 className="font-bold">{method.id}</h4>
@@ -3382,7 +2495,7 @@ const PrintingSettingsView: React.FC<{ onSave: () => Promise<void>; settings: Ap
                                 </div>
                                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{method.description}</p>
                             </div>
-                            {settings.printing.method === method.id && <IconCheck className="h-6 w-6 text-green-500 flex-shrink-0"/>}
+                            {localSettings.method === method.id && <IconCheck className="h-6 w-6 text-green-500 flex-shrink-0"/>}
                         </button>
                     ))}
                 </div>
@@ -3396,7 +2509,6 @@ const ZoneEditor: React.FC<{
     onSave: (zone: Zone) => void;
     onExit: () => void;
 }> = ({ initialZone, onSave, onExit }) => {
-    // ... (Same ZoneEditor code)
     const [zone, setZone] = useState(initialZone);
     const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
     const gridRef = useRef<HTMLDivElement>(null);
@@ -3548,17 +2660,18 @@ const ZoneEditor: React.FC<{
                                 const row = Math.floor(index / zone.cols) + 1;
                                 const col = (index % zone.cols) + 1;
                                 if (isCellOccupied(row, col)) return null;
+
                                 return (
-                                    <div
-                                        key={`cell-${row}-${col}`}
-                                        onClick={() => addTable(row, col)}
-                                        className="bg-gray-100 dark:bg-gray-800/50 rounded-lg flex items-center justify-center text-gray-400 hover:bg-green-100 hover:text-green-600 cursor-pointer border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-green-400"
-                                        style={{ gridRow: row, gridColumn: col }}
-                                    >
-                                        <IconPlus className="h-6 w-6"/>
-                                    </div>
-                                );
-                            })}
+                                <button
+                                    key={`cell-${row}-${col}`}
+                                    onClick={() => addTable(row, col)}
+                                    style={{ gridRow: row, gridColumn: col }}
+                                    className="aspect-square bg-gray-50 dark:bg-gray-700/50 rounded-md flex items-center justify-center text-gray-400 hover:bg-emerald-50 hover:text-emerald-500 dark:hover:bg-emerald-900/50 dark:hover:text-emerald-400 transition-colors"
+                                >
+                                    <IconPlus className="h-6 w-6" />
+                                </button>
+                            );
+                           })}
                         </div>
                     </div>
                 </main>
@@ -3567,413 +2680,464 @@ const ZoneEditor: React.FC<{
     );
 };
 
-const SettingsModal: React.FC<{
+const ZoneNameModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
-    onEditZoneLayout: (zone: Zone) => void;
-    initialPage?: SettingsPage;
-}> = ({ isOpen, onClose, onEditZoneLayout, initialPage = 'general' }) => {
-    const [settings, setSettings] = useState<AppSettings | null>(null);
-    const [activePage, setActivePage] = useState<SettingsPage>(initialPage);
-    const [zones, setZones] = useState<Zone[]>([]);
+    onSave: (zone: Pick<Zone, 'name' | 'rows' | 'cols'> & { id?: string }) => void;
+    zone: Zone | null;
+}> = ({ isOpen, onClose, onSave, zone }) => {
+    const [name, setName] = useState('');
 
     useEffect(() => {
         if (isOpen) {
-            setActivePage(initialPage);
-            getAppSettings().then(setSettings);
-            fetchData();
+            setName(zone ? zone.name : '');
         }
-    }, [isOpen, initialPage]);
+    }, [zone, isOpen]);
 
-    const handleSaveSettings = async () => {
-        if (!settings) return;
-        try {
-            await saveAppSettings(settings);
-            alert("¡Configuración guardada!");
-        } catch (error) {
-            alert("Error al guardar la configuración.");
-            console.error(error);
-        }
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!name.trim()) return;
+        
+        const zoneDataToSave = {
+            id: zone?.id,
+            name: name.trim(),
+            rows: zone?.rows || 6, // Default values for new zones
+            cols: zone?.cols || 10,
+        };
+        onSave(zoneDataToSave);
     };
 
-    const fetchData = async () => {
-        try {
-            const data = await getZones();
-            setZones(data);
-        } catch (err) {
-            console.error('Failed to load zones.', err);
-        }
-    };
-
-    const handleAddZone = async () => {
-        const name = prompt("Enter new zone name:");
-        if (name) {
-            await saveZone({ name, rows: 5, cols: 5 });
-            fetchData();
-        }
-    };
-
-    const handleEditZoneName = async (zone: Zone) => {
-        if (zone.name.trim() === '') return;
-        await saveZone({ id: zone.id, name: zone.name, rows: zone.rows, cols: zone.cols });
-        fetchData();
-    };
-
-    const handleDeleteZone = async (zoneId: string) => {
-        if (window.confirm("Are you sure you want to delete this zone and all its tables?")) {
-            await deleteZone(zoneId);
-            fetchData();
-        }
-    };
-
-    const handleEditLayout = (zone: Zone) => {
-        onEditZoneLayout(zone);
-        // Don't close modal here, let parent handle it to switch views smoothly
-    };
-    
-    if (!isOpen || !settings) return null;
-
-    const navItems: { id: SettingsPage; name: string; icon: React.ReactNode }[] = [
-        { id: 'general', name: 'General', icon: <IconSettings /> },
-        { id: 'store-data', name: 'Datos de la tienda', icon: <IconStore /> },
-        { id: 'shipping-costs', name: 'Costos de envío', icon: <IconDelivery /> },
-        { id: 'payment-methods', name: 'Métodos de pago', icon: <IconPayment /> },
-        { id: 'hours', name: 'Horarios', icon: <IconClock /> },
-        { id: 'zones-tables', name: 'Zonas y mesas', icon: <IconTableLayout /> },
-        { id: 'printing', name: 'Impresión', icon: <IconPrinter /> },
-    ];
-
-    const renderPage = () => {
-        switch (activePage) {
-            case 'general': return <GeneralSettings onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
-            case 'store-data': return <BranchSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
-            case 'shipping-costs': return <ShippingSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
-            case 'payment-methods': return <PaymentSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
-            case 'hours': return <HoursSettings onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
-            case 'zones-tables': return <ZonesAndTablesSettings zones={zones} onAddZone={handleAddZone} onEditZoneName={handleEditZoneName} onDeleteZone={handleDeleteZone} onEditZoneLayout={handleEditLayout} />;
-            case 'printing': return <PrintingSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
-            default: return null;
-        }
-    };
+    if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-40 flex justify-end">
-            <div className="bg-white dark:bg-gray-900 h-full w-full max-w-5xl flex flex-col relative">
-                <header className="p-4 border-b dark:border-gray-700 flex justify-between items-center shrink-0">
-                    <div className="flex items-center gap-x-4">
-                        <h2 className="text-xl font-bold">Configuración</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md">
+                <form onSubmit={handleSubmit} className="p-6">
+                    <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">
+                        {zone ? 'Editar nombre de la zona' : 'Nueva zona'}
+                    </h2>
+                    <div>
+                        <label htmlFor="zoneName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Nombre
+                        </label>
+                        <input
+                            id="zoneName"
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            required
+                            autoFocus
+                            className="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 dark:text-white"
+                        />
                     </div>
-                    <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"><IconX /></button>
+                    <div className="flex justify-end space-x-4 pt-6">
+                        <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 dark:border-gray-500 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 font-semibold">
+                            Cancelar
+                        </button>
+                        <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 font-semibold">
+                            {zone ? 'Guardar Cambios' : 'Crear zona'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+const SettingsModal: React.FC<{ onClose: () => void; initialPage?: SettingsPage; onDataChange: () => void; }> = ({ onClose, initialPage, onDataChange }) => {
+    const [activePage, setActivePage] = useState<SettingsPage>(initialPage || 'general');
+    const [settings, setSettings] = usePersistentState<AppSettings>('app_settings', INITIAL_SETTINGS);
+    
+    // Zone management state is now centralized here
+    const [zones, setZones] = useState<Zone[]>([]);
+    const [isLoadingZones, setIsLoadingZones] = useState(true);
+    const [editingZoneLayout, setEditingZoneLayout] = useState<Zone | null>(null);
+    const [editingZoneForName, setEditingZoneForName] = useState<Zone | null>(null);
+    const [isZoneNameModalOpen, setIsZoneNameModalOpen] = useState(false);
+
+    const fetchAllZones = async () => {
+        try {
+            setIsLoadingZones(true);
+            const fetchedZones = await getZones();
+            setZones(fetchedZones);
+        } catch (error) {
+            console.error("Failed to fetch zones:", error);
+            alert("Could not load zones from database.");
+        } finally {
+            setIsLoadingZones(false);
+        }
+    };
+
+    useEffect(() => {
+        if(activePage === 'zones-tables') {
+            fetchAllZones();
+        }
+    }, [activePage]);
+
+    const handleOpenZoneNameModal = (zone: Zone | null) => {
+        setEditingZoneForName(zone);
+        setIsZoneNameModalOpen(true);
+    };
+
+    const handleCloseZoneNameModal = () => {
+        setEditingZoneForName(null);
+        setIsZoneNameModalOpen(false);
+    };
+
+    const handleSaveZoneName = async (zoneData: Pick<Zone, 'name' | 'rows' | 'cols'> & { id?: string }) => {
+        try {
+            await saveZone(zoneData);
+            await fetchAllZones();
+            onDataChange();
+        } catch (error) {
+            alert("Failed to save zone name.");
+        } finally {
+            handleCloseZoneNameModal();
+        }
+    };
+    
+    const handleDeleteZone = async (zoneId: string) => {
+        if(window.confirm("¿Seguro que quieres borrar esta zona y todas sus mesas? Esta acción es irreversible.")) {
+            try {
+                await deleteZone(zoneId);
+                await fetchAllZones();
+                onDataChange();
+            } catch (error) {
+                alert("Failed to delete zone.");
+            }
+        }
+    };
+
+    const handleSaveZoneLayoutAndExit = async (zone: Zone) => {
+        try {
+            await saveZoneLayout(zone);
+            await fetchAllZones();
+            onDataChange();
+        } catch (error) {
+             alert("Failed to save zone layout.");
+        } finally {
+            setEditingZoneLayout(null);
+        }
+    };
+    
+    const settingsNavItems: {id: SettingsPage; name: string; icon: React.ReactNode }[] = [
+        { id: 'general', name: 'General', icon: <IconSettings className="h-5 w-5" /> },
+        { id: 'store-data', name: 'Datos de sucursal', icon: <IconStore className="h-5 w-5" /> },
+        { id: 'shipping-costs', name: 'Costos de envío', icon: <IconDelivery className="h-5 w-5" /> },
+        { id: 'payment-methods', name: 'Métodos de pago', icon: <IconPayment className="h-5 w-5" /> },
+        { id: 'hours', name: 'Horarios', icon: <IconClock className="h-5 w-5" /> },
+        { id: 'zones-tables', name: 'Zonas y mesas', icon: <IconTableLayout className="h-5 w-5" /> },
+        { id: 'printing', name: 'Impresión', icon: <IconPrinter className="h-5 w-5" /> },
+    ];
+    
+    const renderContent = () => {
+        switch(activePage) {
+            case 'general':
+                return <GeneralSettings settings={settings} setSettings={setSettings} />;
+            case 'store-data':
+                return <BranchSettingsView settings={settings} setSettings={setSettings} />;
+            case 'shipping-costs':
+                return <ShippingSettingsView settings={settings} setSettings={setSettings} />;
+            case 'payment-methods':
+                return <PaymentSettingsView settings={settings} setSettings={setSettings} />;
+            case 'hours':
+                return <HoursSettings settings={settings} setSettings={setSettings} />;
+            case 'zones-tables':
+                if (isLoadingZones) return <div>Cargando zonas...</div>
+                return <ZonesAndTablesSettings 
+                            zones={zones} 
+                            onAddZone={() => handleOpenZoneNameModal(null)} 
+                            onEditZoneName={(zone) => handleSaveZoneName(zone)}
+                            onDeleteZone={handleDeleteZone}
+                            onEditZoneLayout={setEditingZoneLayout}
+                        />;
+            case 'printing':
+                return <PrintingSettingsView settings={settings} setSettings={setSettings} />;
+            default:
+                return <div className="text-center p-10 text-gray-500">{settingsNavItems.find(i => i.id === activePage)?.name} (próximamente)</div>
+        }
+    }
+
+    if (editingZoneLayout) {
+        return <ZoneEditor initialZone={editingZoneLayout} onSave={handleSaveZoneLayoutAndExit} onExit={() => setEditingZoneLayout(null)} />;
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex justify-center items-center">
+            <div className="bg-gray-100 dark:bg-gray-900 rounded-lg shadow-xl w-[95%] h-[90%] max-w-6xl flex flex-col">
+                <header className="bg-white dark:bg-gray-800 p-4 border-b dark:border-gray-700 flex justify-between items-center rounded-t-lg">
+                    <h2 className="text-xl font-bold">Configuración</h2>
+                    <button onClick={onClose} className="text-gray-500 hover:text-gray-800"><IconX /></button>
                 </header>
                 <div className="flex flex-1 overflow-hidden">
-                    <aside className="w-64 border-r dark:border-gray-700 p-4">
+                    <aside className="w-1/4 bg-white dark:bg-gray-800 p-4 border-r dark:border-gray-700">
                         <nav className="space-y-1">
-                            {navItems.map(item => (
-                                <button key={item.id} onClick={() => setActivePage(item.id)} className={`w-full flex items-center gap-x-3 px-3 py-2.5 rounded-md text-sm font-medium ${activePage === item.id ? 'bg-green-50 text-green-700 dark:bg-green-900/50 dark:text-green-300' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+                            {settingsNavItems.map(item => (
+                                <button
+                                    key={item.id}
+                                    onClick={() => setActivePage(item.id)}
+                                    className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium ${activePage === item.id ? 'bg-green-50 text-green-700 dark:bg-green-900/50 dark:text-green-300' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                                >
                                     {item.icon}
-                                    {item.name}
+                                    <span>{item.name}</span>
                                 </button>
                             ))}
                         </nav>
                     </aside>
-                    <main className="flex-1 p-6 overflow-y-auto bg-gray-50 dark:bg-gray-900/50">
-                        {renderPage()}
+                    <main className="flex-1 p-6 overflow-y-auto">
+                        {renderContent()}
                     </main>
                 </div>
             </div>
+             <ZoneNameModal
+                isOpen={isZoneNameModalOpen}
+                onClose={handleCloseZoneNameModal}
+                onSave={handleSaveZoneName}
+                zone={editingZoneForName}
+            />
         </div>
     );
-};
+}
 
-const QRModal: React.FC<{
-    isOpen: boolean;
-    onClose: () => void;
-    url: string;
-    title: string;
-    filename: string;
-}> = ({ isOpen, onClose, url, title, filename }) => {
-    if (!isOpen) return null;
-
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(url)}`;
-
-    const handleDownload = async () => {
-        try {
-            const response = await fetch(qrUrl);
-            if (!response.ok) throw new Error('Network response was not ok.');
-            const blob = await response.blob();
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(link.href);
-        } catch (error) {
-            console.error("Failed to download QR code:", error);
-            alert("No se pudo descargar el código QR.");
-        }
-    };
-
+// --- Share Components ---
+const QRCodeModal: React.FC<{ url: string; title: string; onClose: () => void }> = ({ url, title, onClose }) => {
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(url)}`;
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-sm text-center p-8" onClick={e => e.stopPropagation()}>
-                <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">{title}</h2>
-                <p className="text-gray-500 dark:text-gray-400 mb-6">Escanea este código para abrir el menú.</p>
-                <div className="flex justify-center">
-                    <img src={qrUrl} alt={title} className="w-64 h-64 rounded-lg border-4 border-white dark:border-gray-700" />
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-sm text-center p-8 relative">
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <IconX />
+                </button>
+                <h3 className="text-xl font-bold mb-2">{title}</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Escanea el código para abrir el enlace.</p>
+                <div className="p-4 border dark:border-gray-600 rounded-md inline-block">
+                    <img src={qrImageUrl} alt={`QR Code for ${title}`} width="250" height="250" />
                 </div>
-                <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                    <button onClick={handleDownload} className="w-full px-4 py-3 bg-green-600 text-white rounded-md text-sm font-semibold hover:bg-green-700">
-                        Descargar QR
-                    </button>
-                    <button onClick={onClose} className="w-full px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md text-sm font-semibold hover:bg-gray-300 dark:hover:bg-gray-600">
-                        Cerrar
-                    </button>
-                </div>
+                <a href={qrImageUrl} download={`${title.replace(' ', '_')}_QR.png`} className="mt-6 w-full block bg-emerald-600 text-white py-3 rounded-md font-semibold hover:bg-emerald-700 transition-colors">
+                    Descargar QR
+                </a>
             </div>
         </div>
     );
 };
 
-const ShareView: React.FC<{ onGoToTableSettings: () => void }> = ({ onGoToTableSettings }) => {
-    const [activeTab, setActiveTab] = useState<'domicilio' | 'mesas' | 'multi-sucursal'>('domicilio');
-    const [settings, setSettings] = useState<AppSettings | null>(null);
-    const [zones, setZones] = useState<Zone[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isQrModalOpen, setIsQrModalOpen] = useState(false);
-    const [qrModalData, setQrModalData] = useState({ url: '', title: '', filename: '' });
-    const [toastMessage, setToastMessage] = useState<string | null>(null);
+const ShareView: React.FC<{ zones: Zone[]; onConfigureZonesClick: () => void; }> = ({ zones, onConfigureZonesClick }) => {
+    const [activeTab, setActiveTab] = useState('domicilio');
+    const [copyStatus, setCopyStatus] = useState<'link' | 'message' | null>(null);
+    const [qrModalData, setQrModalData] = useState<{ url: string, title: string } | null>(null);
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [appSettings, zoneData] = await Promise.all([
-                    getAppSettings(),
-                    getZones()
-                ]);
-                setSettings(appSettings);
-                setZones(zoneData);
-            } catch (error) {
-                console.error("Failed to load share data:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchData();
-    }, []);
+    const menuUrl = 'https://maspedidos.menu/anyvalpark';
+    const whatsAppMessage = `¡Hola! Accede a nuestro menú y realiza tu pedido:\n\n1. Haz clic aquí 👇👇👇\n${menuUrl}\n\n2. Escoge tus productos, método de pago y ¡listo!`;
 
-    const showToast = (message: string) => {
-        setToastMessage(message);
-        setTimeout(() => setToastMessage(null), 3000);
-    };
-
-    const copyToClipboard = (text: string) => {
-        navigator.clipboard.writeText(text).then(() => {
-            showToast("Enlace copiado al portapapeles");
+    const handleCopy = (type: 'link' | 'message') => {
+        navigator.clipboard.writeText(type === 'link' ? menuUrl : whatsAppMessage).then(() => {
+            setCopyStatus(type);
+            setTimeout(() => setCopyStatus(null), 2000);
         });
     };
     
-    const openQrModal = (url: string, title: string, filename: string) => {
-        setQrModalData({ url, title, filename });
-        setIsQrModalOpen(true);
-    };
-
-    if (isLoading || !settings) {
-         return <div className="p-10 text-center">Cargando opciones de compartir...</div>;
+    const handleTableClick = (zone: Zone, table: Table) => {
+        const tableUrl = `${window.location.origin}${window.location.pathname}#/menu?table=${table.id}&zone=${zone.id}`;
+        setQrModalData({ url: tableUrl, title: `${zone.name} - Mesa ${table.name}`});
     }
 
-    const baseUrl = window.location.origin + window.location.pathname;
-    const menuLink = `${baseUrl}#/menu`;
+    const tabs = [
+        { id: 'domicilio', title: 'Domicilio / Para recoger' },
+        { id: 'mesas', title: 'Mesas' },
+        { id: 'multi-sucursal', title: 'Enlace multi-sucursal' },
+    ];
 
     return (
         <div className="space-y-6">
-             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6 mb-6">
-                <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">Comparte tu menú digital</h2>
-                <div className="flex items-center gap-4">
-                    <input type="text" readOnly value={menuLink} className="flex-1 bg-gray-100 dark:bg-gray-700 border-none rounded-lg px-4 py-3 text-gray-600 dark:text-gray-300 font-mono text-sm focus:ring-0"/>
-                    <button onClick={() => copyToClipboard(menuLink)} className="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 px-4 py-3 rounded-lg font-semibold transition-colors">Copiar</button>
-                    <button onClick={() => openQrModal(menuLink, "Código QR del Menú", "menu-qr.png")} className="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 px-4 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2">
-                        <IconQR className="h-5 w-5"/> QR
-                    </button>
-                    <a href={menuLink} target="_blank" rel="noopener noreferrer" className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2">
-                        <IconExternalLink className="h-5 w-5"/> Abrir
-                    </a>
-                </div>
-            </div>
-
+            {qrModalData && <QRCodeModal url={qrModalData.url} title={qrModalData.title} onClose={() => setQrModalData(null)} />}
             <div className="border-b border-gray-200 dark:border-gray-700">
                 <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-                    <button onClick={() => setActiveTab('domicilio')} className={`${activeTab === 'domicilio' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}>Domicilios y Recoger</button>
-                    <button onClick={() => setActiveTab('mesas')} className={`${activeTab === 'mesas' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}>Mesas (Dine-in)</button>
-                    <button onClick={() => setActiveTab('multi-sucursal')} className={`${activeTab === 'multi-sucursal' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}>Multi-sucursal</button>
+                    {tabs.map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`${
+                                activeTab === tab.id
+                                    ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600'
+                            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm focus:outline-none`}
+                        >
+                            {tab.title}
+                        </button>
+                    ))}
                 </nav>
             </div>
 
             {activeTab === 'domicilio' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6 flex flex-col items-center text-center hover:border-emerald-500 transition-colors cursor-pointer group" onClick={() => copyToClipboard(menuLink)}>
-                         <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                            <IconDelivery className="h-8 w-8"/>
-                         </div>
-                         <h3 className="font-bold text-lg mb-2">Enlace para Domicilios</h3>
-                         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Comparte este enlace en tus redes sociales (Instagram, Facebook) y perfil de WhatsApp Business.</p>
-                         <span className="text-emerald-600 font-semibold text-sm">Click para copiar</span>
+                <div className="space-y-6 max-w-4xl mx-auto">
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border dark:border-gray-700">
+                        <h3 className="font-semibold text-lg">Enlace de menú</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">El enlace de menú permite a tus clientes hacer pedidos a domicilio y para recoger.</p>
+                        <div className="mt-4 flex flex-col sm:flex-row items-center gap-2 p-2 bg-gray-50 dark:bg-gray-900/50 rounded-md border dark:border-gray-700">
+                            <span className="text-gray-700 dark:text-gray-300 px-2 flex-grow">{menuUrl}</span>
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => handleCopy('link')} className="px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md text-sm font-semibold hover:bg-gray-100 dark:hover:bg-gray-600 w-32">
+                                    {copyStatus === 'link' ? 'Copiado!' : 'Copiar enlace'}
+                                </button>
+                                <button onClick={() => setQrModalData({ url: menuUrl, title: "Menú Digital" })} className="p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600"><IconQR/></button>
+                                <a href="#/menu" target="_blank" className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700">
+                                    Ver menú
+                                </a>
+                            </div>
+                        </div>
                     </div>
-                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6 flex flex-col items-center text-center hover:border-emerald-500 transition-colors cursor-pointer group" onClick={() => copyToClipboard(menuLink)}>
-                         <div className="w-16 h-16 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                            <IconStore className="h-8 w-8"/>
-                         </div>
-                         <h3 className="font-bold text-lg mb-2">Enlace para Recoger</h3>
-                         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Ideal para clientes que quieren ordenar antes de llegar a tu local.</p>
-                         <span className="text-emerald-600 font-semibold text-sm">Click para copiar</span>
+                     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border dark:border-gray-700">
+                        <h3 className="font-semibold text-lg flex items-center gap-x-2">¿Cómo compartir? <IconWhatsapp className="h-6 w-6 text-green-500" /></h3>
+                        <p className="font-semibold mt-4">WhatsApp Business</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Configura este mensaje para ser enviado automáticamente cada vez que un cliente quiera hacer un pedido.</p>
+                        <a href="#" className="flex items-center gap-x-1 text-sm text-green-600 dark:text-green-400 font-semibold mt-2 hover:underline"><IconPlayCircle className="h-5 w-5"/> Ver tutorial para configurarlo</a>
+                        <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-md border dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                            {whatsAppMessage}
+                        </div>
+                        <div className="text-right mt-4">
+                            <button onClick={() => handleCopy('message')} className="px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md text-sm font-semibold hover:bg-gray-100 dark:hover:bg-gray-600 w-36">
+                               {copyStatus === 'message' ? 'Copiado!' : 'Copiar mensaje'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
             
             {activeTab === 'mesas' && (
                 <div className="space-y-6">
-                    {zones.length === 0 ? (
-                         <div className="text-center py-10 px-6 border-2 border-dashed dark:border-gray-600 rounded-lg">
-                            <IconTableLayout className="h-10 w-10 mx-auto text-gray-400 mb-3"/>
-                            <h4 className="text-md font-semibold text-gray-800 dark:text-gray-200">No tienes mesas configuradas</h4>
-                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 mb-4">Configura tus zonas y mesas primero para generar sus códigos QR.</p>
-                            <button onClick={onGoToTableSettings} className="text-emerald-600 font-semibold hover:underline">Ir a configuración de mesas</button>
-                        </div>
-                    ) : (
-                        zones.map(zone => (
-                            <div key={zone.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6">
-                                <h3 className="font-bold text-lg mb-4 border-b dark:border-gray-700 pb-2">{zone.name}</h3>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                                    {zone.tables.map(table => {
-                                        const tableUrl = `${menuLink}?table=${table.name}&zone=${zone.name}`;
-                                        return (
-                                            <div key={table.id} className="border dark:border-gray-600 rounded-lg p-4 text-center hover:shadow-md transition-shadow bg-gray-50 dark:bg-gray-900/50">
-                                                <p className="font-bold text-lg mb-2">{table.name}</p>
-                                                <button 
-                                                    onClick={() => openQrModal(tableUrl, `Mesa ${table.name} - ${zone.name}`, `qr-${zone.name}-${table.name}.png`)}
-                                                    className="text-xs bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 px-3 py-1.5 rounded-md font-medium hover:bg-gray-100 dark:hover:bg-gray-600"
-                                                >
-                                                    Ver QR
-                                                </button>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border dark:border-gray-700">
+                        <p className="text-sm text-gray-600 dark:text-gray-300">Utiliza los QR de mesas para que tus clientes realicen los pedidos directamente desde su mesa. El cliente podrá escoger productos, hacer pedidos, llamar al mesero y solicitar la cuenta, todo desde el menú digital interactivo sin la intervención directa de un mesero. Recibe los pedidos y las alertas en el <a href="#" className="text-emerald-600 font-semibold hover:underline">Panel de mesas</a>.</p>
+                    </div>
+                     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border dark:border-gray-700">
+                        <h3 className="font-semibold text-lg">¿Cómo compartir?</h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Coloca los códigos QR impresos en sus respectivas mesas, preferiblemente en servilleteros o en el centro de la mesa, para que tus clientes puedan verlos y escanearlos facilmente.</p>
+                     </div>
+                      <div className="p-3 bg-blue-50 dark:bg-blue-900/50 border border-blue-200 dark:border-blue-800 rounded-md flex items-center gap-x-3 text-sm text-blue-800 dark:text-blue-200">
+                        <IconInfo className="h-5 w-5 flex-shrink-0" />
+                        <span>Cada mesa tiene su propio código QR. Haz clic en una mesa para descargar su código QR.</span>
+                    </div>
+
+                    {zones.map(zone => (
+                         <div key={zone.id} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border dark:border-gray-700">
+                            <div className="flex justify-between items-center mb-6">
+                                <span className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-full text-sm font-medium">{zone.name}</span>
+                                <button onClick={onConfigureZonesClick} className="flex items-center gap-x-1 px-3 py-1.5 border dark:border-gray-600 rounded-md text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-700">
+                                    <IconSettings className="h-4 w-4"/> Ajustes
+                                </button>
                             </div>
-                        ))
-                    )}
+                            {zone.tables.length === 0 ? (
+                                <div className="text-center py-10">
+                                    <div className="mx-auto h-16 w-16 text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                                        <IconTableLayout className="h-10 w-10"/>
+                                    </div>
+                                    <h4 className="mt-4 font-semibold">No hay mesas en esta zona</h4>
+                                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Agrega mesas en esta zona para que tus clientes hagan pedidos en tu restaurante directamente desde su mesa.</p>
+                                    <button onClick={onConfigureZonesClick} className="mt-6 flex items-center mx-auto space-x-2 px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700">
+                                        <IconPlus className="h-5 w-5" />
+                                        <span>Agregar mesas</span>
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                                    {zone.tables.map(table => (
+                                        <button key={table.id} onClick={() => handleTableClick(zone, table)} className="aspect-square flex flex-col items-center justify-center border-2 dark:border-gray-600 rounded-lg font-bold text-lg hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/50 dark:hover:text-emerald-300 transition-colors">
+                                            <span>{table.name}</span>
+                                            <IconQR className="h-5 w-5 mt-1 text-gray-400"/>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                         </div>
+                    ))}
                 </div>
             )}
 
             {activeTab === 'multi-sucursal' && (
-                 <div className="text-center py-16 px-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                    <div className="mx-auto h-16 w-16 text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-                        <IconStore className="h-10 w-10" />
-                    </div>
-                    <h3 className="mt-4 text-lg font-semibold text-gray-800 dark:text-gray-200">Gestión Multi-sucursal</h3>
-                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">Próximamente podrás gestionar múltiples sucursales y generar enlaces únicos para cada una.</p>
-                </div>
-            )}
-
-            <QRModal 
-                isOpen={isQrModalOpen} 
-                onClose={() => setIsQrModalOpen(false)} 
-                url={qrModalData.url} 
-                title={qrModalData.title} 
-                filename={qrModalData.filename}
-            />
-            
-            {toastMessage && (
-                <div className="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-2 animate-fade-in-up">
-                    <IconCheck className="h-5 w-5 text-emerald-400"/>
-                    {toastMessage}
+                <div className="text-center p-10 text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
+                    Enlace multi-sucursal (próximamente)
                 </div>
             )}
         </div>
     );
 };
 
+const MenuPreviewModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
+    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+        <style>{`
+            @keyframes fade-in {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            .animate-fade-in {
+                animation: fade-in 0.2s ease-out forwards;
+            }
+        `}</style>
+        <div 
+            className="relative w-full max-w-[400px] h-[820px] flex flex-col bg-black rounded-[40px] shadow-2xl border-4 border-gray-700 overflow-hidden" 
+            onClick={e => e.stopPropagation()}
+        >
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-6 bg-black rounded-b-xl z-20"></div>
+            <div className="flex-grow overflow-y-auto bg-white">
+                <CustomerView />
+            </div>
+        </div>
+        <button onClick={onClose} className="absolute top-4 right-4 text-white bg-gray-800/50 p-2 rounded-full hover:bg-gray-700/70 z-50">
+            <IconX className="h-6 w-6" />
+        </button>
+    </div>
+);
+
+// FIX: Moved AdminView component definition to the end of the file to fix 'Cannot find name' errors for components it uses (e.g., Analytics, Messages, etc.).
 const AdminView: React.FC = () => {
     const [currentPage, setCurrentPage] = useState<AdminViewPage>('dashboard');
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [isPreviewOpen, setIsPreviewOpen] = useState(false); // Placeholder for preview modal logic
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [theme, toggleTheme] = useTheme();
-    
-    // State for Zone Editor Logic
-    const [isZoneEditorOpen, setIsZoneEditorOpen] = useState(false);
-    const [zoneToEdit, setZoneToEdit] = useState<Zone | null>(null);
+    const [zones, setZones] = useState<Zone[]>([]);
+    const [initialSettingsPage, setInitialSettingsPage] = useState<SettingsPage>('general');
 
-    const openTableSettings = () => {
-        setIsSettingsOpen(true);
-        // In a real app, pass initialPage='zones-tables' prop to SettingsModal
-    };
-    
-    const handleEditZoneLayout = (zone: Zone) => {
-        setZoneToEdit(zone);
-        setIsSettingsOpen(false);
-        setIsZoneEditorOpen(true);
-    };
-
-    const handleSaveZoneLayout = async (updatedZone: Zone) => {
+    const fetchAdminZones = async () => {
         try {
-            await saveZoneLayout(updatedZone);
-            setIsZoneEditorOpen(false);
-            setZoneToEdit(null);
-            setIsSettingsOpen(true); // Return to settings
+            const data = await getZones();
+            setZones(data);
         } catch (error) {
-            alert("Error al guardar la distribución: " + error);
+            console.error("Failed to fetch zones for admin view:", error);
         }
     };
 
-    const renderPage = () => {
-        switch (currentPage) {
-            case 'dashboard': return <Dashboard />;
-            case 'products': return <MenuManagement />;
-            case 'orders': return <OrderManagement onSettingsClick={openTableSettings} />;
-            case 'analytics': return <Analytics />;
-            case 'messages': return <Messages />;
-            case 'availability': return <AvailabilityView />;
-            case 'share': return <ShareView onGoToTableSettings={openTableSettings}/>;
-            case 'tutorials': return <div className="p-10 text-center text-gray-500">Tutoriales próximamente...</div>;
-            default: return <Dashboard />;
-        }
+    useEffect(() => {
+        fetchAdminZones();
+    }, []);
+
+    const handleOpenSettings = (page: SettingsPage = 'general') => {
+        setInitialSettingsPage(page);
+        setIsSettingsOpen(true);
     };
 
     return (
-        <div className="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-200 overflow-hidden transition-colors duration-200">
+        <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
             <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
-            <div className="flex-1 flex flex-col min-w-0">
+            <div className="flex-1 flex flex-col overflow-hidden">
                 <Header 
                     title={PAGE_TITLES[currentPage]} 
-                    onSettingsClick={() => setIsSettingsOpen(true)} 
+                    onSettingsClick={() => handleOpenSettings()}
                     onPreviewClick={() => setIsPreviewOpen(true)}
                     theme={theme}
-                    toggleTheme={toggleTheme}
+                    toggleTheme={toggleTheme} 
                 />
-                <main className="flex-1 overflow-auto p-8 scroll-smooth">
-                    <div className="max-w-7xl mx-auto">
-                        {renderPage()}
-                    </div>
+                <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900 p-6 md:p-8">
+                    {currentPage === 'dashboard' && <Dashboard />}
+                    {currentPage === 'products' && <MenuManagement />}
+                    {currentPage === 'orders' && <OrderManagement onSettingsClick={() => handleOpenSettings('zones-tables')} />}
+                    {currentPage === 'analytics' && <Analytics />}
+                    {currentPage === 'messages' && <Messages />}
+                    {currentPage === 'availability' && <AvailabilityView />}
+                    {currentPage === 'share' && <ShareView zones={zones} onConfigureZonesClick={() => handleOpenSettings('zones-tables')} />}
+                    {currentPage === 'tutorials' && <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">Tutoriales (próximamente)</div>}
                 </main>
             </div>
-            
-            {isZoneEditorOpen && zoneToEdit && (
-                <ZoneEditor 
-                    initialZone={zoneToEdit}
-                    onSave={handleSaveZoneLayout}
-                    onExit={() => {
-                        setIsZoneEditorOpen(false);
-                        setZoneToEdit(null);
-                        setIsSettingsOpen(true);
-                    }}
-                />
-            )}
-            
-            <SettingsModal 
-                isOpen={isSettingsOpen} 
-                onClose={() => setIsSettingsOpen(false)} 
-                onEditZoneLayout={handleEditZoneLayout}
-            />
+            {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} initialPage={initialSettingsPage} onDataChange={fetchAdminZones} />}
+            {isPreviewOpen && <MenuPreviewModal onClose={() => setIsPreviewOpen(false)} />}
         </div>
     );
 };
