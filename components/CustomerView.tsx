@@ -1,12 +1,314 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck, IconCalendar, IconDuplicate, IconMap } from '../constants';
+import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck, IconCalendar, IconDuplicate } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
-// Sub-components definitions
+// Main View Manager
+export default function CustomerView() {
+    const [view, setView] = useState<'menu' | 'cart' | 'checkout' | 'confirmation'>('menu');
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+    const [generalComments, setGeneralComments] = useState('');
+    const [settings, setSettings] = useState<AppSettings | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [tableInfo, setTableInfo] = useState<{ table: string; zone: string } | null>(null);
+    // State for Order Type (Delivery, TakeAway, DineIn)
+    const [orderType, setOrderType] = useState<OrderType>(OrderType.Delivery);
+
+    const { cartItems, addToCart, removeFromCart, updateQuantity, clearCart, cartTotal, itemCount } = useCart();
+    
+    // Global data for the menu
+    const [allPromotions, setAllPromotions] = useState<Promotion[]>([]);
+    const [allPersonalizations, setAllPersonalizations] = useState<Personalization[]>([]);
+    const [allProducts, setAllProducts] = useState<Product[]>([]);
+    const [allCategories, setAllCategories] = useState<Category[]>([]);
+
+    const fetchMenuData = async () => {
+        try {
+            // Parallel data fetching for speed
+            const [appSettings, fetchedPromotions, fetchedPersonalizations, fetchedProducts, fetchedCategories] = await Promise.all([
+                getAppSettings(),
+                getPromotions(),
+                getPersonalizations(),
+                getProducts(),
+                getCategories()
+            ]);
+            setSettings(appSettings);
+            setAllPromotions(fetchedPromotions);
+            setAllPersonalizations(fetchedPersonalizations);
+            setAllProducts(fetchedProducts);
+            setAllCategories(fetchedCategories);
+        } catch (error) {
+            console.error("Failed to fetch data:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchMenuData();
+        
+        // Subscribe to real-time updates for the menu (Admin changes)
+        subscribeToMenuUpdates(() => {
+            console.log("Menu updated from admin (Realtime), refreshing...");
+            fetchMenuData();
+        });
+
+        // Polling fallback: Check for updates every 30 seconds to ensure sync
+        const intervalId = setInterval(() => {
+            console.log("Auto-refreshing menu data (Polling)...");
+            fetchMenuData();
+        }, 30000);
+
+        const params = new URLSearchParams(window.location.hash.split('?')[1]);
+        const table = params.get('table');
+        const zone = params.get('zone');
+        if (table && zone) {
+            setTableInfo({ table, zone });
+            setOrderType(OrderType.DineIn);
+        }
+
+        return () => {
+            unsubscribeFromChannel();
+            clearInterval(intervalId);
+        };
+    }, []);
+
+    const handleProductClick = (product: Product) => {
+        setSelectedProduct(product);
+    };
+
+    const handleAddToCart = (product: Product, quantity: number, comments?: string, options: PersonalizationOption[] = []) => {
+        addToCart(product, quantity, comments, options);
+        setSelectedProduct(null);
+    };
+
+    const handlePlaceOrder = async (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number = 0) => {
+        if (!settings) return;
+
+        const shippingCost = (orderType === OrderType.Delivery && settings.shipping.costType === ShippingCostType.Fixed) 
+            ? (settings.shipping.fixedCost ?? 0) 
+            : 0;
+
+        const finalTotal = cartTotal + shippingCost + tipAmount;
+
+        const newOrder: Omit<Order, 'id' | 'createdAt'> = {
+            customer,
+            items: cartItems,
+            total: finalTotal,
+            status: OrderStatus.Pending,
+            branchId: 'main-branch',
+            generalComments: generalComments + (tipAmount > 0 ? ` | Propina: ${settings.company.currency.code} ${tipAmount.toFixed(2)}` : ''),
+            orderType: orderType,
+            tableId: orderType === OrderType.DineIn && tableInfo ? `${tableInfo.zone} - ${tableInfo.table}` : undefined,
+        };
+
+        try {
+            await saveOrder(newOrder);
+        } catch(e) {
+            console.error("Failed to save order", e);
+            alert("Hubo un error al guardar tu pedido. Por favor, intenta de nuevo.");
+            return; // Stop if saving fails
+        }
+
+        // Helper to format options string
+        const formatOptions = (item: CartItem) => {
+            if (!item.selectedOptions || item.selectedOptions.length === 0) return '';
+            return item.selectedOptions.map(opt => `    + ${opt.name}`).join('\n');
+        };
+
+        let messageParts: string[];
+
+        const itemDetails = cartItems.map(item => {
+            let detail = `*${item.quantity}x ${item.name}*`;
+            const optionsStr = formatOptions(item);
+            if (optionsStr) detail += `\n${optionsStr}`;
+            if (item.comments) detail += `\n  - _Nota: ${item.comments}_`;
+            return detail;
+        });
+
+        const currency = settings.company.currency.code;
+
+        if (orderType === OrderType.DineIn) {
+            messageParts = [
+                `*🛎️ Nuevo Pedido en Mesa de ${settings.company.name.toUpperCase()}*`,
+                `---------------------------------`,
+                `*MESA:* ${tableInfo?.zone} - ${tableInfo?.table}`,
+                 `*CLIENTE:* ${customer.name}`,
+                `---------------------------------`,
+                `*DETALLES DEL PEDIDO:*`,
+                ...itemDetails,
+                ``,
+                generalComments ? `*Comentarios Generales:*\n_${generalComments}_` : '',
+                `---------------------------------`,
+                `*Subtotal:* ${currency} $${cartTotal.toFixed(2)}`,
+                tipAmount > 0 ? `*Propina:* ${currency} $${tipAmount.toFixed(2)}` : '',
+                `*Total a Pagar:* ${currency} $${finalTotal.toFixed(2)}`,
+                `*Método de pago:* ${paymentMethod}`,
+            ];
+        } else if (orderType === OrderType.TakeAway) {
+             messageParts = [
+                `*🛍️ Nuevo Pedido Para Recoger - ${settings.company.name.toUpperCase()}*`,
+                `---------------------------------`,
+                `*CLIENTE:*`,
+                `*Nombre:* ${customer.name}`,
+                `*Teléfono:* ${customer.phone}`,
+                `---------------------------------`,
+                `*TIPO:* Para llevar (Recoger en tienda)`,
+                `---------------------------------`,
+                `*DETALLES DEL PEDIDO:*`,
+                ...itemDetails,
+                ``,
+                generalComments ? `*Comentarios Generales:*\n_${generalComments}_` : '',
+                `---------------------------------`,
+                `*Subtotal:* ${currency} $${cartTotal.toFixed(2)}`,
+                tipAmount > 0 ? `*Propina:* ${currency} $${tipAmount.toFixed(2)}` : '',
+                `*Total a Pagar:* ${currency} $${finalTotal.toFixed(2)}`,
+                `*Método de pago:* ${paymentMethod}`,
+            ];
+        } else {
+            // Delivery
+            messageParts = [
+                `*⭐ Nuevo Pedido a Domicilio - ${settings.company.name.toUpperCase()}*`,
+                `---------------------------------`,
+                `*CLIENTE:*`,
+                `*Nombre:* ${customer.name}`,
+                `*Teléfono:* ${customer.phone}`,
+                `---------------------------------`,
+                `*DIRECCIÓN DE ENTREGA:*`,
+                `*Colonia:* ${customer.address.colonia}`,
+                `*Calle:* ${customer.address.calle}`,
+                `*Número:* ${customer.address.numero}`,
+                customer.address.entreCalles ? `*Entre Calles:* ${customer.address.entreCalles}` : '',
+                customer.address.referencias ? `*Referencias:* ${customer.address.referencias}` : '',
+                `---------------------------------`,
+                `*DETALLES DEL PEDIDO:*`,
+                ...itemDetails,
+                ``,
+                generalComments ? `*Comentarios Generales:*\n_${generalComments}_` : '',
+                `---------------------------------`,
+                `*Subtotal:* ${currency} $${cartTotal.toFixed(2)}`,
+                `*Envío:* ${shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : 'Por cotizar'}`,
+                tipAmount > 0 ? `*Propina:* ${currency} $${tipAmount.toFixed(2)}` : '',
+                `*Total Estimado:* ${currency} $${finalTotal.toFixed(2)}`,
+                `*Método de pago:* ${paymentMethod}`,
+            ];
+        }
+
+
+        const whatsappMessage = encodeURIComponent(messageParts.filter(p => p !== '').join('\n'));
+        const whatsappUrl = `https://wa.me/${settings.branch.whatsappNumber}?text=${whatsappMessage}`;
+        
+        window.open(whatsappUrl, '_blank');
+        setView('confirmation');
+    };
+
+    const handleStartNewOrder = () => {
+        clearCart();
+        setGeneralComments('');
+        setView('menu');
+        // Do not clear tableInfo, as the customer is likely still at the same table.
+    };
+
+    const getHeaderTitle = () => {
+        switch(view) {
+            case 'cart': return 'Tu pedido';
+            case 'checkout': return 'Completa tu pedido';
+            case 'confirmation': return 'Confirmación';
+            default: return '';
+        }
+    };
+    
+    const canGoBack = view === 'cart' || view === 'checkout';
+    const handleBack = () => {
+        if (view === 'checkout') setView('cart');
+        else if (view === 'cart') setView('menu');
+    }
+    
+    if (isLoading || !settings) {
+        return (
+            <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-gray-300">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500 mb-4"></div>
+                <p className="animate-pulse">Sincronizando menú...</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-gray-900 min-h-screen font-sans text-gray-100 selection:bg-emerald-500 selection:text-white">
+            <div className="container mx-auto max-w-md bg-gray-900 min-h-screen shadow-2xl relative pb-24 border-x border-gray-800">
+                
+                {view !== 'menu' && <Header title={getHeaderTitle()} onBack={canGoBack ? handleBack : undefined} />}
+
+                {view === 'menu' && (
+                    <>
+                        <RestaurantHero 
+                            settings={settings} 
+                            tableInfo={tableInfo} 
+                            orderType={orderType}
+                            setOrderType={setOrderType}
+                        />
+                        <MenuList 
+                            products={allProducts}
+                            categories={allCategories}
+                            onProductClick={handleProductClick} 
+                            cartItems={cartItems} 
+                            currency={settings.company.currency.code}
+                            promotions={allPromotions}
+                        />
+                    </>
+                )}
+
+                {view === 'cart' && (
+                    <CartSummaryView 
+                        cartItems={cartItems}
+                        cartTotal={cartTotal}
+                        onUpdateQuantity={updateQuantity}
+                        onRemoveItem={removeFromCart}
+                        generalComments={generalComments}
+                        onGeneralCommentsChange={setGeneralComments}
+                        onProceedToCheckout={() => setView('checkout')}
+                    />
+                )}
+                
+                {view === 'checkout' && (
+                    <CheckoutView 
+                        cartTotal={cartTotal}
+                        onPlaceOrder={handlePlaceOrder}
+                        settings={settings}
+                        orderType={orderType}
+                    />
+                )}
+
+                {view === 'confirmation' && (
+                    <OrderConfirmation onNewOrder={handleStartNewOrder} settings={settings} />
+                )}
+
+                {selectedProduct && (
+                    <ProductDetailModal 
+                        product={selectedProduct} 
+                        onAddToCart={handleAddToCart}
+                        onClose={() => setSelectedProduct(null)}
+                        personalizations={allPersonalizations}
+                        promotions={allPromotions}
+                    />
+                )}
+
+                {view === 'menu' && itemCount > 0 && (
+                    <FooterBar 
+                        itemCount={itemCount} 
+                        cartTotal={cartTotal}
+                        onViewCart={() => setView('cart')} 
+                    />
+                )}
+                <Chatbot />
+            </div>
+        </div>
+    );
+}
+
+// Sub-components
 const Header: React.FC<{ title: string; onBack?: () => void }> = ({ title, onBack }) => (
     <header className="p-4 flex justify-between items-center sticky top-0 bg-gray-900/90 backdrop-blur-md z-20 border-b border-gray-800">
         {onBack ? (
@@ -88,13 +390,7 @@ const RestaurantHero: React.FC<{
     const currentSchedule = schedules[0];
 
     useEffect(() => {
-        // Check manual override first
-        if (settings.branch.isOpen === false) {
-            setIsOpenNow(false);
-            return;
-        }
-
-        // Determine if open based on schedule
+        // Determine if open
         if (!currentSchedule) return;
         const now = new Date();
         const daysOrder = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -119,7 +415,7 @@ const RestaurantHero: React.FC<{
         } else {
             setIsOpenNow(false);
         }
-    }, [currentSchedule, settings.branch.isOpen]);
+    }, [currentSchedule]);
 
     const getShippingCostText = () => {
         if (orderType === OrderType.TakeAway) return "Gratis";
@@ -283,46 +579,6 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
     return { price: bestPrice, promotion: bestPromo };
 };
 
-const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: () => void; currency: string; promotions: Promotion[] }> = ({ product, quantityInCart, onClick, currency, promotions }) => {
-    const { price: discountedPrice, promotion } = getDiscountedPrice(product, promotions);
-    const hasDiscount = promotion !== undefined;
-
-    return (
-        <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group relative overflow-hidden">
-            {hasDiscount && (
-                <div className="absolute top-0 left-0 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-br-lg z-10">
-                    -{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}
-                </div>
-            )}
-            <div className="relative h-24 w-24 flex-shrink-0">
-                <img src={product.imageUrl} alt={product.name} className="w-full h-full rounded-lg object-cover" />
-                {quantityInCart > 0 && (
-                    <div className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg ring-2 ring-gray-900">
-                        {quantityInCart}
-                    </div>
-                )}
-            </div>
-            <div className="flex-1 flex flex-col justify-between py-1">
-                <div>
-                    <h3 className="font-bold text-gray-100 leading-tight group-hover:text-emerald-400 transition-colors">{product.name}</h3>
-                    <p className="text-sm text-gray-400 line-clamp-2 mt-1 leading-snug">{product.description}</p>
-                </div>
-                <div className="flex justify-between items-end mt-2">
-                    <div className="flex flex-col">
-                        {hasDiscount && (
-                            <span className="text-xs text-gray-500 line-through">{currency} ${product.price.toFixed(2)}</span>
-                        )}
-                        <p className={`font-bold ${hasDiscount ? 'text-rose-400' : 'text-white'}`}>{currency} ${discountedPrice.toFixed(2)}</p>
-                    </div>
-                    <div className="bg-gray-700 p-1.5 rounded-full text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
-                        <IconPlus className="h-4 w-4" />
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
 const MenuList: React.FC<{
     products: Product[],
     categories: Category[],
@@ -466,6 +722,46 @@ const MenuList: React.FC<{
     );
 };
 
+const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: () => void; currency: string; promotions: Promotion[] }> = ({ product, quantityInCart, onClick, currency, promotions }) => {
+    const { price: discountedPrice, promotion } = getDiscountedPrice(product, promotions);
+    const hasDiscount = promotion !== undefined;
+
+    return (
+        <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group relative overflow-hidden">
+            {hasDiscount && (
+                <div className="absolute top-0 left-0 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-br-lg z-10">
+                    -{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}
+                </div>
+            )}
+            <div className="relative h-24 w-24 flex-shrink-0">
+                <img src={product.imageUrl} alt={product.name} className="w-full h-full rounded-lg object-cover" />
+                {quantityInCart > 0 && (
+                    <div className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg ring-2 ring-gray-900">
+                        {quantityInCart}
+                    </div>
+                )}
+            </div>
+            <div className="flex-1 flex flex-col justify-between py-1">
+                <div>
+                    <h3 className="font-bold text-gray-100 leading-tight group-hover:text-emerald-400 transition-colors">{product.name}</h3>
+                    <p className="text-sm text-gray-400 line-clamp-2 mt-1 leading-snug">{product.description}</p>
+                </div>
+                <div className="flex justify-between items-end mt-2">
+                    <div className="flex flex-col">
+                        {hasDiscount && (
+                            <span className="text-xs text-gray-500 line-through">{currency} ${product.price.toFixed(2)}</span>
+                        )}
+                        <p className={`font-bold ${hasDiscount ? 'text-rose-400' : 'text-white'}`}>{currency} ${discountedPrice.toFixed(2)}</p>
+                    </div>
+                    <div className="bg-gray-700 p-1.5 rounded-full text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                        <IconPlus className="h-4 w-4" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const ProductDetailModal: React.FC<{
     product: Product, 
     onAddToCart: (product: Product, quantity: number, comments?: string, options?: PersonalizationOption[]) => void, 
@@ -514,7 +810,7 @@ const ProductDetailModal: React.FC<{
     // Validation is now optional as requested by user
     const isValid = true; 
 
-    const totalOptionsPrice = Object.values(selectedOptions).flat().reduce((acc: number, opt: PersonalizationOption) => acc + opt.price, 0);
+    const totalOptionsPrice = Object.values(selectedOptions).flat().reduce((acc, opt) => acc + opt.price, 0);
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
 
     const handleAdd = () => {
@@ -649,7 +945,7 @@ const CartSummaryView: React.FC<{
             <div className="space-y-4">
                 {cartItems.map(item => {
                     const options: PersonalizationOption[] = item.selectedOptions || [];
-                    const optionsTotal = options.reduce((acc: number, o: PersonalizationOption) => acc + o.price, 0);
+                    const optionsTotal = options.reduce((acc: number, o: any) => acc + o.price, 0);
                     const itemTotal = (item.price + optionsTotal) * item.quantity;
 
                     return (
@@ -834,7 +1130,7 @@ const CheckoutView: React.FC<{
             <div className="space-y-3 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
                  <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Pago</h3>
                  <div className="space-y-2 pt-2">
-                    {availableMethods.map(method => (
+                    {availablePaymentMethods.map(method => (
                         <div key={method}>
                             <label className={`flex justify-between items-center p-4 rounded-xl cursor-pointer transition-all border ${selectedPaymentMethod === method ? 'bg-emerald-900/20 border-emerald-500 ring-1 ring-emerald-500 shadow-lg shadow-emerald-900/10' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}>
                                 <span className={`font-medium ${selectedPaymentMethod === method ? 'text-emerald-400' : 'text-white'}`}>{method}</span>
@@ -941,328 +1237,3 @@ const FooterBar: React.FC<{ itemCount: number, cartTotal: number, onViewCart: ()
         </footer>
     );
 };
-
-// Main View Manager
-export default function CustomerView() {
-    const [view, setView] = useState<'menu' | 'cart' | 'checkout' | 'confirmation'>('menu');
-    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-    const [generalComments, setGeneralComments] = useState('');
-    const [settings, setSettings] = useState<AppSettings | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [tableInfo, setTableInfo] = useState<{ table: string; zone: string } | null>(null);
-    // State for Order Type (Delivery, TakeAway, DineIn)
-    const [orderType, setOrderType] = useState<OrderType>(OrderType.Delivery);
-
-    const { cartItems, addToCart, removeFromCart, updateQuantity, clearCart, cartTotal, itemCount } = useCart();
-    
-    // Global data for the menu
-    const [allPromotions, setAllPromotions] = useState<Promotion[]>([]);
-    const [allPersonalizations, setAllPersonalizations] = useState<Personalization[]>([]);
-    const [allProducts, setAllProducts] = useState<Product[]>([]);
-    const [allCategories, setAllCategories] = useState<Category[]>([]);
-
-    const fetchMenuData = async () => {
-        try {
-            // Parallel data fetching for speed
-            const [appSettings, fetchedPromotions, fetchedPersonalizations, fetchedProducts, fetchedCategories] = await Promise.all([
-                getAppSettings(),
-                getPromotions(),
-                getPersonalizations(),
-                getProducts(),
-                getCategories()
-            ]);
-            setSettings(appSettings);
-            setAllPromotions(fetchedPromotions);
-            setAllPersonalizations(fetchedPersonalizations);
-            setAllProducts(fetchedProducts);
-            setAllCategories(fetchedCategories);
-        } catch (error) {
-            console.error("Failed to fetch data:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchMenuData();
-        
-        // Subscribe to real-time updates for the menu (Admin changes)
-        subscribeToMenuUpdates(() => {
-            console.log("Menu updated from admin (Realtime), refreshing...");
-            fetchMenuData();
-        });
-
-        // Polling fallback: Check for updates every 30 seconds to ensure sync
-        const intervalId = setInterval(() => {
-            console.log("Auto-refreshing menu data (Polling)...");
-            fetchMenuData();
-        }, 30000);
-
-        const params = new URLSearchParams(window.location.hash.split('?')[1]);
-        const table = params.get('table');
-        const zone = params.get('zone');
-        if (table && zone) {
-            setTableInfo({ table, zone });
-            setOrderType(OrderType.DineIn);
-        }
-
-        return () => {
-            unsubscribeFromChannel();
-            clearInterval(intervalId);
-        };
-    }, []);
-
-    const handleProductClick = (product: Product) => {
-        setSelectedProduct(product);
-    };
-
-    const handleAddToCart = (product: Product, quantity: number, comments?: string, options: PersonalizationOption[] = []) => {
-        addToCart(product, quantity, comments, options);
-        setSelectedProduct(null);
-    };
-
-    const handlePlaceOrder = async (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number = 0, gpsLocation?: string) => {
-        if (!settings) return;
-
-        const shippingCost = (orderType === OrderType.Delivery && settings.shipping.costType === ShippingCostType.Fixed) 
-            ? (settings.shipping.fixedCost ?? 0) 
-            : 0;
-
-        const finalTotal = cartTotal + shippingCost + tipAmount;
-
-        const newOrder: Omit<Order, 'id' | 'createdAt'> = {
-            customer,
-            items: cartItems,
-            total: finalTotal,
-            status: OrderStatus.Pending,
-            branchId: 'main-branch',
-            generalComments: generalComments + (tipAmount > 0 ? ` | Propina: ${settings.company.currency.code} ${tipAmount.toFixed(2)}` : ''),
-            orderType: orderType,
-            tableId: orderType === OrderType.DineIn && tableInfo ? `${tableInfo.zone} - ${tableInfo.table}` : undefined,
-        };
-
-        try {
-            await saveOrder(newOrder);
-        } catch(e) {
-            console.error("Failed to save order", e);
-            alert("Hubo un error al guardar tu pedido. Por favor, intenta de nuevo.");
-            return; // Stop if saving fails
-        }
-
-        // Helper to format options string
-        const formatOptions = (item: CartItem) => {
-            if (!item.selectedOptions || item.selectedOptions.length === 0) return '';
-            return item.selectedOptions.map(opt => `   + ${opt.name}`).join('\n');
-        };
-
-        let messageParts: string[];
-
-        const itemDetails = cartItems.map(item => {
-            let detail = `▪️ ${item.quantity}x ${item.name}`;
-            const optionsStr = formatOptions(item);
-            if (optionsStr) detail += `\n${optionsStr}`;
-            if (item.comments) detail += `\n   _Nota: ${item.comments}_`;
-            return detail;
-        });
-
-        const currency = settings.company.currency.code;
-        const lineSeparator = "━━━━━━━━━━━━━━━━━━━━";
-
-        if (orderType === OrderType.DineIn) {
-            messageParts = [
-                `🧾 *TICKET DE PEDIDO - MESA*`,
-                `📍 *${settings.company.name.toUpperCase()}*`,
-                lineSeparator,
-                `🗓️ Fecha: ${new Date().toLocaleDateString()}`,
-                `⏰ Hora: ${new Date().toLocaleTimeString()}`,
-                lineSeparator,
-                `🪑 *UBICACIÓN*`,
-                `Zona: ${tableInfo?.zone}`,
-                `Mesa: ${tableInfo?.table}`,
-                `👤 Cliente: ${customer.name}`,
-                lineSeparator,
-                `🛒 *DETALLE DEL CONSUMO*`,
-                ...itemDetails,
-                ``,
-                generalComments ? `📝 *NOTAS:* ${generalComments}` : '',
-                lineSeparator,
-                `💰 *RESUMEN*`,
-                `Subtotal: ${currency} $${cartTotal.toFixed(2)}`,
-                tipAmount > 0 ? `Propina: ${currency} $${tipAmount.toFixed(2)}` : '',
-                `*TOTAL A PAGAR: ${currency} $${finalTotal.toFixed(2)}*`,
-                lineSeparator,
-                `💳 Método: ${paymentMethod}`,
-                `✅ Estado: PENDIENTE DE CONFIRMACIÓN`
-            ];
-        } else if (orderType === OrderType.TakeAway) {
-             messageParts = [
-                `🧾 *TICKET PARA RECOGER*`,
-                `📍 *${settings.company.name.toUpperCase()}*`,
-                lineSeparator,
-                `🗓️ Fecha: ${new Date().toLocaleDateString()}`,
-                `⏰ Hora: ${new Date().toLocaleTimeString()}`,
-                lineSeparator,
-                `👤 *CLIENTE*`,
-                `Nombre: ${customer.name}`,
-                `Tel: ${customer.phone}`,
-                `🏷️ Tipo: Para llevar (Pick-up)`,
-                lineSeparator,
-                `🛒 *DETALLE DEL PEDIDO*`,
-                ...itemDetails,
-                ``,
-                generalComments ? `📝 *NOTAS:* ${generalComments}` : '',
-                lineSeparator,
-                `💰 *RESUMEN*`,
-                `Subtotal: ${currency} $${cartTotal.toFixed(2)}`,
-                tipAmount > 0 ? `Propina: ${currency} $${tipAmount.toFixed(2)}` : '',
-                `*TOTAL A PAGAR: ${currency} $${finalTotal.toFixed(2)}*`,
-                lineSeparator,
-                `💳 Método: ${paymentMethod}`,
-                `✅ Estado: PENDIENTE DE CONFIRMACIÓN`
-            ];
-        } else {
-            // Delivery
-            messageParts = [
-                `🧾 *TICKET DE ENTREGA*`,
-                `📍 *${settings.company.name.toUpperCase()}*`,
-                lineSeparator,
-                `🗓️ Fecha: ${new Date().toLocaleDateString()}`,
-                `⏰ Hora: ${new Date().toLocaleTimeString()}`,
-                lineSeparator,
-                `👤 *CLIENTE*`,
-                `Nombre: ${customer.name}`,
-                `Tel: ${customer.phone}`,
-                lineSeparator,
-                `📍 *DIRECCIÓN DE ENTREGA*`,
-                gpsLocation ? `🌐 *Ubicación GPS:* ${gpsLocation}` : '',
-                customer.address.calle ? `🏠 ${customer.address.calle} #${customer.address.numero}` : '',
-                customer.address.colonia ? `🏙️ Col. ${customer.address.colonia}` : '',
-                customer.address.referencias ? `👀 Ref: ${customer.address.referencias}` : '',
-                lineSeparator,
-                `🛒 *DETALLE DEL PEDIDO*`,
-                ...itemDetails,
-                ``,
-                generalComments ? `📝 *NOTAS:* ${generalComments}` : '',
-                lineSeparator,
-                `💰 *RESUMEN*`,
-                `Subtotal: ${currency} $${cartTotal.toFixed(2)}`,
-                `Envío: ${shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : 'Por cotizar'}`,
-                tipAmount > 0 ? `Propina: ${currency} $${tipAmount.toFixed(2)}` : '',
-                `*TOTAL A PAGAR: ${currency} $${finalTotal.toFixed(2)}*`,
-                lineSeparator,
-                `💳 Método: ${paymentMethod}`,
-                `✅ Estado: PENDIENTE DE CONFIRMACIÓN`
-            ];
-        }
-
-
-        const whatsappMessage = encodeURIComponent(messageParts.filter(p => p !== '').join('\n'));
-        const whatsappUrl = `https://wa.me/${settings.branch.whatsappNumber}?text=${whatsappMessage}`;
-        
-        window.open(whatsappUrl, '_blank');
-        setView('confirmation');
-    };
-
-    const handleStartNewOrder = () => {
-        clearCart();
-        setGeneralComments('');
-        setView('menu');
-        // Do not clear tableInfo, as the customer is likely still at the same table.
-    };
-
-    const getHeaderTitle = () => {
-        switch(view) {
-            case 'cart': return 'Tu pedido';
-            case 'checkout': return 'Completa tu pedido';
-            case 'confirmation': return 'Confirmación';
-            default: return '';
-        }
-    };
-    
-    const canGoBack = view === 'cart' || view === 'checkout';
-    const handleBack = () => {
-        if (view === 'checkout') setView('cart');
-        else if (view === 'cart') setView('menu');
-    }
-    
-    if (isLoading || !settings) {
-        return (
-            <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-gray-300">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500 mb-4"></div>
-                <p className="animate-pulse">Sincronizando menú...</p>
-            </div>
-        );
-    }
-
-    return (
-        <div className="bg-gray-900 min-h-screen font-sans text-gray-100 selection:bg-emerald-500 selection:text-white">
-            <div className="container mx-auto max-w-md bg-gray-900 min-h-screen shadow-2xl relative pb-24 border-x border-gray-800">
-                
-                {view !== 'menu' && <Header title={getHeaderTitle()} onBack={canGoBack ? handleBack : undefined} />}
-
-                {view === 'menu' && (
-                    <>
-                        <RestaurantHero 
-                            settings={settings} 
-                            tableInfo={tableInfo} 
-                            orderType={orderType}
-                            setOrderType={setOrderType}
-                        />
-                        <MenuList 
-                            products={allProducts}
-                            categories={allCategories}
-                            onProductClick={handleProductClick} 
-                            cartItems={cartItems} 
-                            currency={settings.company.currency.code}
-                            promotions={allPromotions}
-                        />
-                    </>
-                )}
-
-                {view === 'cart' && (
-                    <CartSummaryView 
-                        cartItems={cartItems}
-                        cartTotal={cartTotal}
-                        onUpdateQuantity={updateQuantity}
-                        onRemoveItem={removeFromCart}
-                        generalComments={generalComments}
-                        onGeneralCommentsChange={setGeneralComments}
-                        onProceedToCheckout={() => setView('checkout')}
-                    />
-                )}
-                
-                {view === 'checkout' && (
-                    <CheckoutView 
-                        cartTotal={cartTotal}
-                        onPlaceOrder={handlePlaceOrder}
-                        settings={settings}
-                        orderType={orderType}
-                    />
-                )}
-
-                {view === 'confirmation' && (
-                    <OrderConfirmation onNewOrder={handleStartNewOrder} settings={settings} />
-                )}
-
-                {selectedProduct && (
-                    <ProductDetailModal 
-                        product={selectedProduct} 
-                        onAddToCart={handleAddToCart}
-                        onClose={() => setSelectedProduct(null)}
-                        personalizations={allPersonalizations}
-                        promotions={allPromotions}
-                    />
-                )}
-
-                {view === 'menu' && itemCount > 0 && (
-                    <FooterBar 
-                        itemCount={itemCount} 
-                        cartTotal={cartTotal}
-                        onViewCart={() => setView('cart')} 
-                    />
-                )}
-                <Chatbot />
-            </div>
-        </div>
-    );
-}
