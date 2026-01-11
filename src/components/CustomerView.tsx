@@ -6,331 +6,6 @@ import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, Ic
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
-// Main View Manager
-export default function CustomerView() {
-    const [view, setView] = useState<'menu' | 'cart' | 'checkout' | 'confirmation'>('menu');
-    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-    const [generalComments, setGeneralComments] = useState('');
-    const [settings, setSettings] = useState<AppSettings | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [tableInfo, setTableInfo] = useState<{ table: string; zone: string } | null>(null);
-    // State for Order Type (Delivery, TakeAway, DineIn)
-    const [orderType, setOrderType] = useState<OrderType>(OrderType.Delivery);
-
-    const { cartItems, addToCart, removeFromCart, updateQuantity, clearCart, cartTotal, itemCount } = useCart();
-    
-    // Global data for the menu
-    const [allPromotions, setAllPromotions] = useState<Promotion[]>([]);
-    const [allPersonalizations, setAllPersonalizations] = useState<Personalization[]>([]);
-    const [allProducts, setAllProducts] = useState<Product[]>([]);
-    const [allCategories, setAllCategories] = useState<Category[]>([]);
-
-    const fetchMenuData = async () => {
-        try {
-            // Parallel data fetching for speed
-            const [appSettings, fetchedPromotions, fetchedPersonalizations, fetchedProducts, fetchedCategories] = await Promise.all([
-                getAppSettings(),
-                getPromotions(),
-                getPersonalizations(),
-                getProducts(),
-                getCategories()
-            ]);
-            setSettings(appSettings);
-            setAllPromotions(fetchedPromotions);
-            setAllPersonalizations(fetchedPersonalizations);
-            setAllProducts(fetchedProducts);
-            setAllCategories(fetchedCategories);
-        } catch (error) {
-            console.error("Failed to fetch data:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchMenuData();
-        
-        // Subscribe to real-time updates for the menu (Admin changes)
-        subscribeToMenuUpdates(() => {
-            console.log("Menu updated from admin (Realtime), refreshing...");
-            fetchMenuData();
-        });
-
-        // Polling fallback: Check for updates every 30 seconds to ensure sync
-        const intervalId = setInterval(() => {
-            console.log("Auto-refreshing menu data (Polling)...");
-            fetchMenuData();
-        }, 30000);
-
-        const params = new URLSearchParams(window.location.hash.split('?')[1]);
-        const table = params.get('table');
-        const zone = params.get('zone');
-        if (table && zone) {
-            setTableInfo({ table, zone });
-            setOrderType(OrderType.DineIn);
-        }
-
-        return () => {
-            unsubscribeFromChannel();
-            clearInterval(intervalId);
-        };
-    }, []);
-
-    const handleProductClick = (product: Product) => {
-        setSelectedProduct(product);
-    };
-
-    const handleAddToCart = (product: Product, quantity: number, comments?: string, options: PersonalizationOption[] = []) => {
-        addToCart(product, quantity, comments, options);
-        setSelectedProduct(null);
-    };
-
-    const handlePlaceOrder = async (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number = 0, gpsLocation?: string) => {
-        if (!settings) return;
-
-        const shippingCost = (orderType === OrderType.Delivery && settings.shipping.costType === ShippingCostType.Fixed) 
-            ? (settings.shipping.fixedCost ?? 0) 
-            : 0;
-
-        const finalTotal = cartTotal + shippingCost + tipAmount;
-
-        const newOrder: Omit<Order, 'id' | 'createdAt'> = {
-            customer,
-            items: cartItems,
-            total: finalTotal,
-            status: OrderStatus.Pending,
-            branchId: 'main-branch',
-            generalComments: generalComments + (tipAmount > 0 ? ` | Propina: ${settings.company.currency.code} ${tipAmount.toFixed(2)}` : ''),
-            orderType: orderType,
-            tableId: orderType === OrderType.DineIn && tableInfo ? `${tableInfo.zone} - ${tableInfo.table}` : undefined,
-        };
-
-        try {
-            await saveOrder(newOrder);
-        } catch(e) {
-            console.error("Failed to save order", e);
-            alert("Hubo un error al guardar tu pedido. Por favor, intenta de nuevo.");
-            return; // Stop if saving fails
-        }
-
-        // Helper to format options string
-        const formatOptions = (item: CartItem) => {
-            if (!item.selectedOptions || item.selectedOptions.length === 0) return '';
-            return item.selectedOptions.map(opt => `   + ${opt.name}`).join('\n');
-        };
-
-        let messageParts: string[];
-
-        const itemDetails = cartItems.map(item => {
-            let detail = `▪️ ${item.quantity}x ${item.name}`;
-            const optionsStr = formatOptions(item);
-            if (optionsStr) detail += `\n${optionsStr}`;
-            if (item.comments) detail += `\n   _Nota: ${item.comments}_`;
-            return detail;
-        });
-
-        const currency = settings.company.currency.code;
-        const lineSeparator = "━━━━━━━━━━━━━━━━━━━━";
-
-        if (orderType === OrderType.DineIn) {
-            messageParts = [
-                `🧾 *TICKET DE PEDIDO - MESA*`,
-                `📍 *${settings.company.name.toUpperCase()}*`,
-                lineSeparator,
-                `🗓️ Fecha: ${new Date().toLocaleDateString()}`,
-                `⏰ Hora: ${new Date().toLocaleTimeString()}`,
-                lineSeparator,
-                `🪑 *UBICACIÓN*`,
-                `Zona: ${tableInfo?.zone}`,
-                `Mesa: ${tableInfo?.table}`,
-                `👤 Cliente: ${customer.name}`,
-                lineSeparator,
-                `🛒 *DETALLE DEL CONSUMO*`,
-                ...itemDetails,
-                ``,
-                generalComments ? `📝 *NOTAS:* ${generalComments}` : '',
-                lineSeparator,
-                `💰 *RESUMEN*`,
-                `Subtotal: ${currency} $${cartTotal.toFixed(2)}`,
-                tipAmount > 0 ? `Propina: ${currency} $${tipAmount.toFixed(2)}` : '',
-                `*TOTAL A PAGAR: ${currency} $${finalTotal.toFixed(2)}*`,
-                lineSeparator,
-                `💳 Método: ${paymentMethod}`,
-                `✅ Estado: PENDIENTE DE CONFIRMACIÓN`
-            ];
-        } else if (orderType === OrderType.TakeAway) {
-             messageParts = [
-                `🧾 *TICKET PARA RECOGER*`,
-                `📍 *${settings.company.name.toUpperCase()}*`,
-                lineSeparator,
-                `🗓️ Fecha: ${new Date().toLocaleDateString()}`,
-                `⏰ Hora: ${new Date().toLocaleTimeString()}`,
-                lineSeparator,
-                `👤 *CLIENTE*`,
-                `Nombre: ${customer.name}`,
-                `Tel: ${customer.phone}`,
-                `🏷️ Tipo: Para llevar (Pick-up)`,
-                lineSeparator,
-                `🛒 *DETALLE DEL PEDIDO*`,
-                ...itemDetails,
-                ``,
-                generalComments ? `📝 *NOTAS:* ${generalComments}` : '',
-                lineSeparator,
-                `💰 *RESUMEN*`,
-                `Subtotal: ${currency} $${cartTotal.toFixed(2)}`,
-                tipAmount > 0 ? `Propina: ${currency} $${tipAmount.toFixed(2)}` : '',
-                `*TOTAL A PAGAR: ${currency} $${finalTotal.toFixed(2)}*`,
-                lineSeparator,
-                `💳 Método: ${paymentMethod}`,
-                `✅ Estado: PENDIENTE DE CONFIRMACIÓN`
-            ];
-        } else {
-            // Delivery
-            messageParts = [
-                `🧾 *TICKET DE ENTREGA*`,
-                `📍 *${settings.company.name.toUpperCase()}*`,
-                lineSeparator,
-                `🗓️ Fecha: ${new Date().toLocaleDateString()}`,
-                `⏰ Hora: ${new Date().toLocaleTimeString()}`,
-                lineSeparator,
-                `👤 *CLIENTE*`,
-                `Nombre: ${customer.name}`,
-                `Tel: ${customer.phone}`,
-                lineSeparator,
-                `📍 *DIRECCIÓN DE ENTREGA*`,
-                gpsLocation ? `🌐 *Ubicación GPS:* ${gpsLocation}` : '',
-                customer.address.calle ? `🏠 ${customer.address.calle} #${customer.address.numero}` : '',
-                customer.address.colonia ? `🏙️ Col. ${customer.address.colonia}` : '',
-                customer.address.referencias ? `👀 Ref: ${customer.address.referencias}` : '',
-                lineSeparator,
-                `🛒 *DETALLE DEL PEDIDO*`,
-                ...itemDetails,
-                ``,
-                generalComments ? `📝 *NOTAS:* ${generalComments}` : '',
-                lineSeparator,
-                `💰 *RESUMEN*`,
-                `Subtotal: ${currency} $${cartTotal.toFixed(2)}`,
-                `Envío: ${shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : 'Por cotizar'}`,
-                tipAmount > 0 ? `Propina: ${currency} $${tipAmount.toFixed(2)}` : '',
-                `*TOTAL A PAGAR: ${currency} $${finalTotal.toFixed(2)}*`,
-                lineSeparator,
-                `💳 Método: ${paymentMethod}`,
-                `✅ Estado: PENDIENTE DE CONFIRMACIÓN`
-            ];
-        }
-
-
-        const whatsappMessage = encodeURIComponent(messageParts.filter(p => p !== '').join('\n'));
-        const whatsappUrl = `https://wa.me/${settings.branch.whatsappNumber}?text=${whatsappMessage}`;
-        
-        window.open(whatsappUrl, '_blank');
-        setView('confirmation');
-    };
-
-    const handleStartNewOrder = () => {
-        clearCart();
-        setGeneralComments('');
-        setView('menu');
-        // Do not clear tableInfo, as the customer is likely still at the same table.
-    };
-
-    const getHeaderTitle = () => {
-        switch(view) {
-            case 'cart': return 'Tu pedido';
-            case 'checkout': return 'Completa tu pedido';
-            case 'confirmation': return 'Confirmación';
-            default: return '';
-        }
-    };
-    
-    const canGoBack = view === 'cart' || view === 'checkout';
-    const handleBack = () => {
-        if (view === 'checkout') setView('cart');
-        else if (view === 'cart') setView('menu');
-    }
-    
-    if (isLoading || !settings) {
-        return (
-            <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-gray-300">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500 mb-4"></div>
-                <p className="animate-pulse">Sincronizando menú...</p>
-            </div>
-        );
-    }
-
-    return (
-        <div className="bg-gray-900 min-h-screen font-sans text-gray-100 selection:bg-emerald-500 selection:text-white">
-            <div className="container mx-auto max-w-md bg-gray-900 min-h-screen shadow-2xl relative pb-24 border-x border-gray-800">
-                
-                {view !== 'menu' && <Header title={getHeaderTitle()} onBack={canGoBack ? handleBack : undefined} />}
-
-                {view === 'menu' && (
-                    <>
-                        <RestaurantHero 
-                            settings={settings} 
-                            tableInfo={tableInfo} 
-                            orderType={orderType}
-                            setOrderType={setOrderType}
-                        />
-                        <MenuList 
-                            products={allProducts}
-                            categories={allCategories}
-                            onProductClick={handleProductClick} 
-                            cartItems={cartItems} 
-                            currency={settings.company.currency.code}
-                            promotions={allPromotions}
-                        />
-                    </>
-                )}
-
-                {view === 'cart' && (
-                    <CartSummaryView 
-                        cartItems={cartItems}
-                        cartTotal={cartTotal}
-                        onUpdateQuantity={updateQuantity}
-                        onRemoveItem={removeFromCart}
-                        generalComments={generalComments}
-                        onGeneralCommentsChange={setGeneralComments}
-                        onProceedToCheckout={() => setView('checkout')}
-                    />
-                )}
-                
-                {view === 'checkout' && (
-                    <CheckoutView 
-                        cartTotal={cartTotal}
-                        onPlaceOrder={handlePlaceOrder}
-                        settings={settings}
-                        orderType={orderType}
-                    />
-                )}
-
-                {view === 'confirmation' && (
-                    <OrderConfirmation onNewOrder={handleStartNewOrder} settings={settings} />
-                )}
-
-                {selectedProduct && (
-                    <ProductDetailModal 
-                        product={selectedProduct} 
-                        onAddToCart={handleAddToCart}
-                        onClose={() => setSelectedProduct(null)}
-                        personalizations={allPersonalizations}
-                        promotions={allPromotions}
-                    />
-                )}
-
-                {view === 'menu' && itemCount > 0 && (
-                    <FooterBar 
-                        itemCount={itemCount} 
-                        cartTotal={cartTotal}
-                        onViewCart={() => setView('cart')} 
-                    />
-                )}
-                <Chatbot />
-            </div>
-        </div>
-    );
-}
-
 // Sub-components
 const Header: React.FC<{ title: string; onBack?: () => void }> = ({ title, onBack }) => (
     <header className="p-4 flex justify-between items-center sticky top-0 bg-gray-900/90 backdrop-blur-md z-20 border-b border-gray-800">
@@ -608,6 +283,46 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
     return { price: bestPrice, promotion: bestPromo };
 };
 
+const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: () => void; currency: string; promotions: Promotion[] }> = ({ product, quantityInCart, onClick, currency, promotions }) => {
+    const { price: discountedPrice, promotion } = getDiscountedPrice(product, promotions);
+    const hasDiscount = promotion !== undefined;
+
+    return (
+        <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group relative overflow-hidden">
+            {hasDiscount && (
+                <div className="absolute top-0 left-0 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-br-lg z-10">
+                    -{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}
+                </div>
+            )}
+            <div className="relative h-24 w-24 flex-shrink-0">
+                <img src={product.imageUrl} alt={product.name} className="w-full h-full rounded-lg object-cover" />
+                {quantityInCart > 0 && (
+                    <div className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg ring-2 ring-gray-900">
+                        {quantityInCart}
+                    </div>
+                )}
+            </div>
+            <div className="flex-1 flex flex-col justify-between py-1">
+                <div>
+                    <h3 className="font-bold text-gray-100 leading-tight group-hover:text-emerald-400 transition-colors">{product.name}</h3>
+                    <p className="text-sm text-gray-400 line-clamp-2 mt-1 leading-snug">{product.description}</p>
+                </div>
+                <div className="flex justify-between items-end mt-2">
+                    <div className="flex flex-col">
+                        {hasDiscount && (
+                            <span className="text-xs text-gray-500 line-through">{currency} ${product.price.toFixed(2)}</span>
+                        )}
+                        <p className={`font-bold ${hasDiscount ? 'text-rose-400' : 'text-white'}`}>{currency} ${discountedPrice.toFixed(2)}</p>
+                    </div>
+                    <div className="bg-gray-700 p-1.5 rounded-full text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                        <IconPlus className="h-4 w-4" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const MenuList: React.FC<{
     products: Product[],
     categories: Category[],
@@ -751,46 +466,6 @@ const MenuList: React.FC<{
     );
 };
 
-const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: () => void; currency: string; promotions: Promotion[] }> = ({ product, quantityInCart, onClick, currency, promotions }) => {
-    const { price: discountedPrice, promotion } = getDiscountedPrice(product, promotions);
-    const hasDiscount = promotion !== undefined;
-
-    return (
-        <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group relative overflow-hidden">
-            {hasDiscount && (
-                <div className="absolute top-0 left-0 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-br-lg z-10">
-                    -{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}
-                </div>
-            )}
-            <div className="relative h-24 w-24 flex-shrink-0">
-                <img src={product.imageUrl} alt={product.name} className="w-full h-full rounded-lg object-cover" />
-                {quantityInCart > 0 && (
-                    <div className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg ring-2 ring-gray-900">
-                        {quantityInCart}
-                    </div>
-                )}
-            </div>
-            <div className="flex-1 flex flex-col justify-between py-1">
-                <div>
-                    <h3 className="font-bold text-gray-100 leading-tight group-hover:text-emerald-400 transition-colors">{product.name}</h3>
-                    <p className="text-sm text-gray-400 line-clamp-2 mt-1 leading-snug">{product.description}</p>
-                </div>
-                <div className="flex justify-between items-end mt-2">
-                    <div className="flex flex-col">
-                        {hasDiscount && (
-                            <span className="text-xs text-gray-500 line-through">{currency} ${product.price.toFixed(2)}</span>
-                        )}
-                        <p className={`font-bold ${hasDiscount ? 'text-rose-400' : 'text-white'}`}>{currency} ${discountedPrice.toFixed(2)}</p>
-                    </div>
-                    <div className="bg-gray-700 p-1.5 rounded-full text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
-                        <IconPlus className="h-4 w-4" />
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
 const ProductDetailModal: React.FC<{
     product: Product, 
     onAddToCart: (product: Product, quantity: number, comments?: string, options?: PersonalizationOption[]) => void, 
@@ -928,4 +603,341 @@ const ProductDetailModal: React.FC<{
                     <div className="flex items-center justify-between gap-4 mb-4">
                          <span className="text-gray-400 font-medium">Cantidad</span>
                          <div className="flex items-center gap-6 bg-gray-800 rounded-full px-2 py-1 border border-gray-700">
-                            <button onClick={() => setQuantity(q => Math.max(1, q
+                            <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="p-2 rounded-full hover:bg-gray-700 text-white transition-colors"><IconMinus className="h-5 w-5"/></button>
+                            <span className="font-bold text-xl text-white w-6 text-center">{quantity}</span>
+                            <button onClick={() => setQuantity(q => q + 1)} className="p-2 rounded-full hover:bg-gray-700 text-white transition-colors"><IconPlus className="h-5 w-5"/></button>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={handleAdd}
+                        className="w-full font-bold py-4 px-6 rounded-xl transition-all transform active:scale-[0.98] shadow-lg flex justify-between items-center bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-900/20"
+                    >
+                        <span>Agregar al pedido</span>
+                        <span>${totalPrice.toFixed(2)}</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+const CartSummaryView: React.FC<{
+    cartItems: CartItem[], 
+    cartTotal: number,
+    onUpdateQuantity: (id: string, q: number) => void, 
+    onRemoveItem: (id: string) => void,
+    generalComments: string,
+    onGeneralCommentsChange: (c: string) => void,
+    onProceedToCheckout: () => void
+}> = ({ cartItems, cartTotal, onUpdateQuantity, onRemoveItem, generalComments, onGeneralCommentsChange, onProceedToCheckout }) => {
+    
+    if (cartItems.length === 0) {
+        return (
+            <div className="p-8 text-center h-[calc(100vh-80px)] flex flex-col items-center justify-center text-gray-400">
+                 <div className="w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center mb-6">
+                    <IconClock className="h-10 w-10 opacity-50" />
+                 </div>
+                 <h2 className="text-2xl font-bold mb-2 text-white">Tu carrito está vacío</h2>
+                 <p className="mb-8">¿Hambre? Explora nuestro menú y encuentra algo delicioso.</p>
+                 <button onClick={() => window.history.back()} className="px-6 py-3 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-colors">Ir al Menú</button>
+            </div>
+        )
+    }
+
+    return (
+        <div className="p-4 pb-40 animate-fade-in">
+            <div className="space-y-4">
+                {cartItems.map(item => {
+                    const options: PersonalizationOption[] = item.selectedOptions || [];
+                    const optionsTotal = options.reduce((acc: number, o: PersonalizationOption) => acc + o.price, 0);
+                    const itemTotal = (item.price + optionsTotal) * item.quantity;
+
+                    return (
+                        <div key={item.cartItemId} className="flex gap-4 bg-gray-800/50 p-3 rounded-xl border border-gray-800">
+                            <img src={item.imageUrl} alt={item.name} className="w-20 h-20 rounded-lg object-cover"/>
+                            <div className="flex-grow flex flex-col justify-between">
+                                <div className="flex justify-between items-start">
+                                    <h3 className="font-bold text-gray-100">{item.name}</h3>
+                                    <p className="font-bold text-emerald-400">${itemTotal.toFixed(2)}</p>
+                                </div>
+                                {item.selectedOptions && item.selectedOptions.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1 mb-1">
+                                        {item.selectedOptions.map((opt, idx) => (
+                                            <span key={idx} className="text-xs text-gray-400 bg-gray-700/50 px-2 py-0.5 rounded-md border border-gray-700">
+                                                {opt.name}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                                {item.comments && <p className="text-xs text-gray-400 italic line-clamp-1">"{item.comments}"</p>}
+                                
+                                <div className="flex items-center justify-between mt-2">
+                                    <div className="flex items-center gap-3 bg-gray-800 rounded-lg px-1 border border-gray-700">
+                                        <button onClick={() => item.quantity > 1 ? onUpdateQuantity(item.cartItemId, item.quantity - 1) : onRemoveItem(item.cartItemId)} className="p-1.5 text-gray-300 hover:text-white"><IconMinus className="h-4 w-4"/></button>
+                                        <span className="font-bold w-4 text-center text-sm text-white">{item.quantity}</span>
+                                        <button onClick={() => onUpdateQuantity(item.cartItemId, item.quantity + 1)} className="p-1.5 text-gray-300 hover:text-white"><IconPlus className="h-4 w-4"/></button>
+                                    </div>
+                                    <button onClick={() => onRemoveItem(item.cartItemId)} className="text-gray-500 hover:text-red-400 p-2"><IconTrash className="h-5 w-5"/></button>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                })}
+            </div>
+            
+             <div className="mt-8">
+                <label className="font-bold text-gray-300 block mb-2">Comentarios generales</label>
+                <textarea 
+                    value={generalComments}
+                    onChange={(e) => onGeneralCommentsChange(e.target.value)}
+                    rows={2}
+                    className="w-full p-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    placeholder="¿Algo más que debamos saber?"
+                />
+            </div>
+
+             <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-gray-900 border-t border-gray-800 shadow-2xl p-4 safe-bottom z-30">
+                <div className="flex justify-between items-center mb-4 px-2">
+                    <span className="text-gray-400">Total estimado</span>
+                    <span className="font-bold text-2xl text-white">${cartTotal.toFixed(2)}</span>
+                </div>
+                 <button onClick={onProceedToCheckout} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 px-6 rounded-xl shadow-lg shadow-emerald-900/20 transition-all transform active:scale-[0.98]">
+                    Continuar
+                </button>
+            </div>
+        </div>
+    )
+}
+
+const CheckoutView: React.FC<{
+    cartTotal: number, 
+    onPlaceOrder: (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number) => void, 
+    settings: AppSettings, 
+    orderType: OrderType 
+}> = ({ cartTotal, onPlaceOrder, settings, orderType }) => {
+    const [customer, setCustomer] = useState<Customer>({
+        name: '', phone: '', address: { colonia: '', calle: '', numero: '', entreCalles: '', referencias: '' }
+    });
+    const [tipAmount, setTipAmount] = useState(0);
+    
+    const isDelivery = orderType === OrderType.Delivery;
+    const isPickup = orderType === OrderType.TakeAway;
+    const isDineIn = orderType === OrderType.DineIn;
+
+    // Determine available payment methods
+    const availablePaymentMethods = isDelivery 
+        ? settings.payment.deliveryMethods 
+        : settings.payment.pickupMethods;
+
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>(availablePaymentMethods[0] || 'Efectivo');
+
+    const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setCustomer(prev => ({
+            ...prev,
+            address: { ...prev.address, [name]: value }
+        }));
+    };
+
+    const handleTipSelection = (percentage: number) => {
+        setTipAmount(cartTotal * (percentage / 100));
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onPlaceOrder(customer, selectedPaymentMethod, tipAmount);
+    };
+
+    const inputClasses = "w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-gray-500 transition-all";
+    const labelClasses = "text-sm font-bold text-gray-400 mb-1 block";
+
+    const shippingCost = (isDelivery && settings.shipping.costType === ShippingCostType.Fixed) ? (settings.shipping.fixedCost ?? 0) : 0;
+    const finalTotal = cartTotal + shippingCost + tipAmount;
+    
+    return (
+        <form onSubmit={handleSubmit} className="p-4 space-y-6 pb-44 animate-fade-in">
+            <div className="space-y-4 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
+                <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Tus datos</h3>
+                <div>
+                    <label className={labelClasses}>Nombre</label>
+                    <input type="text" value={customer.name} onChange={e => setCustomer(c => ({...c, name: e.target.value}))} className={inputClasses} placeholder="Tu nombre completo" required />
+                </div>
+                 {!isDineIn && (
+                    <div>
+                        <label className={labelClasses}>Número telefónico</label>
+                        <input type="tel" value={customer.phone} onChange={e => setCustomer(c => ({...c, phone: e.target.value}))} className={inputClasses} placeholder="WhatsApp o celular" required />
+                    </div>
+                )}
+            </div>
+
+            {isDelivery && (
+                <div className="space-y-4 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
+                    <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Entrega</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="col-span-2">
+                            <label className={labelClasses}>Calle</label>
+                            <input type="text" name="calle" value={customer.address.calle} onChange={handleAddressChange} className={inputClasses} required />
+                        </div>
+                        <div>
+                            <label className={labelClasses}>Número Ext.</label>
+                            <input type="text" name="numero" value={customer.address.numero} onChange={handleAddressChange} className={inputClasses} required />
+                        </div>
+                         <div>
+                            <label className={labelClasses}>Colonia</label>
+                            <input type="text" name="colonia" value={customer.address.colonia} onChange={handleAddressChange} className={inputClasses} required />
+                        </div>
+                    </div>
+                    <div>
+                        <label className={labelClasses}>Referencias <span className="font-normal text-gray-500 text-xs">(Opcional)</span></label>
+                        <input type="text" name="referencias" value={customer.address.referencias} onChange={handleAddressChange} className={inputClasses} placeholder="Color de casa, portón, etc." />
+                    </div>
+                </div>
+            )}
+            
+            {isPickup && (
+                 <div className="p-5 bg-emerald-900/20 border border-emerald-800/50 rounded-2xl text-center">
+                    <IconStore className="h-10 w-10 text-emerald-500 mx-auto mb-2"/>
+                    <h3 className="font-bold text-white">Recoger en Tienda</h3>
+                    <p className="text-sm text-gray-400 mt-1">No olvides pasar a recoger tu pedido.</p>
+                    <p className="text-sm text-gray-400 mt-1 font-medium">{settings.branch.fullAddress}</p>
+                </div>
+            )}
+
+            {settings.payment.showTipField && (
+                <div className="space-y-3 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
+                    <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Propina para el equipo</h3>
+                    <div className="flex gap-2">
+                        {[10, 15, 20].map(pct => (
+                            <button 
+                                key={pct}
+                                type="button" 
+                                onClick={() => handleTipSelection(pct)}
+                                className={`flex-1 py-2 rounded-lg font-bold text-sm border transition-all ${Math.abs(tipAmount - (cartTotal * pct / 100)) < 0.1 ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-gray-800 border-gray-600 text-gray-300 hover:border-gray-500'}`}
+                            >
+                                {pct}%
+                            </button>
+                        ))}
+                        <div className="flex-1 relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                            <input 
+                                type="number" 
+                                placeholder="Otro" 
+                                value={tipAmount || ''}
+                                onChange={(e) => setTipAmount(parseFloat(e.target.value) || 0)}
+                                className="w-full py-2 pl-6 pr-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:border-emerald-500 outline-none"
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="space-y-3 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
+                 <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Pago</h3>
+                 <div className="space-y-2 pt-2">
+                    {availableMethods.map(method => (
+                        <div key={method}>
+                            <label className={`flex justify-between items-center p-4 rounded-xl cursor-pointer transition-all border ${selectedPaymentMethod === method ? 'bg-emerald-900/20 border-emerald-500 ring-1 ring-emerald-500 shadow-lg shadow-emerald-900/10' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}>
+                                <span className={`font-medium ${selectedPaymentMethod === method ? 'text-emerald-400' : 'text-white'}`}>{method}</span>
+                                <input type="radio" name="payment" value={method} checked={selectedPaymentMethod === method} onChange={() => setSelectedPaymentMethod(method)} className="h-5 w-5 accent-emerald-500" />
+                            </label>
+                            
+                            {/* Detailed Payment Info Display */}
+                            {selectedPaymentMethod === method && method === 'Pago Móvil' && settings.payment.pagoMovil && (
+                                <div className="mt-2 p-4 bg-gray-700/50 rounded-xl border border-gray-600 animate-fade-in">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h4 className="text-emerald-400 font-bold text-sm uppercase">Datos Pago Móvil</h4>
+                                        <button type="button" onClick={() => {
+                                            const text = `Banco: ${settings.payment.pagoMovil?.bank}\nTel: ${settings.payment.pagoMovil?.phone}\nCI/RIF: ${settings.payment.pagoMovil?.idNumber}`;
+                                            navigator.clipboard.writeText(text);
+                                            alert('Datos copiados');
+                                        }} className="text-xs text-gray-400 hover:text-white flex items-center gap-1"><IconDuplicate className="h-3 w-3"/> Copiar</button>
+                                    </div>
+                                    <div className="text-sm text-gray-200 space-y-1 font-mono">
+                                        <p><span className="text-gray-500">Banco:</span> {settings.payment.pagoMovil.bank}</p>
+                                        <p><span className="text-gray-500">Teléfono:</span> {settings.payment.pagoMovil.phone}</p>
+                                        <p><span className="text-gray-500">Cédula/RIF:</span> {settings.payment.pagoMovil.idNumber}</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedPaymentMethod === method && method === 'Transferencia' && settings.payment.transfer && (
+                                <div className="mt-2 p-4 bg-gray-700/50 rounded-xl border border-gray-600 animate-fade-in">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h4 className="text-emerald-400 font-bold text-sm uppercase">Datos Transferencia</h4>
+                                        <button type="button" onClick={() => {
+                                            const text = `Banco: ${settings.payment.transfer?.bank}\nCuenta: ${settings.payment.transfer?.accountNumber}\nTitular: ${settings.payment.transfer?.accountHolder}\nCI/RIF: ${settings.payment.transfer?.idNumber}`;
+                                            navigator.clipboard.writeText(text);
+                                            alert('Datos copiados');
+                                        }} className="text-xs text-gray-400 hover:text-white flex items-center gap-1"><IconDuplicate className="h-3 w-3"/> Copiar</button>
+                                    </div>
+                                    <div className="text-sm text-gray-200 space-y-1 font-mono">
+                                        <p><span className="text-gray-500">Banco:</span> {settings.payment.transfer.bank}</p>
+                                        <p><span className="text-gray-500">Cuenta:</span> {settings.payment.transfer.accountNumber}</p>
+                                        <p><span className="text-gray-500">Titular:</span> {settings.payment.transfer.accountHolder}</p>
+                                        <p><span className="text-gray-500">CI/RIF:</span> {settings.payment.transfer.idNumber}</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                 </div>
+            </div>
+            
+            <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-gray-900 border-t border-gray-800 shadow-2xl p-4 safe-bottom z-30">
+                <div className="space-y-2 mb-4 text-sm px-2">
+                     <div className="flex justify-between text-gray-400">
+                        <span>Subtotal</span>
+                        <span>${cartTotal.toFixed(2)}</span>
+                    </div>
+                    {isDelivery && (
+                        <div className="flex justify-between text-gray-400">
+                            <span>Envío</span>
+                            <span>{shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : "Por cotizar"}</span>
+                        </div>
+                    )}
+                    {tipAmount > 0 && (
+                        <div className="flex justify-between text-emerald-400">
+                            <span>Propina</span>
+                            <span>${tipAmount.toFixed(2)}</span>
+                        </div>
+                    )}
+                     <div className="flex justify-between font-bold text-xl text-white pt-2 border-t border-gray-800">
+                        <span>Total</span>
+                        <span>${finalTotal.toFixed(2)} {isDelivery && shippingCost === 0 && "+ envío"}</span>
+                    </div>
+                </div>
+                 <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 px-6 rounded-xl shadow-lg flex items-center justify-center gap-3 transition-all transform active:scale-[0.98]">
+                    <IconWhatsapp className="h-6 w-6" />
+                    Realizar Pedido
+                </button>
+            </div>
+        </form>
+    )
+}
+
+const OrderConfirmation: React.FC<{ onNewOrder: () => void, settings: AppSettings }> = ({ onNewOrder, settings }) => (
+    <div className="p-6 text-center flex flex-col items-center justify-center h-[80vh] animate-fade-in">
+        <div className="w-24 h-24 bg-emerald-500/20 rounded-full flex items-center justify-center mb-6">
+            <svg className="w-12 h-12 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+        </div>
+        <h3 className="text-3xl font-bold mb-3 text-white">¡Pedido Enviado!</h3>
+        <p className="text-gray-400 mb-8 text-lg leading-relaxed">Te redirigimos a WhatsApp con los detalles de tu orden. El equipo de {settings.company.name} confirmará tu pedido en breve.</p>
+        <button onClick={onNewOrder} className="w-full max-w-xs bg-gray-800 text-white py-4 rounded-xl font-bold hover:bg-gray-700 transition-colors border border-gray-700">
+            Volver al Inicio
+        </button>
+    </div>
+);
+
+const FooterBar: React.FC<{ itemCount: number, cartTotal: number, onViewCart: () => void }> = ({ itemCount, cartTotal, onViewCart }) => {
+    return (
+         <footer className="fixed bottom-4 left-4 right-4 max-w-md mx-auto z-20 animate-slide-up">
+            <button onClick={onViewCart} className="w-full bg-emerald-500 text-white font-bold py-4 px-6 rounded-2xl flex justify-between items-center shadow-2xl shadow-emerald-900/50 hover:bg-emerald-400 transition-transform hover:-translate-y-1 active:translate-y-0">
+                <div className="flex items-center gap-3">
+                    <div className="bg-emerald-700/50 px-3 py-1 rounded-lg text-sm font-extrabold border border-emerald-400/30">{itemCount}</div>
+                    <span>Ver Pedido</span>
+                </div>
+                <span className="text-lg">${cartTotal.toFixed(2)}</span>
+            </button>
+        </footer>
+    );
+};
