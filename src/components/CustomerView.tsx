@@ -56,12 +56,20 @@ export default function CustomerView() {
     const handleProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
-            if (file.size > 2 * 1024 * 1024) return alert("La imagen es muy pesada. Máximo 2MB.");
+            if (file.size > 3 * 1024 * 1024) return alert("Imagen demasiado grande (Máximo 3MB)");
             const reader = new FileReader();
             reader.onload = (event) => setPaymentProof(event.target?.result as string);
             reader.readAsDataURL(file);
         }
     };
+
+    // Lógica Robusta de Detección de Pago Digital
+    const isDigital = useMemo(() => {
+        if (!selectedPaymentMethod) return false;
+        const m = selectedPaymentMethod.toLowerCase();
+        // Si NO es efectivo y NO es punto, es digital (Transferencia, Pago Móvil, Zelle, etc)
+        return !m.includes('efectivo') && !m.includes('punto');
+    }, [selectedPaymentMethod]);
 
     const handlePlaceOrder = async () => {
         if (!settings) return;
@@ -69,12 +77,8 @@ export default function CustomerView() {
         if (orderType === OrderType.Delivery && !customerAddress.calle) return alert("Ingresa la dirección.");
         if (!selectedPaymentMethod) return alert("Selecciona un método de pago.");
         
-        // Detección robusta de pago digital
-        const m = selectedPaymentMethod.toLowerCase();
-        const isDigital = !m.includes('efectivo') && !m.includes('punto');
-        
         if (isDigital && !paymentProof) {
-            return alert("Por favor, adjunta el comprobante (capture) de tu pago.");
+            return alert("Para pagos digitales es obligatorio adjuntar el capture.");
         }
 
         setIsPlacingOrder(true);
@@ -93,7 +97,7 @@ export default function CustomerView() {
                 paymentStatus: 'pending',
                 paymentProof: paymentProof || undefined,
             });
-            const message = encodeURIComponent(`*NUEVO PEDIDO*\nCliente: ${customerName}\nTotal: $${finalTotal.toFixed(2)}\nPago: ${selectedPaymentMethod}${paymentProof ? '\n✅ Capture adjunto' : ''}`);
+            const message = encodeURIComponent(`*NUEVO PEDIDO*\nCliente: ${customerName}\nTotal: $${finalTotal.toFixed(2)}\nPago: ${selectedPaymentMethod}${paymentProof ? '\n✅ Capture enviado' : ''}`);
             window.open(`https://wa.me/${settings.branch.whatsappNumber.replace(/\D/g, '')}?text=${message}`, '_blank');
             clearCart();
             setView('confirmation');
@@ -160,10 +164,6 @@ export default function CustomerView() {
     if (view === 'checkout') {
         const shippingCost = (orderType === OrderType.Delivery && settings?.shipping.costType === ShippingCostType.Fixed) ? (settings.shipping.fixedCost ?? 0) : 0;
         
-        // Lógica de detección ultra-robusta por exclusión
-        const m = (selectedPaymentMethod || "").toLowerCase().trim();
-        const isDigital = !!m && !m.includes('efectivo') && !m.includes('punto');
-
         return (
             <div className="min-h-screen bg-[#0f1115] flex flex-col text-gray-200">
                 <header className="p-4 bg-[#1a1c23] flex items-center gap-3 border-b border-gray-800 sticky top-0 z-30">
@@ -177,8 +177,7 @@ export default function CustomerView() {
                         <h3 className="font-black text-[10px] uppercase tracking-[0.2em] text-emerald-500">Tus Datos</h3>
                         <div className="space-y-3">
                             <input type="text" placeholder="Tu Nombre Completo" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full p-4 bg-[#0f1115] border border-gray-800 rounded-2xl outline-none focus:border-emerald-500 transition-all text-sm" />
-                            <input type="tel" placeholder="WhatsApp (Ej. 0412...)" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full p-4 bg-[#0f1115] border border-gray-800 rounded-2xl outline-none focus:border-emerald-500 transition-all font-mono text-sm" />
-                            {orderType === OrderType.Delivery && <input type="text" placeholder="Dirección Exacta" value={customerAddress.calle} onChange={e => setCustomerAddress({...customerAddress, calle: e.target.value})} className="w-full p-4 bg-[#0f1115] border border-gray-800 rounded-2xl outline-none focus:border-emerald-500 transition-all text-sm" />}
+                            <input type="tel" placeholder="WhatsApp (Ej. 0414-0000000)" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full p-4 bg-[#0f1115] border border-gray-800 rounded-2xl outline-none focus:border-emerald-500 transition-all font-mono text-sm" />
                         </div>
                     </div>
 
@@ -187,47 +186,53 @@ export default function CustomerView() {
                         <h3 className="font-black text-[10px] uppercase tracking-[0.2em] text-emerald-500">Forma de pago</h3>
                         <div className="grid grid-cols-2 gap-2">
                             {settings?.payment[orderType === OrderType.Delivery ? 'deliveryMethods' : 'pickupMethods'].map(m => (
-                                <button key={m} onClick={() => { setSelectedPaymentMethod(m); setPaymentProof(null); }} className={`p-4 rounded-xl border font-bold text-xs uppercase transition-all ${selectedPaymentMethod === m ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg' : 'bg-[#0f1115] border-gray-800 text-gray-500'}`}>{m}</button>
+                                <button 
+                                    key={m} 
+                                    onClick={() => { setSelectedPaymentMethod(m); setPaymentProof(null); }} 
+                                    className={`p-4 rounded-xl border font-bold text-xs uppercase transition-all ${selectedPaymentMethod === m ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg' : 'bg-[#0f1115] border-gray-800 text-gray-500'}`}
+                                >
+                                    {m}
+                                </button>
                             ))}
                         </div>
 
-                        {/* BLOQUE DINÁMICO DE PAGO DIGITAL (Transferencia, Pago Móvil, Zelle, etc) */}
+                        {/* BLOQUE DIGITAL DINÁMICO */}
                         {isDigital && (
-                            <div className="mt-6 pt-6 border-t border-gray-800 space-y-6">
-                                <div className="p-5 bg-emerald-500/5 rounded-3xl border-2 border-emerald-500/20 shadow-inner">
+                            <div className="mt-6 pt-6 border-t border-gray-800 space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
+                                <div className="p-5 bg-emerald-500/5 rounded-3xl border-2 border-emerald-500/20">
                                     <div className="flex items-center gap-2 text-emerald-400 font-black text-[9px] uppercase tracking-[0.3em] mb-4">
-                                        <IconInfo className="h-4 w-4"/> Datos de Transferencia
+                                        <IconInfo className="h-4 w-4"/> Datos de Pago
                                     </div>
                                     <div className="space-y-4 text-sm">
-                                        {m.includes('movil') || m.includes('móvil') ? (
+                                        {selectedPaymentMethod.toLowerCase().includes('movil') || selectedPaymentMethod.toLowerCase().includes('móvil') ? (
                                             <>
-                                                <div className="flex justify-between border-b border-gray-800/50 pb-2"><span className="text-gray-500">Banco:</span> <span className="font-bold text-emerald-100">{settings?.payment.pagoMovil?.bank || 'Ver WhatsApp'}</span></div>
-                                                <div className="flex justify-between border-b border-gray-800/50 pb-2"><span className="text-gray-500">Teléfono:</span> <span className="font-mono font-bold text-emerald-400">{settings?.payment.pagoMovil?.phone || 'Ver WhatsApp'}</span></div>
-                                                <div className="flex justify-between"><span className="text-gray-500">Cédula/RIF:</span> <span className="font-mono font-bold text-emerald-100">{settings?.payment.pagoMovil?.idNumber || 'Ver WhatsApp'}</span></div>
+                                                <div className="flex justify-between border-b border-gray-800/40 pb-2"><span className="text-gray-500">Banco:</span> <span className="font-bold text-emerald-100">{settings?.payment.pagoMovil?.bank || 'Consultar WhatsApp'}</span></div>
+                                                <div className="flex justify-between border-b border-gray-800/40 pb-2"><span className="text-gray-500">Teléfono:</span> <span className="font-mono font-bold text-emerald-400">{settings?.payment.pagoMovil?.phone || 'Consultar WhatsApp'}</span></div>
+                                                <div className="flex justify-between"><span className="text-gray-500">Cédula:</span> <span className="font-mono font-bold text-emerald-100">{settings?.payment.pagoMovil?.idNumber || 'Consultar WhatsApp'}</span></div>
                                             </>
                                         ) : (
                                             <>
-                                                <div className="flex justify-between border-b border-gray-800/50 pb-2"><span className="text-gray-500">Banco:</span> <span className="font-bold text-emerald-100">{settings?.payment.transfer?.bank || 'Ver WhatsApp'}</span></div>
-                                                <div className="flex flex-col gap-1 border-b border-gray-800/50 pb-2"><span className="text-gray-500 text-[10px] uppercase font-bold">N° Cuenta:</span> <span className="font-mono font-bold text-emerald-400 text-xs break-all leading-tight">{settings?.payment.transfer?.accountNumber || 'Ver WhatsApp'}</span></div>
-                                                <div className="flex justify-between"><span className="text-gray-500">Titular:</span> <span className="font-bold text-emerald-100 text-right">{settings?.payment.transfer?.accountHolder || 'Ver WhatsApp'}</span></div>
+                                                <div className="flex justify-between border-b border-gray-800/40 pb-2"><span className="text-gray-500">Banco:</span> <span className="font-bold text-emerald-100">{settings?.payment.transfer?.bank || 'Consultar WhatsApp'}</span></div>
+                                                <div className="flex flex-col gap-1 border-b border-gray-800/40 pb-2"><span className="text-gray-500 text-[10px] uppercase font-bold">N° Cuenta:</span> <span className="font-mono font-bold text-emerald-400 text-xs break-all leading-relaxed">{settings?.payment.transfer?.accountNumber || 'Consultar WhatsApp'}</span></div>
+                                                <div className="flex justify-between"><span className="text-gray-500">Titular:</span> <span className="font-bold text-emerald-100 text-right">{settings?.payment.transfer?.accountHolder || 'Consultar WhatsApp'}</span></div>
                                             </>
                                         )}
                                     </div>
                                 </div>
 
                                 <div className="space-y-4">
-                                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">Capture del pago (Obligatorio)</p>
+                                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">Adjunta tu capture de pago (Requerido)</p>
                                     {!paymentProof ? (
                                         <label className="flex flex-col items-center justify-center w-full h-44 border-2 border-dashed border-emerald-500/40 rounded-[2rem] bg-[#0f1115] cursor-pointer hover:border-emerald-500 hover:bg-emerald-500/5 transition-all group">
                                             <IconUpload className="h-10 w-10 text-emerald-500/40 group-hover:text-emerald-500 mb-2 transition-transform group-hover:-translate-y-1"/>
-                                            <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest text-center px-4">Toca para cargar tu comprobante</span>
+                                            <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Toca para subir imagen</span>
                                             <input type="file" className="hidden" accept="image/*" onChange={handleProofUpload} />
                                         </label>
                                     ) : (
                                         <div className="relative rounded-[2rem] overflow-hidden shadow-2xl border-2 border-emerald-500">
                                             <img src={paymentProof} className="w-full h-64 object-cover opacity-80" />
-                                            <button onClick={() => setPaymentProof(null)} className="absolute top-4 right-4 bg-red-500 text-white p-3 rounded-full shadow-2xl hover:scale-110 active:scale-90 transition-all"><IconTrash className="h-5 w-5"/></button>
-                                            <div className="absolute bottom-0 left-0 right-0 bg-emerald-600 text-white text-[9px] font-black text-center py-3 uppercase tracking-[0.2em]">Imagen cargada con éxito</div>
+                                            <button onClick={() => setPaymentProof(null)} className="absolute top-4 right-4 bg-red-500 text-white p-3 rounded-full shadow-2xl hover:scale-110 active:scale-90 transition-transform"><IconTrash className="h-5 w-5"/></button>
+                                            <div className="absolute bottom-0 left-0 right-0 bg-emerald-600 text-white text-[9px] font-black text-center py-3 uppercase tracking-[0.2em]">Capture cargado con éxito</div>
                                         </div>
                                     )}
                                 </div>
@@ -236,14 +241,14 @@ export default function CustomerView() {
                     </div>
 
                     <div className="bg-[#1a1c23] p-5 rounded-[2rem] border border-gray-800 shadow-xl space-y-4">
-                        <h3 className="font-black text-[10px] uppercase tracking-[0.2em] text-emerald-500">Nota para el restaurante</h3>
-                        <textarea value={generalComments} onChange={(e) => setGeneralComments(e.target.value)} rows={2} className="w-full p-4 bg-[#0f1115] border border-gray-800 rounded-2xl outline-none focus:border-emerald-500 transition-all resize-none text-sm" placeholder="Ej. Tocar el timbre fuerte, sin cebolla..." />
+                        <h3 className="font-black text-[10px] uppercase tracking-[0.2em] text-emerald-500">Nota Adicional</h3>
+                        <textarea value={generalComments} onChange={(e) => setGeneralComments(e.target.value)} rows={2} className="w-full p-4 bg-[#0f1115] border border-gray-800 rounded-2xl outline-none focus:border-emerald-500 transition-all resize-none text-sm" placeholder="Ej. Tocar el timbre fuerte, sin servilletas..." />
                     </div>
                 </div>
 
                 <div className="p-6 bg-[#1a1c23] border-t border-gray-800 shadow-2xl rounded-t-[2.5rem] space-y-4">
                     <div className="flex justify-between items-center px-2">
-                        <span className="text-gray-500 font-bold text-xs uppercase tracking-widest">Total a pagar</span>
+                        <span className="text-gray-500 font-bold text-xs uppercase tracking-widest">Total Orden</span>
                         <span className="text-3xl font-black text-emerald-500 tracking-tighter">${(cartTotal + shippingCost).toFixed(2)}</span>
                     </div>
                     <button 
@@ -251,9 +256,9 @@ export default function CustomerView() {
                         disabled={isPlacingOrder || (isDigital && !paymentProof)}
                         className={`w-full py-5 rounded-3xl font-black shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all uppercase tracking-widest text-sm ${isPlacingOrder || (isDigital && !paymentProof) ? 'bg-gray-800 text-gray-600 cursor-not-allowed' : 'bg-emerald-600 text-white shadow-emerald-600/40'}`}
                     >
-                        {isPlacingOrder ? <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div> : <><IconWhatsapp className="h-6 w-6"/> Confirmar por WhatsApp</>}
+                        {isPlacingOrder ? <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div> : <><IconWhatsapp className="h-6 w-6"/> {isDigital && !paymentProof ? 'Subir Capture Primero' : 'Confirmar Pedido'}</>}
                     </button>
-                    {isDigital && !paymentProof && <p className="text-[8px] text-center text-red-500 font-black uppercase animate-pulse">Sube tu capture para habilitar el botón</p>}
+                    {isDigital && !paymentProof && <p className="text-[8px] text-center text-red-500 font-black uppercase animate-pulse">Debes subir el comprobante para habilitar el botón</p>}
                 </div>
             </div>
         );
@@ -263,8 +268,8 @@ export default function CustomerView() {
         <div className="min-h-screen bg-emerald-600 flex flex-col items-center justify-center p-6 text-white text-center">
             <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-8 shadow-2xl animate-bounce"><IconCheck className="h-12 w-12 text-emerald-600" /></div>
             <h1 className="text-4xl font-black mb-4 uppercase tracking-tighter">¡LISTO!</h1>
-            <p className="mb-10 text-emerald-100 font-bold max-w-xs leading-tight">Tu pedido ha sido enviado. Por favor completa la confirmación en nuestro WhatsApp.</p>
-            <button onClick={() => setView('menu')} className="bg-white text-emerald-600 px-10 py-4 rounded-2xl font-black shadow-2xl hover:bg-emerald-50 transition-all uppercase text-xs tracking-widest">Volver al menú</button>
+            <p className="mb-10 text-emerald-100 font-bold max-w-xs leading-tight">Tu pedido está siendo procesado. Te hemos enviado a WhatsApp para los detalles finales.</p>
+            <button onClick={() => setView('menu')} className="bg-white text-emerald-600 px-10 py-4 rounded-2xl font-black shadow-2xl hover:bg-emerald-50 transition-all uppercase text-xs tracking-widest">Volver al inicio</button>
         </div>
     );
     return null;
