@@ -6,8 +6,8 @@ import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, Ico
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
-// MARCADOR DE VERSIÓN PARA VERIFICAR DESPLIEGUE EN VERCEL
-const APP_BUILD_ID = "BUILD_2024_05_PAY_FIX_V2";
+// IDENTIFICADOR DE VERSIÓN PARA VERIFICAR EN VERCEL
+const APP_VERSION_TAG = "VER_1.1_GOLD_FIX";
 
 export default function CustomerView() {
     const [view, setView] = useState<'menu' | 'cart' | 'checkout' | 'confirmation'>('menu');
@@ -37,18 +37,12 @@ export default function CustomerView() {
             const [appSettings, fetchedPromotions, fetchedPersonalizations, fetchedProducts, fetchedCategories] = await Promise.all([
                 getAppSettings(), getPromotions(), getPersonalizations(), getProducts(), getCategories()
             ]);
-            
-            // Verificación de integridad de settings para evitar fallos de renderizado
-            if (appSettings && !appSettings.shipping.deliveryTime) {
-                appSettings.shipping.deliveryTime = { min: 25, max: 45 };
-            }
-            
             setSettings(appSettings);
             setAllPromotions(fetchedPromotions);
             setAllPersonalizations(fetchedPersonalizations);
             setAllProducts(fetchedProducts);
             setAllCategories(fetchedCategories);
-        } catch (error) { console.error("Data Fetch Error:", error); } finally { setIsLoading(false); }
+        } catch (error) { console.error(error); } finally { setIsLoading(false); }
     };
 
     useEffect(() => {
@@ -78,6 +72,7 @@ export default function CustomerView() {
         if (orderType === OrderType.Delivery && !customerAddress.calle) return alert("Ingresa la dirección.");
         if (!selectedPaymentMethod) return alert("Selecciona un método de pago.");
         
+        // Detección simplificada
         const m = selectedPaymentMethod.toLowerCase();
         const isDigital = !m.includes('efectivo') && !m.includes('punto');
         
@@ -168,34 +163,35 @@ export default function CustomerView() {
     if (view === 'checkout') {
         const shippingCost = (orderType === OrderType.Delivery && settings?.shipping.costType === ShippingCostType.Fixed) ? (settings.shipping.fixedCost ?? 0) : 0;
         
-        // Lógica de detección ultra-robusta por exclusión
+        // BLOQUE DE LÓGICA DE PAGO DIGITAL BLINDADA
         const m = (selectedPaymentMethod || "").toLowerCase().trim();
         const isDigital = !!m && !m.includes('efectivo') && !m.includes('punto');
 
         return (
-            <div className="min-h-screen bg-[#0f1115] flex flex-col text-gray-200">
-                <header className="p-4 bg-[#1a1c23] flex items-center gap-3 border-b border-gray-800 sticky top-0 z-50">
+            <div className="min-h-screen bg-[#0f1115] text-gray-200">
+                {/* Header Fijo */}
+                <div className="p-4 bg-[#1a1c23] flex items-center gap-3 border-b border-gray-800 sticky top-0 z-[60]">
                     <button onClick={() => setView('cart')} className="p-2 bg-[#2a2e38] rounded-full text-white shadow-lg"><IconArrowLeft/></button>
                     <h1 className="font-black uppercase tracking-tighter text-sm">Finalizar Pedido</h1>
-                </header>
+                </div>
                 
-                <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
-                    {/* TIPO DE ENTREGA */}
-                    <div className="bg-[#1a1c23] p-5 rounded-[2rem] border border-gray-800 shadow-xl space-y-4">
-                        <h3 className="font-black text-[10px] uppercase tracking-[0.2em] text-emerald-500">¿Cómo recibes tu pedido?</h3>
+                <div className="p-4 pb-44 space-y-6 max-w-2xl mx-auto">
+                    {/* SECCIÓN 1: TIPO DE ENTREGA */}
+                    <div className="bg-[#1a1c23] p-5 rounded-[2rem] border border-gray-800 shadow-xl">
+                        <h3 className="font-black text-[10px] uppercase tracking-[0.2em] text-emerald-500 mb-4">¿Cómo recibes tu pedido?</h3>
                         <div className="grid grid-cols-2 gap-3">
-                            <button onClick={() => setOrderType(OrderType.Delivery)} className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all duration-300 gap-1 ${orderType === OrderType.Delivery ? 'bg-emerald-600/10 border-emerald-500 shadow-[0_0_15px_-5px_rgba(16,185,129,0.4)]' : 'bg-[#0f1115] border-gray-800 opacity-60'}`}>
-                                <IconStore className={`h-6 w-6 ${orderType === OrderType.Delivery ? 'text-emerald-400' : 'text-gray-500'}`} />
+                            <button onClick={() => setOrderType(OrderType.Delivery)} className={`flex flex-col items-center justify-center p-5 rounded-2xl border transition-all duration-300 gap-1 ${orderType === OrderType.Delivery ? 'bg-emerald-600/10 border-emerald-500 shadow-[0_0_20px_-5px_rgba(16,185,129,0.5)]' : 'bg-[#0f1115] border-gray-800 opacity-60'}`}>
+                                <IconStore className={`h-7 w-7 ${orderType === OrderType.Delivery ? 'text-emerald-400' : 'text-gray-500'}`} />
                                 <span className={`text-[10px] font-black uppercase tracking-widest ${orderType === OrderType.Delivery ? 'text-white' : 'text-gray-500'}`}>Domicilio</span>
-                                <span className="text-[8px] font-bold text-emerald-500/80 flex items-center gap-1 mt-1">
+                                <span className="text-[9px] font-bold text-emerald-500/80 flex items-center gap-1 mt-1">
                                     <IconClock className="h-2.5 w-2.5" />
                                     {settings?.shipping.deliveryTime.min || '25'}-{settings?.shipping.deliveryTime.max || '45'} min
                                 </span>
                             </button>
-                            <button onClick={() => setOrderType(OrderType.TakeAway)} className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all duration-300 gap-1 ${orderType === OrderType.TakeAway ? 'bg-emerald-600/10 border-emerald-500 shadow-[0_0_15px_-5px_rgba(16,185,129,0.4)]' : 'bg-[#0f1115] border-gray-800 opacity-60'}`}>
-                                <IconLocationMarker className={`h-6 w-6 ${orderType === OrderType.TakeAway ? 'text-emerald-400' : 'text-gray-500'}`} />
+                            <button onClick={() => setOrderType(OrderType.TakeAway)} className={`flex flex-col items-center justify-center p-5 rounded-2xl border transition-all duration-300 gap-1 ${orderType === OrderType.TakeAway ? 'bg-emerald-600/10 border-emerald-500 shadow-[0_0_20px_-5px_rgba(16,185,129,0.5)]' : 'bg-[#0f1115] border-gray-800 opacity-60'}`}>
+                                <IconLocationMarker className={`h-7 w-7 ${orderType === OrderType.TakeAway ? 'text-emerald-400' : 'text-gray-500'}`} />
                                 <span className={`text-[10px] font-black uppercase tracking-widest ${orderType === OrderType.TakeAway ? 'text-white' : 'text-gray-500'}`}>Para llevar</span>
-                                <span className="text-[8px] font-bold text-emerald-500/80 flex items-center gap-1 mt-1">
+                                <span className="text-[9px] font-bold text-emerald-500/80 flex items-center gap-1 mt-1">
                                     <IconClock className="h-2.5 w-2.5" />
                                     {settings?.shipping.pickupTime.min || '15'} min
                                 </span>
@@ -203,7 +199,7 @@ export default function CustomerView() {
                         </div>
                     </div>
 
-                    {/* TUS DATOS */}
+                    {/* SECCIÓN 2: TUS DATOS */}
                     <div className="bg-[#1a1c23] p-5 rounded-[2rem] border border-gray-800 shadow-xl space-y-4">
                         <h3 className="font-black text-[10px] uppercase tracking-[0.2em] text-emerald-500">Tus Datos</h3>
                         <div className="space-y-3">
@@ -213,16 +209,16 @@ export default function CustomerView() {
                         </div>
                     </div>
 
-                    {/* FORMA DE PAGO */}
-                    <div className="bg-[#1a1c23] p-5 rounded-[2rem] border border-gray-800 shadow-xl space-y-4">
-                        <h3 className="font-black text-[10px] uppercase tracking-[0.2em] text-emerald-500">Forma de pago</h3>
+                    {/* SECCIÓN 3: FORMA DE PAGO */}
+                    <div className="bg-[#1a1c23] p-5 rounded-[2rem] border border-gray-800 shadow-xl">
+                        <h3 className="font-black text-[10px] uppercase tracking-[0.2em] text-emerald-500 mb-4">Forma de pago</h3>
                         <div className="grid grid-cols-2 gap-2">
-                            {settings?.payment[orderType === OrderType.Delivery ? 'deliveryMethods' : 'pickupMethods'].map(pm => (
+                            {(settings?.payment[orderType === OrderType.Delivery ? 'deliveryMethods' : 'pickupMethods'] || ['Efectivo', 'Pago Móvil']).map(pm => (
                                 <button key={pm} onClick={() => { setSelectedPaymentMethod(pm); setPaymentProof(null); }} className={`p-4 rounded-xl border font-bold text-[10px] uppercase transition-all ${selectedPaymentMethod === pm ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg' : 'bg-[#0f1115] border-gray-800 text-gray-500'}`}>{pm}</button>
                             ))}
                         </div>
 
-                        {/* BLOQUE DIGITAL AUTOMÁTICO */}
+                        {/* BLOQUE DIGITAL AUTOMÁTICO - SE MUESTRA SIEMPRE QUE NO SEA EFECTIVO/PUNTO */}
                         {isDigital && (
                             <div className="mt-6 pt-6 border-t border-gray-800 space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
                                 <div className="p-5 bg-emerald-500/5 rounded-3xl border-2 border-emerald-500/20">
@@ -266,18 +262,17 @@ export default function CustomerView() {
                         )}
                     </div>
 
-                    {/* NOTA ADICIONAL */}
+                    {/* SECCIÓN 4: NOTA */}
                     <div className="bg-[#1a1c23] p-5 rounded-[2rem] border border-gray-800 shadow-xl space-y-4">
                         <h3 className="font-black text-[10px] uppercase tracking-[0.2em] text-emerald-500">Nota para el restaurante</h3>
                         <textarea value={generalComments} onChange={(e) => setGeneralComments(e.target.value)} rows={2} className="w-full p-4 bg-[#0f1115] border border-gray-800 rounded-2xl outline-none focus:border-emerald-500 transition-all resize-none text-sm" placeholder="Ej. Sin cebolla, tocar timbre fuerte..." />
                     </div>
                     
-                    {/* INDICADOR DE VERSIÓN PARA DEBUG (Opcional, borrar tras éxito) */}
-                    <p className="text-[8px] text-center text-gray-800 uppercase tracking-widest opacity-20">BUILD ID: {APP_BUILD_ID}</p>
+                    <p className="text-[8px] text-center text-gray-800 uppercase tracking-widest opacity-30 py-4">DEPLOY ID: {APP_VERSION_TAG}</p>
                 </div>
 
-                {/* FOOTER FIJO */}
-                <div className="p-6 bg-[#1a1c23] border-t border-gray-800 shadow-2xl rounded-t-[2.5rem] space-y-4 z-50">
+                {/* Footer Fijo con Z-INDEX Superior */}
+                <div className="fixed bottom-0 left-0 right-0 p-6 bg-[#1a1c23] border-t border-gray-800 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] rounded-t-[2.5rem] space-y-4 z-[70] max-w-2xl mx-auto">
                     <div className="flex justify-between items-center px-2">
                         <span className="text-gray-500 font-bold text-xs uppercase tracking-widest">Total Orden</span>
                         <span className="text-3xl font-black text-emerald-500 tracking-tighter">${(cartTotal + shippingCost).toFixed(2)}</span>
@@ -287,9 +282,9 @@ export default function CustomerView() {
                         disabled={isPlacingOrder || (isDigital && !paymentProof)}
                         className={`w-full py-5 rounded-3xl font-black shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all uppercase tracking-widest text-sm ${isPlacingOrder || (isDigital && !paymentProof) ? 'bg-gray-800 text-gray-600 cursor-not-allowed' : 'bg-emerald-600 text-white shadow-emerald-600/40'}`}
                     >
-                        {isPlacingOrder ? <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div> : <><IconWhatsapp className="h-6 w-6"/> {isDigital && !paymentProof ? 'Subir Capture Primero' : 'Confirmar Pedido'}</>}
+                        {isPlacingOrder ? <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div> : <><IconWhatsapp className="h-6 w-6"/> {isDigital && !paymentProof ? 'Sube tu capture' : 'Confirmar Pedido'}</>}
                     </button>
-                    {isDigital && !paymentProof && <p className="text-[8px] text-center text-red-500 font-black uppercase animate-pulse">Adjunta el capture para habilitar el botón</p>}
+                    {isDigital && !paymentProof && <p className="text-[8px] text-center text-red-500 font-black uppercase animate-pulse">Adjunta el comprobante para activar el botón</p>}
                 </div>
             </div>
         );
