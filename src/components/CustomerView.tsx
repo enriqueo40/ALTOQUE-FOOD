@@ -56,7 +56,7 @@ export default function CustomerView() {
     const handleProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
-            if (file.size > 2 * 1024 * 1024) return alert("La imagen es muy pesada. Máximo 2MB.");
+            if (file.size > 3 * 1024 * 1024) return alert("Imagen demasiado pesada. Máximo 3MB.");
             const reader = new FileReader();
             reader.onload = (event) => setPaymentProof(event.target?.result as string);
             reader.readAsDataURL(file);
@@ -69,9 +69,10 @@ export default function CustomerView() {
         if (orderType === OrderType.Delivery && !customerAddress.calle) return alert("Ingresa la dirección.");
         if (!selectedPaymentMethod) return alert("Selecciona un método de pago.");
         
-        // Métodos que requieren capture
-        const requiresProof = ['Pago Móvil', 'Transferencia', 'Zelle'].includes(selectedPaymentMethod);
-        if (requiresProof && !paymentProof) return alert("Por favor sube la captura de pantalla de tu pago para confirmar.");
+        // Lógica de validación robusta
+        const m = selectedPaymentMethod.toLowerCase();
+        const isDigital = !m.includes('efectivo') && !m.includes('punto');
+        if (isDigital && !paymentProof) return alert("Debes adjuntar el comprobante de pago para continuar.");
 
         setIsPlacingOrder(true);
         const shippingCost = (orderType === OrderType.Delivery && settings.shipping.costType === ShippingCostType.Fixed) ? (settings.shipping.fixedCost ?? 0) : 0;
@@ -95,6 +96,13 @@ export default function CustomerView() {
             setView('confirmation');
         } catch(e) { alert("Error al procesar el pedido."); } finally { setIsPlacingOrder(false); }
     };
+
+    // Variable reactiva para detectar si el pago es digital
+    const isDigital = useMemo(() => {
+        if (!selectedPaymentMethod) return false;
+        const m = selectedPaymentMethod.toLowerCase();
+        return !m.includes('efectivo') && !m.includes('punto');
+    }, [selectedPaymentMethod]);
 
     if (isLoading) return <div className="h-screen flex items-center justify-center dark:bg-gray-900"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>;
 
@@ -156,9 +164,6 @@ export default function CustomerView() {
     if (view === 'checkout') {
         const shippingCost = (orderType === OrderType.Delivery && settings?.shipping.costType === ShippingCostType.Fixed) ? (settings.shipping.fixedCost ?? 0) : 0;
         
-        // Lógica de "Acordeón" de Pago
-        const isDigital = ['Pago Móvil', 'Transferencia', 'Zelle'].includes(selectedPaymentMethod);
-
         return (
             <div className="min-h-screen bg-[#0f1115] flex flex-col text-gray-200">
                 <header className="p-4 bg-[#1a1c23] flex items-center gap-3 border-b border-gray-800 sticky top-0 z-30">
@@ -186,45 +191,44 @@ export default function CustomerView() {
                             ))}
                         </div>
 
-                        {/* CUADRO DE DATOS QUE SE ABRE AL PULSAR */}
+                        {/* BLOQUE DINÁMICO DE PAGO DIGITAL */}
                         {isDigital && (
-                            <div className="mt-4 p-5 bg-emerald-500/5 rounded-3xl border-2 border-emerald-500/20 animate-in fade-in slide-in-from-top-4 duration-300">
-                                <div className="flex items-center gap-2 text-emerald-400 font-black text-[9px] uppercase tracking-[0.3em] mb-4">
-                                    <IconInfo className="h-4 w-4"/> Datos para tu {selectedPaymentMethod}
-                                </div>
-                                <div className="space-y-4 text-sm">
-                                    {selectedPaymentMethod === 'Pago Móvil' ? (
-                                        <>
-                                            <div className="flex justify-between border-b border-gray-800 pb-2"><span className="text-gray-500">Banco:</span> <span className="font-bold">{settings?.payment.pagoMovil?.bank || 'Consultar por WA'}</span></div>
-                                            <div className="flex justify-between border-b border-gray-800 pb-2"><span className="text-gray-500">Teléfono:</span> <span className="font-mono font-bold text-emerald-400">{settings?.payment.pagoMovil?.phone || 'Consultar por WA'}</span></div>
-                                            <div className="flex justify-between"><span className="text-gray-500">Cédula:</span> <span className="font-mono font-bold">{settings?.payment.pagoMovil?.idNumber || 'Consultar por WA'}</span></div>
-                                        </>
-                                    ) : selectedPaymentMethod === 'Transferencia' ? (
-                                        <>
-                                            <div className="flex justify-between border-b border-gray-800 pb-2"><span className="text-gray-500">Banco:</span> <span className="font-bold">{settings?.payment.transfer?.bank || 'Consultar por WA'}</span></div>
-                                            <div className="flex flex-col gap-1 border-b border-gray-800 pb-2"><span className="text-gray-500 text-[10px]">N° Cuenta:</span> <span className="font-mono font-bold text-xs break-all text-emerald-400">{settings?.payment.transfer?.accountNumber || 'Consultar por WA'}</span></div>
-                                            <div className="flex justify-between"><span className="text-gray-500">Titular:</span> <span className="font-bold">{settings?.payment.transfer?.accountHolder || 'Consultar por WA'}</span></div>
-                                        </>
-                                    ) : (
-                                        <div className="text-center py-2">
-                                            <p className="text-gray-400 text-xs">Para pagos por Zelle, solicita el correo oficial al completar tu pedido por WhatsApp.</p>
-                                        </div>
-                                    )}
+                            <div className="mt-6 pt-6 border-t border-gray-800 space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
+                                <div className="p-5 bg-emerald-500/5 rounded-3xl border-2 border-emerald-500/20 shadow-inner">
+                                    <div className="flex items-center gap-2 text-emerald-400 font-black text-[9px] uppercase tracking-[0.3em] mb-4">
+                                        <IconInfo className="h-4 w-4"/> Datos para tu transferencia
+                                    </div>
+                                    <div className="space-y-4 text-sm">
+                                        {selectedPaymentMethod.toLowerCase().includes('movil') || selectedPaymentMethod.toLowerCase().includes('móvil') ? (
+                                            <>
+                                                <div className="flex justify-between border-b border-gray-800/50 pb-2"><span className="text-gray-500">Banco:</span> <span className="font-bold text-emerald-100">{settings?.payment.pagoMovil?.bank || 'Consultar por WA'}</span></div>
+                                                <div className="flex justify-between border-b border-gray-800/50 pb-2"><span className="text-gray-500">Teléfono:</span> <span className="font-mono font-bold text-emerald-400">{settings?.payment.pagoMovil?.phone || 'Consultar por WA'}</span></div>
+                                                <div className="flex justify-between"><span className="text-gray-500">Cédula:</span> <span className="font-mono font-bold text-emerald-100">{settings?.payment.pagoMovil?.idNumber || 'Consultar por WA'}</span></div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="flex justify-between border-b border-gray-800/50 pb-2"><span className="text-gray-500">Banco:</span> <span className="font-bold text-emerald-100">{settings?.payment.transfer?.bank || 'Consultar por WA'}</span></div>
+                                                <div className="flex flex-col gap-1 border-b border-gray-800/50 pb-2"><span className="text-gray-500 text-[10px] uppercase font-bold">N° Cuenta:</span> <span className="font-mono font-bold text-emerald-400 text-xs break-all leading-relaxed">{settings?.payment.transfer?.accountNumber || 'Consultar por WA'}</span></div>
+                                                <div className="flex justify-between"><span className="text-gray-500">Titular:</span> <span className="font-bold text-emerald-100 text-right">{settings?.payment.transfer?.accountHolder || 'Consultar por WA'}</span></div>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
 
-                                {/* AREA DE SUBIR CAPTURE INTEGRADA */}
-                                <div className="mt-6">
+                                <div className="space-y-4">
+                                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">Adjunta captura del pago (Obligatorio)</p>
                                     {!paymentProof ? (
-                                        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-700 rounded-2xl bg-[#0f1115] cursor-pointer hover:border-emerald-500 hover:bg-emerald-500/5 transition-all group">
-                                            <IconUpload className="h-8 w-8 text-gray-600 group-hover:text-emerald-500 mb-2 transition-transform group-hover:-translate-y-1"/>
-                                            <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Subir Capture del Pago</span>
+                                        <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-emerald-500/40 rounded-[2rem] bg-[#0f1115] cursor-pointer hover:border-emerald-500 hover:bg-emerald-500/5 transition-all group">
+                                            <IconUpload className="h-10 w-10 text-emerald-500/40 group-hover:text-emerald-500 mb-2 transition-transform group-hover:-translate-y-1"/>
+                                            <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Toca para subir Capture</span>
                                             <input type="file" className="hidden" accept="image/*" onChange={handleProofUpload} />
                                         </label>
                                     ) : (
-                                        <div className="relative rounded-2xl overflow-hidden shadow-2xl border-2 border-emerald-500">
-                                            <img src={paymentProof} className="w-full h-40 object-cover opacity-80" />
-                                            <button onClick={() => setPaymentProof(null)} className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full shadow-2xl active:scale-90 transition-transform"><IconTrash className="h-4 w-4"/></button>
-                                            <div className="absolute bottom-0 left-0 right-0 bg-emerald-600 text-white text-[9px] font-black text-center py-2 uppercase tracking-widest">Capture cargado ✅</div>
+                                        <div className="relative rounded-[2rem] overflow-hidden shadow-2xl border-2 border-emerald-500 group">
+                                            <img src={paymentProof} className="w-full h-56 object-cover opacity-80" />
+                                            <div className="absolute inset-0 bg-emerald-600/10"></div>
+                                            <button onClick={() => setPaymentProof(null)} className="absolute top-4 right-4 bg-red-500 text-white p-3 rounded-full shadow-2xl hover:scale-110 transition-transform"><IconTrash className="h-5 w-5"/></button>
+                                            <div className="absolute bottom-0 left-0 right-0 bg-emerald-600 text-white text-[9px] font-black text-center py-3 uppercase tracking-[0.2em]">Capture cargado correctamente</div>
                                         </div>
                                     )}
                                 </div>
@@ -246,10 +250,11 @@ export default function CustomerView() {
                     <button 
                         onClick={handlePlaceOrder} 
                         disabled={isPlacingOrder || (isDigital && !paymentProof)}
-                        className={`w-full py-5 rounded-3xl font-black shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all uppercase tracking-widest text-sm ${isPlacingOrder || (isDigital && !paymentProof) ? 'bg-gray-800 text-gray-600 cursor-not-allowed' : 'bg-emerald-600 text-white shadow-emerald-600/40'}`}
+                        className={`w-full py-5 rounded-3xl font-black shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all uppercase tracking-widest text-sm ${isPlacingOrder || (isDigital && !paymentProof) ? 'bg-gray-800 text-gray-600 cursor-not-allowed opacity-50' : 'bg-emerald-600 text-white shadow-emerald-600/40'}`}
                     >
-                        {isPlacingOrder ? <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div> : <><IconWhatsapp className="h-6 w-6"/> {isDigital && !paymentProof ? 'Subir Capture Primero' : 'Confirmar Pedido'}</>}
+                        {isPlacingOrder ? <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div> : <><IconWhatsapp className="h-6 w-6"/> Confirmar Pedido</>}
                     </button>
+                    {isDigital && !paymentProof && <p className="text-[8px] text-center text-red-500 font-black uppercase animate-pulse">Sube tu capture para habilitar el envío por WhatsApp</p>}
                 </div>
             </div>
         );
