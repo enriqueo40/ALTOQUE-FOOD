@@ -88,12 +88,6 @@ const RestaurantHero: React.FC<{
     const currentSchedule = schedules[0];
 
     useEffect(() => {
-        // Check manual override first
-        if (settings.branch.isOpen === false) {
-            setIsOpenNow(false);
-            return;
-        }
-
         // Determine if open based on schedule
         if (!currentSchedule) return;
         const now = new Date();
@@ -119,7 +113,7 @@ const RestaurantHero: React.FC<{
         } else {
             setIsOpenNow(false);
         }
-    }, [currentSchedule, settings.branch.isOpen]);
+    }, [currentSchedule]);
 
     const getShippingCostText = () => {
         if (orderType === OrderType.TakeAway) return "Gratis";
@@ -514,16 +508,17 @@ const ProductDetailModal: React.FC<{
     // Validation is now optional as requested by user
     const isValid = true; 
 
-    // Avoid flat() for better TS compatibility and simpler reduction
-    const totalOptionsPrice = Object.values(selectedOptions).reduce((acc, options) => {
-        return acc + options.reduce((sum, opt) => sum + (opt.price || 0), 0);
+    // Correctly typed reduce
+    const totalOptionsPrice = (Object.values(selectedOptions) as PersonalizationOption[][]).reduce((acc: number, options: PersonalizationOption[]) => {
+        return acc + options.reduce((sum: number, opt: PersonalizationOption) => sum + (opt.price || 0), 0);
     }, 0);
     
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
 
     const handleAdd = () => {
         // Removed check: if (!isValid) return;
-        const flatOptions = Object.values(selectedOptions).reduce((acc, curr) => acc.concat(curr), [] as PersonalizationOption[]);
+        // Correctly typed concat and reduce
+        const flatOptions = (Object.values(selectedOptions) as PersonalizationOption[][]).reduce((acc: PersonalizationOption[], curr: PersonalizationOption[]) => acc.concat(curr), [] as PersonalizationOption[]);
         onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptions);
     }
 
