@@ -325,7 +325,7 @@ const MenuList: React.FC<{
     currency: string, 
     promotions: Promotion[]
 }> = ({ products, categories, onProductClick, cartItems, currency, promotions }) => {
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setLocalSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState<string>('');
     
     // Initialize active category on load
@@ -396,7 +396,7 @@ const MenuList: React.FC<{
                             type="text" 
                             placeholder="Buscar productos..." 
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e) => setLocalSearchTerm(e.target.value)}
                             className="w-full bg-gray-800 text-white rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder-gray-500"
                         />
                     </div>
@@ -505,10 +505,15 @@ const ProductDetailModal: React.FC<{
         return selectedOptions[pid]?.some(o => o.id === oid);
     };
 
-    // Correctly typed reduce
-    const totalOptionsPrice = Object.values(selectedOptions).reduce((acc: number, options: PersonalizationOption[]) => {
-        return acc + options.reduce((sum: number, opt: PersonalizationOption) => sum + (opt.price || 0), 0);
-    }, 0);
+    // FIX: Operator '+' cannot be applied to types 'number' and 'unknown'.
+    // Replaced reduce with a more robust typing and explicit loop to avoid type inference issues.
+    let totalOptionsPrice = 0;
+    const selectedOptionGroups = Object.values(selectedOptions) as PersonalizationOption[][];
+    for (const group of selectedOptionGroups) {
+        for (const opt of group) {
+            totalOptionsPrice += Number(opt.price || 0);
+        }
+    }
     
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
 
@@ -562,7 +567,7 @@ const ProductDetailModal: React.FC<{
                                             <div 
                                                 key={opt.id} 
                                                 onClick={() => handleOptionToggle(p, opt)}
-                                                className={`flex justify-between items-center p-3 rounded-lg cursor-pointer border transition-all ${isSelected ? 'bg-emerald-500/20 border-emerald-500 ring-1 ring-emerald-500 shadow-lg shadow-emerald-900/20' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}
+                                                className={`flex justify-between items-center p-3 rounded-lg cursor-pointer border transition-all ${isSelected ? 'bg-emerald-500/20 border-emerald-500 ring-1 border-emerald-500 shadow-lg shadow-emerald-900/20' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}
                                             >
                                                 <div className="flex items-center gap-3">
                                                     <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${isSelected ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-gray-500'}`}>
