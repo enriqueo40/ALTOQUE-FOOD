@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck, IconCalendar, IconDuplicate, IconMap, IconUpload } from '../constants';
+import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck, IconCalendar, IconDuplicate, IconUpload } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
@@ -283,6 +283,46 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
     return { price: bestPrice, promotion: bestPromo };
 };
 
+const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: () => void; currency: string; promotions: Promotion[] }> = ({ product, quantityInCart, onClick, currency, promotions }) => {
+    const { price: discountedPrice, promotion } = getDiscountedPrice(product, promotions);
+    const hasDiscount = promotion !== undefined;
+
+    return (
+        <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group relative overflow-hidden">
+            {hasDiscount && (
+                <div className="absolute top-0 left-0 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-br-lg z-10">
+                    -{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}
+                </div>
+            )}
+            <div className="relative h-24 w-24 flex-shrink-0">
+                <img src={product.imageUrl} alt={product.name} className="w-full h-full rounded-lg object-cover" />
+                {quantityInCart > 0 && (
+                    <div className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg ring-2 ring-gray-900">
+                        {quantityInCart}
+                    </div>
+                )}
+            </div>
+            <div className="flex-1 flex flex-col justify-between py-1">
+                <div>
+                    <h3 className="font-bold text-gray-100 leading-tight group-hover:text-emerald-400 transition-colors">{product.name}</h3>
+                    <p className="text-sm text-gray-400 line-clamp-2 mt-1 leading-snug">{product.description}</p>
+                </div>
+                <div className="flex justify-between items-end mt-2">
+                    <div className="flex flex-col">
+                        {hasDiscount && (
+                            <span className="text-xs text-gray-500 line-through">{currency} ${product.price.toFixed(2)}</span>
+                        )}
+                        <p className={`font-bold ${hasDiscount ? 'text-rose-400' : 'text-white'}`}>{currency} ${discountedPrice.toFixed(2)}</p>
+                    </div>
+                    <div className="bg-gray-700 p-1.5 rounded-full text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                        <IconPlus className="h-4 w-4" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const MenuList: React.FC<{
     products: Product[],
     categories: Category[],
@@ -422,46 +462,6 @@ const MenuList: React.FC<{
                     scrollbar-width: none;
                 }
             `}</style>
-        </div>
-    );
-};
-
-const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: () => void; currency: string; promotions: Promotion[] }> = ({ product, quantityInCart, onClick, currency, promotions }) => {
-    const { price: discountedPrice, promotion } = getDiscountedPrice(product, promotions);
-    const hasDiscount = promotion !== undefined;
-
-    return (
-        <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group relative overflow-hidden">
-            {hasDiscount && (
-                <div className="absolute top-0 left-0 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-br-lg z-10">
-                    -{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}
-                </div>
-            )}
-            <div className="relative h-24 w-24 flex-shrink-0">
-                <img src={product.imageUrl} alt={product.name} className="w-full h-full rounded-lg object-cover" />
-                {quantityInCart > 0 && (
-                    <div className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg ring-2 ring-gray-900">
-                        {quantityInCart}
-                    </div>
-                )}
-            </div>
-            <div className="flex-1 flex flex-col justify-between py-1">
-                <div>
-                    <h3 className="font-bold text-gray-100 leading-tight group-hover:text-emerald-400 transition-colors">{product.name}</h3>
-                    <p className="text-sm text-gray-400 line-clamp-2 mt-1 leading-snug">{product.description}</p>
-                </div>
-                <div className="flex justify-between items-end mt-2">
-                    <div className="flex flex-col">
-                        {hasDiscount && (
-                            <span className="text-xs text-gray-500 line-through">{currency} ${product.price.toFixed(2)}</span>
-                        )}
-                        <p className={`font-bold ${hasDiscount ? 'text-rose-400' : 'text-white'}`}>{currency} ${discountedPrice.toFixed(2)}</p>
-                    </div>
-                    <div className="bg-gray-700 p-1.5 rounded-full text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
-                        <IconPlus className="h-4 w-4" />
-                    </div>
-                </div>
-            </div>
         </div>
     );
 };
@@ -711,7 +711,7 @@ const CartSummaryView: React.FC<{
 
 const CheckoutView: React.FC<{
     cartTotal: number, 
-    onPlaceOrder: (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number) => void, 
+    onPlaceOrder: (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number, paymentProof?: string | null) => void, 
     settings: AppSettings, 
     orderType: OrderType 
 }> = ({ cartTotal, onPlaceOrder, settings, orderType }) => {
@@ -719,6 +719,7 @@ const CheckoutView: React.FC<{
         name: '', phone: '', address: { colonia: '', calle: '', numero: '', entreCalles: '', referencias: '' }
     });
     const [tipAmount, setTipAmount] = useState(0);
+    const [paymentProof, setPaymentProof] = useState<string | null>(null);
     
     const isDelivery = orderType === OrderType.Delivery;
     const isPickup = orderType === OrderType.TakeAway;
@@ -743,15 +744,26 @@ const CheckoutView: React.FC<{
         setTipAmount(cartTotal * (percentage / 100));
     };
 
+    const handleProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPaymentProof(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onPlaceOrder(customer, selectedPaymentMethod, tipAmount);
+        onPlaceOrder(customer, selectedPaymentMethod, tipAmount, paymentProof);
     };
 
     const inputClasses = "w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-gray-500 transition-all";
     const labelClasses = "text-sm font-bold text-gray-400 mb-1 block";
 
-    const shippingCost: number = (isDelivery && settings.shipping.costType === ShippingCostType.Fixed) ? (settings.shipping.fixedCost ?? 0) : 0;
+    const shippingCost: number = (isDelivery && settings.shipping.costType === ShippingCostType.Fixed) ? (Number(settings.shipping.fixedCost) || 0) : 0;
     const finalTotal = cartTotal + shippingCost + tipAmount;
     
     return (
@@ -838,7 +850,7 @@ const CheckoutView: React.FC<{
                         <div key={method}>
                             <label className={`flex justify-between items-center p-4 rounded-xl cursor-pointer transition-all border ${selectedPaymentMethod === method ? 'bg-emerald-900/20 border-emerald-500 ring-1 ring-emerald-500 shadow-lg shadow-emerald-900/10' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}>
                                 <span className={`font-medium ${selectedPaymentMethod === method ? 'text-emerald-400' : 'text-white'}`}>{method}</span>
-                                <input type="radio" name="payment" value={method} checked={selectedPaymentMethod === method} onChange={() => setSelectedPaymentMethod(method)} className="h-5 w-5 accent-emerald-500" />
+                                <input type="radio" name="payment" value={method} checked={selectedPaymentMethod === method} onChange={() => {setSelectedPaymentMethod(method); setPaymentProof(null);}} className="h-5 w-5 accent-emerald-500" />
                             </label>
                             
                             {/* Detailed Payment Info Display */}
@@ -852,10 +864,36 @@ const CheckoutView: React.FC<{
                                             alert('Datos copiados');
                                         }} className="text-xs text-gray-400 hover:text-white flex items-center gap-1"><IconDuplicate className="h-3 w-3"/> Copiar</button>
                                     </div>
-                                    <div className="text-sm text-gray-200 space-y-1 font-mono">
+                                    <div className="text-sm text-gray-200 space-y-1 font-mono mb-4">
                                         <p><span className="text-gray-500">Banco:</span> {settings.payment.pagoMovil.bank}</p>
                                         <p><span className="text-gray-500">Teléfono:</span> {settings.payment.pagoMovil.phone}</p>
                                         <p><span className="text-gray-500">Cédula/RIF:</span> {settings.payment.pagoMovil.idNumber}</p>
+                                    </div>
+                                    
+                                    {/* Upload Capture Section */}
+                                    <div className="mt-4 border-t border-gray-700/50 pt-4">
+                                        <p className="text-xs font-bold text-gray-400 uppercase mb-2">Comprobante de pago</p>
+                                        {!paymentProof ? (
+                                            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:bg-gray-800 transition-colors bg-gray-800/30">
+                                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                                    <IconUpload className="w-8 h-8 text-gray-400 mb-2" />
+                                                    <p className="text-xs text-gray-400 font-medium">Toca para subir captura</p>
+                                                </div>
+                                                <input type="file" className="hidden" accept="image/*" onChange={handleProofUpload} />
+                                            </label>
+                                        ) : (
+                                            <div className="relative w-full h-48 rounded-xl overflow-hidden border border-emerald-500/50 shadow-lg">
+                                                <img src={paymentProof} alt="Comprobante" className="w-full h-full object-cover" />
+                                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                                                     <button onClick={() => setPaymentProof(null)} className="bg-red-500 text-white p-3 rounded-full shadow-lg transform hover:scale-110 transition-transform">
+                                                        <IconTrash className="h-6 w-6" />
+                                                     </button>
+                                                </div>
+                                                <div className="absolute bottom-2 right-2 bg-emerald-500 text-white text-[10px] px-3 py-1 rounded-full font-bold shadow-lg flex items-center gap-1">
+                                                    <IconCheck className="h-3 w-3" /> Cargado
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -870,11 +908,37 @@ const CheckoutView: React.FC<{
                                             alert('Datos copiados');
                                         }} className="text-xs text-gray-400 hover:text-white flex items-center gap-1"><IconDuplicate className="h-3 w-3"/> Copiar</button>
                                     </div>
-                                    <div className="text-sm text-gray-200 space-y-1 font-mono">
+                                    <div className="text-sm text-gray-200 space-y-1 font-mono mb-4">
                                         <p><span className="text-gray-500">Banco:</span> {settings.payment.transfer.bank}</p>
                                         <p><span className="text-gray-500">Cuenta:</span> {settings.payment.transfer.accountNumber}</p>
                                         <p><span className="text-gray-500">Titular:</span> {settings.payment.transfer.accountHolder}</p>
                                         <p><span className="text-gray-500">CI/RIF:</span> {settings.payment.transfer.idNumber}</p>
+                                    </div>
+
+                                    {/* Upload Capture Section */}
+                                    <div className="mt-4 border-t border-gray-700/50 pt-4">
+                                        <p className="text-xs font-bold text-gray-400 uppercase mb-2">Comprobante de pago</p>
+                                        {!paymentProof ? (
+                                            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:bg-gray-800 transition-colors bg-gray-800/30">
+                                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                                    <IconUpload className="w-8 h-8 text-gray-400 mb-2" />
+                                                    <p className="text-xs text-gray-400 font-medium">Toca para subir captura</p>
+                                                </div>
+                                                <input type="file" className="hidden" accept="image/*" onChange={handleProofUpload} />
+                                            </label>
+                                        ) : (
+                                            <div className="relative w-full h-48 rounded-xl overflow-hidden border border-emerald-500/50 shadow-lg">
+                                                <img src={paymentProof} alt="Comprobante" className="w-full h-full object-cover" />
+                                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                                                     <button onClick={() => setPaymentProof(null)} className="bg-red-500 text-white p-3 rounded-full shadow-lg transform hover:scale-110 transition-transform">
+                                                        <IconTrash className="h-6 w-6" />
+                                                     </button>
+                                                </div>
+                                                <div className="absolute bottom-2 right-2 bg-emerald-500 text-white text-[10px] px-3 py-1 rounded-full font-bold shadow-lg flex items-center gap-1">
+                                                    <IconCheck className="h-3 w-3" /> Cargado
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -1025,7 +1089,7 @@ export default function CustomerView() {
         if (!settings) return;
 
         const shippingCost = (orderType === OrderType.Delivery && settings.shipping.costType === ShippingCostType.Fixed) 
-            ? (settings.shipping.fixedCost ?? 0) 
+            ? (Number(settings.shipping.fixedCost) || 0) 
             : 0;
 
         const finalTotal = cartTotal + shippingCost + tipAmount;
