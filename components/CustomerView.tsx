@@ -1,315 +1,11 @@
-
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck, IconCalendar, IconDuplicate } from '../constants';
+import { IconPlus, IconMinus, IconClock, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconStore, IconCheck, IconDuplicate, IconUpload } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
-// Main View Manager
-export default function CustomerView() {
-    const [view, setView] = useState<'menu' | 'cart' | 'checkout' | 'confirmation'>('menu');
-    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-    const [generalComments, setGeneralComments] = useState('');
-    const [settings, setSettings] = useState<AppSettings | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [tableInfo, setTableInfo] = useState<{ table: string; zone: string } | null>(null);
-    // State for Order Type (Delivery, TakeAway, DineIn)
-    const [orderType, setOrderType] = useState<OrderType>(OrderType.Delivery);
-
-    const { cartItems, addToCart, removeFromCart, updateQuantity, clearCart, cartTotal, itemCount } = useCart();
-    
-    // Global data for the menu
-    const [allPromotions, setAllPromotions] = useState<Promotion[]>([]);
-    const [allPersonalizations, setAllPersonalizations] = useState<Personalization[]>([]);
-    const [allProducts, setAllProducts] = useState<Product[]>([]);
-    const [allCategories, setAllCategories] = useState<Category[]>([]);
-
-    const fetchMenuData = async () => {
-        try {
-            // Parallel data fetching for speed
-            const [appSettings, fetchedPromotions, fetchedPersonalizations, fetchedProducts, fetchedCategories] = await Promise.all([
-                getAppSettings(),
-                getPromotions(),
-                getPersonalizations(),
-                getProducts(),
-                getCategories()
-            ]);
-            setSettings(appSettings);
-            setAllPromotions(fetchedPromotions);
-            setAllPersonalizations(fetchedPersonalizations);
-            setAllProducts(fetchedProducts);
-            setAllCategories(fetchedCategories);
-        } catch (error) {
-            console.error("Failed to fetch data:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchMenuData();
-        
-        // Subscribe to real-time updates for the menu (Admin changes)
-        subscribeToMenuUpdates(() => {
-            console.log("Menu updated from admin (Realtime), refreshing...");
-            fetchMenuData();
-        });
-
-        // Polling fallback: Check for updates every 30 seconds to ensure sync
-        const intervalId = setInterval(() => {
-            console.log("Auto-refreshing menu data (Polling)...");
-            fetchMenuData();
-        }, 30000);
-
-        const params = new URLSearchParams(window.location.hash.split('?')[1]);
-        const table = params.get('table');
-        const zone = params.get('zone');
-        if (table && zone) {
-            setTableInfo({ table, zone });
-            setOrderType(OrderType.DineIn);
-        }
-
-        return () => {
-            unsubscribeFromChannel();
-            clearInterval(intervalId);
-        };
-    }, []);
-
-    const handleProductClick = (product: Product) => {
-        setSelectedProduct(product);
-    };
-
-    const handleAddToCart = (product: Product, quantity: number, comments?: string, options: PersonalizationOption[] = []) => {
-        addToCart(product, quantity, comments, options);
-        setSelectedProduct(null);
-    };
-
-    const handlePlaceOrder = async (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number = 0) => {
-        if (!settings) return;
-
-        const shippingCost = (orderType === OrderType.Delivery && settings.shipping.costType === ShippingCostType.Fixed) 
-            ? (settings.shipping.fixedCost ?? 0) 
-            : 0;
-
-        const finalTotal = cartTotal + shippingCost + tipAmount;
-
-        const newOrder: Omit<Order, 'id' | 'createdAt'> = {
-            customer,
-            items: cartItems,
-            total: finalTotal,
-            status: OrderStatus.Pending,
-            branchId: 'main-branch',
-            generalComments: generalComments + (tipAmount > 0 ? ` | Propina: ${settings.company.currency.code} ${tipAmount.toFixed(2)}` : ''),
-            orderType: orderType,
-            tableId: orderType === OrderType.DineIn && tableInfo ? `${tableInfo.zone} - ${tableInfo.table}` : undefined,
-        };
-
-        try {
-            await saveOrder(newOrder);
-        } catch(e) {
-            console.error("Failed to save order", e);
-            alert("Hubo un error al guardar tu pedido. Por favor, intenta de nuevo.");
-            return; // Stop if saving fails
-        }
-
-        // Helper to format options string
-        const formatOptions = (item: CartItem) => {
-            if (!item.selectedOptions || item.selectedOptions.length === 0) return '';
-            return item.selectedOptions.map(opt => `    + ${opt.name}`).join('\n');
-        };
-
-        let messageParts: string[];
-
-        const itemDetails = cartItems.map(item => {
-            let detail = `*${item.quantity}x ${item.name}*`;
-            const optionsStr = formatOptions(item);
-            if (optionsStr) detail += `\n${optionsStr}`;
-            if (item.comments) detail += `\n  - _Nota: ${item.comments}_`;
-            return detail;
-        });
-
-        const currency = settings.company.currency.code;
-
-        if (orderType === OrderType.DineIn) {
-            messageParts = [
-                `*🛎️ Nuevo Pedido en Mesa de ${settings.company.name.toUpperCase()}*`,
-                `---------------------------------`,
-                `*MESA:* ${tableInfo?.zone} - ${tableInfo?.table}`,
-                 `*CLIENTE:* ${customer.name}`,
-                `---------------------------------`,
-                `*DETALLES DEL PEDIDO:*`,
-                ...itemDetails,
-                ``,
-                generalComments ? `*Comentarios Generales:*\n_${generalComments}_` : '',
-                `---------------------------------`,
-                `*Subtotal:* ${currency} $${cartTotal.toFixed(2)}`,
-                tipAmount > 0 ? `*Propina:* ${currency} $${tipAmount.toFixed(2)}` : '',
-                `*Total a Pagar:* ${currency} $${finalTotal.toFixed(2)}`,
-                `*Método de pago:* ${paymentMethod}`,
-            ];
-        } else if (orderType === OrderType.TakeAway) {
-             messageParts = [
-                `*🛍️ Nuevo Pedido Para Recoger - ${settings.company.name.toUpperCase()}*`,
-                `---------------------------------`,
-                `*CLIENTE:*`,
-                `*Nombre:* ${customer.name}`,
-                `*Teléfono:* ${customer.phone}`,
-                `---------------------------------`,
-                `*TIPO:* Para llevar (Recoger en tienda)`,
-                `---------------------------------`,
-                `*DETALLES DEL PEDIDO:*`,
-                ...itemDetails,
-                ``,
-                generalComments ? `*Comentarios Generales:*\n_${generalComments}_` : '',
-                `---------------------------------`,
-                `*Subtotal:* ${currency} $${cartTotal.toFixed(2)}`,
-                tipAmount > 0 ? `*Propina:* ${currency} $${tipAmount.toFixed(2)}` : '',
-                `*Total a Pagar:* ${currency} $${finalTotal.toFixed(2)}`,
-                `*Método de pago:* ${paymentMethod}`,
-            ];
-        } else {
-            // Delivery
-            messageParts = [
-                `*⭐ Nuevo Pedido a Domicilio - ${settings.company.name.toUpperCase()}*`,
-                `---------------------------------`,
-                `*CLIENTE:*`,
-                `*Nombre:* ${customer.name}`,
-                `*Teléfono:* ${customer.phone}`,
-                `---------------------------------`,
-                `*DIRECCIÓN DE ENTREGA:*`,
-                `*Colonia:* ${customer.address.colonia}`,
-                `*Calle:* ${customer.address.calle}`,
-                `*Número:* ${customer.address.numero}`,
-                customer.address.entreCalles ? `*Entre Calles:* ${customer.address.entreCalles}` : '',
-                customer.address.referencias ? `*Referencias:* ${customer.address.referencias}` : '',
-                `---------------------------------`,
-                `*DETALLES DEL PEDIDO:*`,
-                ...itemDetails,
-                ``,
-                generalComments ? `*Comentarios Generales:*\n_${generalComments}_` : '',
-                `---------------------------------`,
-                `*Subtotal:* ${currency} $${cartTotal.toFixed(2)}`,
-                `*Envío:* ${shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : 'Por cotizar'}`,
-                tipAmount > 0 ? `*Propina:* ${currency} $${tipAmount.toFixed(2)}` : '',
-                `*Total Estimado:* ${currency} $${finalTotal.toFixed(2)}`,
-                `*Método de pago:* ${paymentMethod}`,
-            ];
-        }
-
-
-        const whatsappMessage = encodeURIComponent(messageParts.filter(p => p !== '').join('\n'));
-        const whatsappUrl = `https://wa.me/${settings.branch.whatsappNumber}?text=${whatsappMessage}`;
-        
-        window.open(whatsappUrl, '_blank');
-        setView('confirmation');
-    };
-
-    const handleStartNewOrder = () => {
-        clearCart();
-        setGeneralComments('');
-        setView('menu');
-        // Do not clear tableInfo, as the customer is likely still at the same table.
-    };
-
-    const getHeaderTitle = () => {
-        switch(view) {
-            case 'cart': return 'Tu pedido';
-            case 'checkout': return 'Completa tu pedido';
-            case 'confirmation': return 'Confirmación';
-            default: return '';
-        }
-    };
-    
-    const canGoBack = view === 'cart' || view === 'checkout';
-    const handleBack = () => {
-        if (view === 'checkout') setView('cart');
-        else if (view === 'cart') setView('menu');
-    }
-    
-    if (isLoading || !settings) {
-        return (
-            <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-gray-300">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500 mb-4"></div>
-                <p className="animate-pulse">Sincronizando menú...</p>
-            </div>
-        );
-    }
-
-    return (
-        <div className="bg-gray-900 min-h-screen font-sans text-gray-100 selection:bg-emerald-500 selection:text-white">
-            <div className="container mx-auto max-w-md bg-gray-900 min-h-screen shadow-2xl relative pb-24 border-x border-gray-800">
-                
-                {view !== 'menu' && <Header title={getHeaderTitle()} onBack={canGoBack ? handleBack : undefined} />}
-
-                {view === 'menu' && (
-                    <>
-                        <RestaurantHero 
-                            settings={settings} 
-                            tableInfo={tableInfo} 
-                            orderType={orderType}
-                            setOrderType={setOrderType}
-                        />
-                        <MenuList 
-                            products={allProducts}
-                            categories={allCategories}
-                            onProductClick={handleProductClick} 
-                            cartItems={cartItems} 
-                            currency={settings.company.currency.code}
-                            promotions={allPromotions}
-                        />
-                    </>
-                )}
-
-                {view === 'cart' && (
-                    <CartSummaryView 
-                        cartItems={cartItems}
-                        cartTotal={cartTotal}
-                        onUpdateQuantity={updateQuantity}
-                        onRemoveItem={removeFromCart}
-                        generalComments={generalComments}
-                        onGeneralCommentsChange={setGeneralComments}
-                        onProceedToCheckout={() => setView('checkout')}
-                    />
-                )}
-                
-                {view === 'checkout' && (
-                    <CheckoutView 
-                        cartTotal={cartTotal}
-                        onPlaceOrder={handlePlaceOrder}
-                        settings={settings}
-                        orderType={orderType}
-                    />
-                )}
-
-                {view === 'confirmation' && (
-                    <OrderConfirmation onNewOrder={handleStartNewOrder} settings={settings} />
-                )}
-
-                {selectedProduct && (
-                    <ProductDetailModal 
-                        product={selectedProduct} 
-                        onAddToCart={handleAddToCart}
-                        onClose={() => setSelectedProduct(null)}
-                        personalizations={allPersonalizations}
-                        promotions={allPromotions}
-                    />
-                )}
-
-                {view === 'menu' && itemCount > 0 && (
-                    <FooterBar 
-                        itemCount={itemCount} 
-                        cartTotal={cartTotal}
-                        onViewCart={() => setView('cart')} 
-                    />
-                )}
-                <Chatbot />
-            </div>
-        </div>
-    );
-}
-
-// Sub-components
+// Sub-components definitions
 const Header: React.FC<{ title: string; onBack?: () => void }> = ({ title, onBack }) => (
     <header className="p-4 flex justify-between items-center sticky top-0 bg-gray-900/90 backdrop-blur-md z-20 border-b border-gray-800">
         {onBack ? (
@@ -391,7 +87,7 @@ const RestaurantHero: React.FC<{
     const currentSchedule = schedules[0];
 
     useEffect(() => {
-        // Determine if open
+        // Determine if open based on schedule
         if (!currentSchedule) return;
         const now = new Date();
         const daysOrder = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -580,6 +276,46 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
     return { price: bestPrice, promotion: bestPromo };
 };
 
+const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: () => void; currency: string; promotions: Promotion[] }> = ({ product, quantityInCart, onClick, currency, promotions }) => {
+    const { price: discountedPrice, promotion } = getDiscountedPrice(product, promotions);
+    const hasDiscount = promotion !== undefined;
+
+    return (
+        <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group relative overflow-hidden">
+            {hasDiscount && (
+                <div className="absolute top-0 left-0 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-br-lg z-10">
+                    -{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}
+                </div>
+            )}
+            <div className="relative h-24 w-24 flex-shrink-0">
+                <img src={product.imageUrl} alt={product.name} className="w-full h-full rounded-lg object-cover" />
+                {quantityInCart > 0 && (
+                    <div className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg ring-2 ring-gray-900">
+                        {quantityInCart}
+                    </div>
+                )}
+            </div>
+            <div className="flex-1 flex flex-col justify-between py-1">
+                <div>
+                    <h3 className="font-bold text-gray-100 leading-tight group-hover:text-emerald-400 transition-colors">{product.name}</h3>
+                    <p className="text-sm text-gray-400 line-clamp-2 mt-1 leading-snug">{product.description}</p>
+                </div>
+                <div className="flex justify-between items-end mt-2">
+                    <div className="flex flex-col">
+                        {hasDiscount && (
+                            <span className="text-xs text-gray-500 line-through">{currency} ${product.price.toFixed(2)}</span>
+                        )}
+                        <p className={`font-bold ${hasDiscount ? 'text-rose-400' : 'text-white'}`}>{currency} ${discountedPrice.toFixed(2)}</p>
+                    </div>
+                    <div className="bg-gray-700 p-1.5 rounded-full text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                        <IconPlus className="h-4 w-4" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const MenuList: React.FC<{
     products: Product[],
     categories: Category[],
@@ -723,46 +459,6 @@ const MenuList: React.FC<{
     );
 };
 
-const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: () => void; currency: string; promotions: Promotion[] }> = ({ product, quantityInCart, onClick, currency, promotions }) => {
-    const { price: discountedPrice, promotion } = getDiscountedPrice(product, promotions);
-    const hasDiscount = promotion !== undefined;
-
-    return (
-        <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group relative overflow-hidden">
-            {hasDiscount && (
-                <div className="absolute top-0 left-0 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-br-lg z-10">
-                    -{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}
-                </div>
-            )}
-            <div className="relative h-24 w-24 flex-shrink-0">
-                <img src={product.imageUrl} alt={product.name} className="w-full h-full rounded-lg object-cover" />
-                {quantityInCart > 0 && (
-                    <div className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg ring-2 ring-gray-900">
-                        {quantityInCart}
-                    </div>
-                )}
-            </div>
-            <div className="flex-1 flex flex-col justify-between py-1">
-                <div>
-                    <h3 className="font-bold text-gray-100 leading-tight group-hover:text-emerald-400 transition-colors">{product.name}</h3>
-                    <p className="text-sm text-gray-400 line-clamp-2 mt-1 leading-snug">{product.description}</p>
-                </div>
-                <div className="flex justify-between items-end mt-2">
-                    <div className="flex flex-col">
-                        {hasDiscount && (
-                            <span className="text-xs text-gray-500 line-through">{currency} ${product.price.toFixed(2)}</span>
-                        )}
-                        <p className={`font-bold ${hasDiscount ? 'text-rose-400' : 'text-white'}`}>{currency} ${discountedPrice.toFixed(2)}</p>
-                    </div>
-                    <div className="bg-gray-700 p-1.5 rounded-full text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
-                        <IconPlus className="h-4 w-4" />
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
 const ProductDetailModal: React.FC<{
     product: Product, 
     onAddToCart: (product: Product, quantity: number, comments?: string, options?: PersonalizationOption[]) => void, 
@@ -811,12 +507,17 @@ const ProductDetailModal: React.FC<{
     // Validation is now optional as requested by user
     const isValid = true; 
 
-    const totalOptionsPrice = Object.values(selectedOptions).flat().reduce((acc: number, opt: PersonalizationOption) => acc + opt.price, 0);
+    // Correctly typed reduce
+    const totalOptionsPrice = Object.values(selectedOptions).reduce((acc: number, options: PersonalizationOption[]) => {
+        return acc + options.reduce((sum: number, opt: PersonalizationOption) => sum + (opt.price || 0), 0);
+    }, 0);
+    
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
 
     const handleAdd = () => {
         // Removed check: if (!isValid) return;
-        const flatOptions = Object.values(selectedOptions).flat();
+        // Correctly typed concat and reduce
+        const flatOptions = (Object.values(selectedOptions) as PersonalizationOption[][]).reduce((acc: PersonalizationOption[], curr: PersonalizationOption[]) => acc.concat(curr), [] as PersonalizationOption[]);
         onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptions);
     }
 
@@ -1008,14 +709,15 @@ const CartSummaryView: React.FC<{
 
 const CheckoutView: React.FC<{
     cartTotal: number, 
-    onPlaceOrder: (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number) => void, 
+    onPlaceOrder: (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number, paymentProof?: string | null) => void, 
     settings: AppSettings, 
     orderType: OrderType 
 }> = ({ cartTotal, onPlaceOrder, settings, orderType }) => {
     const [customer, setCustomer] = useState<Customer>({
         name: '', phone: '', address: { colonia: '', calle: '', numero: '', entreCalles: '', referencias: '' }
     });
-    const [tipAmount, setTipAmount] = useState(0);
+    const [tipAmount, setTipAmount] = useState<number>(0);
+    const [paymentProof, setPaymentProof] = useState<string | null>(null);
     
     const isDelivery = orderType === OrderType.Delivery;
     const isPickup = orderType === OrderType.TakeAway;
@@ -1040,16 +742,27 @@ const CheckoutView: React.FC<{
         setTipAmount(cartTotal * (percentage / 100));
     };
 
+    const handleProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPaymentProof(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onPlaceOrder(customer, selectedPaymentMethod, tipAmount);
+        onPlaceOrder(customer, selectedPaymentMethod, tipAmount, paymentProof);
     };
 
     const inputClasses = "w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-gray-500 transition-all";
     const labelClasses = "text-sm font-bold text-gray-400 mb-1 block";
 
-    const shippingCost = (isDelivery && settings.shipping.costType === ShippingCostType.Fixed) ? (settings.shipping.fixedCost ?? 0) : 0;
-    const finalTotal = cartTotal + shippingCost + tipAmount;
+    const shippingCost: number = (isDelivery && settings.shipping.costType === ShippingCostType.Fixed) ? (Number(settings.shipping.fixedCost) || 0) : 0;
+    const finalTotal = (Number(cartTotal) || 0) + Number(shippingCost) + (Number(tipAmount) || 0);
     
     return (
         <form onSubmit={handleSubmit} className="p-4 space-y-6 pb-44 animate-fade-in">
@@ -1135,43 +848,68 @@ const CheckoutView: React.FC<{
                         <div key={method}>
                             <label className={`flex justify-between items-center p-4 rounded-xl cursor-pointer transition-all border ${selectedPaymentMethod === method ? 'bg-emerald-900/20 border-emerald-500 ring-1 ring-emerald-500 shadow-lg shadow-emerald-900/10' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}>
                                 <span className={`font-medium ${selectedPaymentMethod === method ? 'text-emerald-400' : 'text-white'}`}>{method}</span>
-                                <input type="radio" name="payment" value={method} checked={selectedPaymentMethod === method} onChange={() => setSelectedPaymentMethod(method)} className="h-5 w-5 accent-emerald-500" />
+                                <input type="radio" name="payment" value={method} checked={selectedPaymentMethod === method} onChange={() => {setSelectedPaymentMethod(method); setPaymentProof(null);}} className="h-5 w-5 accent-emerald-500" />
                             </label>
                             
                             {/* Detailed Payment Info Display */}
-                            {selectedPaymentMethod === method && method === 'Pago Móvil' && settings.payment.pagoMovil && (
+                            {(selectedPaymentMethod === method && (method === 'Pago Móvil' || method === 'Transferencia')) && (
                                 <div className="mt-2 p-4 bg-gray-700/50 rounded-xl border border-gray-600 animate-fade-in">
                                     <div className="flex justify-between items-start mb-2">
-                                        <h4 className="text-emerald-400 font-bold text-sm uppercase">Datos Pago Móvil</h4>
+                                        <h4 className="text-emerald-400 font-bold text-sm uppercase">Datos {method}</h4>
                                         <button type="button" onClick={() => {
-                                            const text = `Banco: ${settings.payment.pagoMovil?.bank}\nTel: ${settings.payment.pagoMovil?.phone}\nCI/RIF: ${settings.payment.pagoMovil?.idNumber}`;
+                                            let text = '';
+                                            if (method === 'Pago Móvil' && settings.payment.pagoMovil) {
+                                                text = `Banco: ${settings.payment.pagoMovil.bank}\nTel: ${settings.payment.pagoMovil.phone}\nCI/RIF: ${settings.payment.pagoMovil.idNumber}`;
+                                            } else if (method === 'Transferencia' && settings.payment.transfer) {
+                                                text = `Banco: ${settings.payment.transfer.bank}\nCuenta: ${settings.payment.transfer.accountNumber}\nTitular: ${settings.payment.transfer.accountHolder}\nCI/RIF: ${settings.payment.transfer.idNumber}`;
+                                            }
                                             navigator.clipboard.writeText(text);
                                             alert('Datos copiados');
                                         }} className="text-xs text-gray-400 hover:text-white flex items-center gap-1"><IconDuplicate className="h-3 w-3"/> Copiar</button>
                                     </div>
-                                    <div className="text-sm text-gray-200 space-y-1 font-mono">
-                                        <p><span className="text-gray-500">Banco:</span> {settings.payment.pagoMovil.bank}</p>
-                                        <p><span className="text-gray-500">Teléfono:</span> {settings.payment.pagoMovil.phone}</p>
-                                        <p><span className="text-gray-500">Cédula/RIF:</span> {settings.payment.pagoMovil.idNumber}</p>
+                                    
+                                    <div className="text-sm text-gray-200 space-y-1 font-mono mb-4">
+                                        {method === 'Pago Móvil' && settings.payment.pagoMovil && (
+                                            <>
+                                                <p><span className="text-gray-500">Banco:</span> {settings.payment.pagoMovil.bank}</p>
+                                                <p><span className="text-gray-500">Teléfono:</span> {settings.payment.pagoMovil.phone}</p>
+                                                <p><span className="text-gray-500">Cédula/RIF:</span> {settings.payment.pagoMovil.idNumber}</p>
+                                            </>
+                                        )}
+                                        {method === 'Transferencia' && settings.payment.transfer && (
+                                            <>
+                                                <p><span className="text-gray-500">Banco:</span> {settings.payment.transfer.bank}</p>
+                                                <p><span className="text-gray-500">Cuenta:</span> {settings.payment.transfer.accountNumber}</p>
+                                                <p><span className="text-gray-500">Titular:</span> {settings.payment.transfer.accountHolder}</p>
+                                                <p><span className="text-gray-500">CI/RIF:</span> {settings.payment.transfer.idNumber}</p>
+                                            </>
+                                        )}
                                     </div>
-                                </div>
-                            )}
-
-                            {selectedPaymentMethod === method && method === 'Transferencia' && settings.payment.transfer && (
-                                <div className="mt-2 p-4 bg-gray-700/50 rounded-xl border border-gray-600 animate-fade-in">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <h4 className="text-emerald-400 font-bold text-sm uppercase">Datos Transferencia</h4>
-                                        <button type="button" onClick={() => {
-                                            const text = `Banco: ${settings.payment.transfer?.bank}\nCuenta: ${settings.payment.transfer?.accountNumber}\nTitular: ${settings.payment.transfer?.accountHolder}\nCI/RIF: ${settings.payment.transfer?.idNumber}`;
-                                            navigator.clipboard.writeText(text);
-                                            alert('Datos copiados');
-                                        }} className="text-xs text-gray-400 hover:text-white flex items-center gap-1"><IconDuplicate className="h-3 w-3"/> Copiar</button>
-                                    </div>
-                                    <div className="text-sm text-gray-200 space-y-1 font-mono">
-                                        <p><span className="text-gray-500">Banco:</span> {settings.payment.transfer.bank}</p>
-                                        <p><span className="text-gray-500">Cuenta:</span> {settings.payment.transfer.accountNumber}</p>
-                                        <p><span className="text-gray-500">Titular:</span> {settings.payment.transfer.accountHolder}</p>
-                                        <p><span className="text-gray-500">CI/RIF:</span> {settings.payment.transfer.idNumber}</p>
+                                    
+                                    {/* Upload Capture Section */}
+                                    <div className="mt-4 border-t border-gray-700/50 pt-4">
+                                        <p className="text-xs font-bold text-gray-400 uppercase mb-2">Comprobante de pago</p>
+                                        {!paymentProof ? (
+                                            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:bg-gray-800 transition-colors bg-gray-800/30">
+                                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                                    <IconUpload className="w-8 h-8 text-gray-400 mb-2" />
+                                                    <p className="text-xs text-gray-400 font-medium">Toca para subir captura</p>
+                                                </div>
+                                                <input type="file" className="hidden" accept="image/*" onChange={handleProofUpload} />
+                                            </label>
+                                        ) : (
+                                            <div className="relative w-full h-48 rounded-xl overflow-hidden border border-emerald-500/50 shadow-lg">
+                                                <img src={paymentProof} alt="Comprobante" className="w-full h-full object-cover" />
+                                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                                                     <button onClick={() => setPaymentProof(null)} className="bg-red-500 text-white p-3 rounded-full shadow-lg transform hover:scale-110 transition-transform">
+                                                        <IconTrash className="h-6 w-6" />
+                                                     </button>
+                                                </div>
+                                                <div className="absolute bottom-2 right-2 bg-emerald-500 text-white text-[10px] px-3 py-1 rounded-full font-bold shadow-lg flex items-center gap-1">
+                                                    <IconCheck className="h-3 w-3" /> Cargado
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -1238,3 +976,333 @@ const FooterBar: React.FC<{ itemCount: number, cartTotal: number, onViewCart: ()
         </footer>
     );
 };
+
+// Main View Manager
+export default function CustomerView() {
+    const [view, setView] = useState<'menu' | 'cart' | 'checkout' | 'confirmation'>('menu');
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+    const [generalComments, setGeneralComments] = useState('');
+    const [settings, setSettings] = useState<AppSettings | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [tableInfo, setTableInfo] = useState<{ table: string; zone: string } | null>(null);
+    // State for Order Type (Delivery, TakeAway, DineIn)
+    const [orderType, setOrderType] = useState<OrderType>(OrderType.Delivery);
+
+    const { cartItems, addToCart, removeFromCart, updateQuantity, clearCart, cartTotal, itemCount } = useCart();
+    
+    // Global data for the menu
+    const [allPromotions, setAllPromotions] = useState<Promotion[]>([]);
+    const [allPersonalizations, setAllPersonalizations] = useState<Personalization[]>([]);
+    const [allProducts, setAllProducts] = useState<Product[]>([]);
+    const [allCategories, setAllCategories] = useState<Category[]>([]);
+
+    const fetchMenuData = async () => {
+        try {
+            // Parallel data fetching for speed
+            const [appSettings, fetchedPromotions, fetchedPersonalizations, fetchedProducts, fetchedCategories] = await Promise.all([
+                getAppSettings(),
+                getPromotions(),
+                getPersonalizations(),
+                getProducts(),
+                getCategories()
+            ]);
+            setSettings(appSettings);
+            setAllPromotions(fetchedPromotions);
+            setAllPersonalizations(fetchedPersonalizations);
+            setAllProducts(fetchedProducts);
+            setAllCategories(fetchedCategories);
+        } catch (error) {
+            console.error("Failed to fetch data:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchMenuData();
+        
+        // Subscribe to real-time updates for the menu (Admin changes)
+        subscribeToMenuUpdates(() => {
+            console.log("Menu updated from admin (Realtime), refreshing...");
+            fetchMenuData();
+        });
+
+        // Polling fallback: Check for updates every 30 seconds to ensure sync
+        const intervalId = setInterval(() => {
+            console.log("Auto-refreshing menu data (Polling)...");
+            fetchMenuData();
+        }, 30000);
+
+        const params = new URLSearchParams(window.location.hash.split('?')[1]);
+        const table = params.get('table');
+        const zone = params.get('zone');
+        if (table && zone) {
+            setTableInfo({ table, zone });
+            setOrderType(OrderType.DineIn);
+        }
+
+        return () => {
+            unsubscribeFromChannel();
+            clearInterval(intervalId);
+        };
+    }, []);
+
+    const handleProductClick = (product: Product) => {
+        setSelectedProduct(product);
+    };
+
+    const handleAddToCart = (product: Product, quantity: number, comments?: string, options: PersonalizationOption[] = []) => {
+        addToCart(product, quantity, comments, options);
+        setSelectedProduct(null);
+    };
+
+    const handlePlaceOrder = async (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number = 0, paymentProof: string | null = null) => {
+        if (!settings) return;
+
+        const shippingCost = (orderType === OrderType.Delivery && settings.shipping.costType === ShippingCostType.Fixed) 
+            ? (Number(settings.shipping.fixedCost) || 0) 
+            : 0;
+
+        const finalTotal = cartTotal + shippingCost + tipAmount;
+
+        const newOrder: Omit<Order, 'id' | 'createdAt'> = {
+            customer,
+            items: cartItems,
+            total: finalTotal,
+            status: OrderStatus.Pending,
+            branchId: 'main-branch',
+            generalComments: generalComments + (tipAmount > 0 ? ` | Propina: ${settings.company.currency.code} ${tipAmount.toFixed(2)}` : ''),
+            orderType: orderType,
+            tableId: orderType === OrderType.DineIn && tableInfo ? `${tableInfo.zone} - ${tableInfo.table}` : undefined,
+            paymentProof: paymentProof || undefined,
+        };
+
+        try {
+            await saveOrder(newOrder);
+        } catch(e) {
+            console.error("Failed to save order", e);
+            alert("Hubo un error al guardar tu pedido. Por favor, intenta de nuevo.");
+            return; // Stop if saving fails
+        }
+
+        // Helper to format options string
+        const formatOptions = (item: CartItem) => {
+            if (!item.selectedOptions || item.selectedOptions.length === 0) return '';
+            return item.selectedOptions.map(opt => `   + ${opt.name}`).join('\n');
+        };
+
+        let messageParts: string[];
+
+        const itemDetails = cartItems.map(item => {
+            let detail = `▪️ ${item.quantity}x ${item.name}`;
+            const optionsStr = formatOptions(item);
+            if (optionsStr) detail += `\n${optionsStr}`;
+            if (item.comments) detail += `\n   _Nota: ${item.comments}_`;
+            return detail;
+        });
+
+        const currency = settings.company.currency.code;
+        const lineSeparator = "━━━━━━━━━━━━━━━━━━━━";
+
+        const proofMessage = paymentProof ? "\n📸 *Comprobante de pago adjunto*" : "";
+
+        if (orderType === OrderType.DineIn) {
+            messageParts = [
+                `🧾 *TICKET DE PEDIDO - MESA*`,
+                `📍 *${settings.company.name.toUpperCase()}*`,
+                lineSeparator,
+                `🗓️ Fecha: ${new Date().toLocaleDateString()}`,
+                `⏰ Hora: ${new Date().toLocaleTimeString()}`,
+                lineSeparator,
+                `🪑 *UBICACIÓN*`,
+                `Zona: ${tableInfo?.zone}`,
+                `Mesa: ${tableInfo?.table}`,
+                `👤 Cliente: ${customer.name}`,
+                lineSeparator,
+                `🛒 *DETALLE DEL CONSUMO*`,
+                ...itemDetails,
+                ``,
+                generalComments ? `📝 *NOTAS:* ${generalComments}` : '',
+                lineSeparator,
+                `💰 *RESUMEN*`,
+                `Subtotal: ${currency} $${cartTotal.toFixed(2)}`,
+                tipAmount > 0 ? `Propina: ${currency} $${tipAmount.toFixed(2)}` : '',
+                `*TOTAL A PAGAR: ${currency} $${finalTotal.toFixed(2)}*`,
+                lineSeparator,
+                `💳 Método: ${paymentMethod}`,
+                proofMessage,
+                `✅ Estado: PENDIENTE DE CONFIRMACIÓN`
+            ];
+        } else if (orderType === OrderType.TakeAway) {
+             messageParts = [
+                `🧾 *TICKET PARA RECOGER*`,
+                `📍 *${settings.company.name.toUpperCase()}*`,
+                lineSeparator,
+                `🗓️ Fecha: ${new Date().toLocaleDateString()}`,
+                `⏰ Hora: ${new Date().toLocaleTimeString()}`,
+                lineSeparator,
+                `👤 *CLIENTE*`,
+                `Nombre: ${customer.name}`,
+                `Tel: ${customer.phone}`,
+                `🏷️ Tipo: Para llevar (Pick-up)`,
+                lineSeparator,
+                `🛒 *DETALLE DEL PEDIDO*`,
+                ...itemDetails,
+                ``,
+                generalComments ? `📝 *NOTAS:* ${generalComments}` : '',
+                lineSeparator,
+                `💰 *RESUMEN*`,
+                `Subtotal: ${currency} $${cartTotal.toFixed(2)}`,
+                tipAmount > 0 ? `Propina: ${currency} $${tipAmount.toFixed(2)}` : '',
+                `*TOTAL A PAGAR: ${currency} $${finalTotal.toFixed(2)}*`,
+                lineSeparator,
+                `💳 Método: ${paymentMethod}`,
+                proofMessage,
+                `✅ Estado: PENDIENTE DE CONFIRMACIÓN`
+            ];
+        } else {
+            // Delivery
+            messageParts = [
+                `🧾 *TICKET DE ENTREGA*`,
+                `📍 *${settings.company.name.toUpperCase()}*`,
+                lineSeparator,
+                `🗓️ Fecha: ${new Date().toLocaleDateString()}`,
+                `⏰ Hora: ${new Date().toLocaleTimeString()}`,
+                lineSeparator,
+                `👤 *CLIENTE*`,
+                `Nombre: ${customer.name}`,
+                `Tel: ${customer.phone}`,
+                lineSeparator,
+                `📍 *DIRECCIÓN DE ENTREGA*`,
+                customer.address.calle ? `🏠 ${customer.address.calle} #${customer.address.numero}` : '',
+                customer.address.colonia ? `🏙️ Col. ${customer.address.colonia}` : '',
+                customer.address.referencias ? `👀 Ref: ${customer.address.referencias}` : '',
+                lineSeparator,
+                `🛒 *DETALLE DEL PEDIDO*`,
+                ...itemDetails,
+                ``,
+                generalComments ? `📝 *NOTAS:* ${generalComments}` : '',
+                lineSeparator,
+                `💰 *RESUMEN*`,
+                `Subtotal: ${currency} $${cartTotal.toFixed(2)}`,
+                `Envío: ${shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : 'Por cotizar'}`,
+                tipAmount > 0 ? `Propina: ${currency} $${tipAmount.toFixed(2)}` : '',
+                `*TOTAL A PAGAR: ${currency} $${finalTotal.toFixed(2)}*`,
+                lineSeparator,
+                `💳 Método: ${paymentMethod}`,
+                proofMessage,
+                `✅ Estado: PENDIENTE DE CONFIRMACIÓN`
+            ];
+        }
+
+
+        const whatsappMessage = encodeURIComponent(messageParts.filter(p => p !== '').join('\n'));
+        const whatsappUrl = `https://wa.me/${settings.branch.whatsappNumber}?text=${whatsappMessage}`;
+        
+        window.open(whatsappUrl, '_blank');
+        setView('confirmation');
+    };
+
+    const handleStartNewOrder = () => {
+        clearCart();
+        setGeneralComments('');
+        setView('menu');
+        // Do not clear tableInfo, as the customer is likely still at the same table.
+    };
+
+    const getHeaderTitle = () => {
+        switch(view) {
+            case 'cart': return 'Tu pedido';
+            case 'checkout': return 'Completa tu pedido';
+            case 'confirmation': return 'Confirmación';
+            default: return '';
+        }
+    };
+    
+    const canGoBack = view === 'cart' || view === 'checkout';
+    const handleBack = () => {
+        if (view === 'checkout') setView('cart');
+        else if (view === 'cart') setView('menu');
+    }
+    
+    if (isLoading || !settings) {
+        return (
+            <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-gray-300">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500 mb-4"></div>
+                <p className="animate-pulse">Sincronizando menú...</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-gray-900 min-h-screen font-sans text-gray-100 selection:bg-emerald-500 selection:text-white">
+            <div className="container mx-auto max-w-md bg-gray-900 min-h-screen shadow-2xl relative pb-24 border-x border-gray-800">
+                
+                {view !== 'menu' && <Header title={getHeaderTitle()} onBack={canGoBack ? handleBack : undefined} />}
+
+                {view === 'menu' && (
+                    <>
+                        <RestaurantHero 
+                            settings={settings} 
+                            tableInfo={tableInfo} 
+                            orderType={orderType}
+                            setOrderType={setOrderType}
+                        />
+                        <MenuList 
+                            products={allProducts}
+                            categories={allCategories}
+                            onProductClick={handleProductClick} 
+                            cartItems={cartItems} 
+                            currency={settings.company.currency.code}
+                            promotions={allPromotions}
+                        />
+                    </>
+                )}
+
+                {view === 'cart' && (
+                    <CartSummaryView 
+                        cartItems={cartItems}
+                        cartTotal={cartTotal}
+                        onUpdateQuantity={updateQuantity}
+                        onRemoveItem={removeFromCart}
+                        generalComments={generalComments}
+                        onGeneralCommentsChange={setGeneralComments}
+                        onProceedToCheckout={() => setView('checkout')}
+                    />
+                )}
+                
+                {view === 'checkout' && (
+                    <CheckoutView 
+                        cartTotal={cartTotal}
+                        onPlaceOrder={handlePlaceOrder}
+                        settings={settings}
+                        orderType={orderType}
+                    />
+                )}
+
+                {view === 'confirmation' && (
+                    <OrderConfirmation onNewOrder={handleStartNewOrder} settings={settings} />
+                )}
+
+                {selectedProduct && (
+                    <ProductDetailModal 
+                        product={selectedProduct} 
+                        onAddToCart={handleAddToCart}
+                        onClose={() => setSelectedProduct(null)}
+                        personalizations={allPersonalizations}
+                        promotions={allPromotions}
+                    />
+                )}
+
+                {view === 'menu' && itemCount > 0 && (
+                    <FooterBar 
+                        itemCount={itemCount} 
+                        cartTotal={cartTotal}
+                        onViewCart={() => setView('cart')} 
+                    />
+                )}
+                <Chatbot />
+            </div>
+        </div>
+    );
+}
