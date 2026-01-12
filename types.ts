@@ -1,5 +1,4 @@
 
-
 export interface Product {
     id: string;
     name: string;
@@ -54,6 +53,7 @@ export interface Customer {
     name: string;
     phone: string;
     address: Address;
+    paymentProof?: string;
 }
 
 export interface Order {
@@ -61,11 +61,11 @@ export interface Order {
     items: CartItem[];
     customer: Customer;
     status: OrderStatus;
-    paymentStatus?: PaymentStatus; // Added this field
-    paymentProof?: string; // Base64 string of the screenshot
+    paymentStatus?: PaymentStatus;
+    paymentProof?: string;
     total: number;
     createdAt: Date;
-    branchId: string;
+    branchId?: string;
     orderType?: OrderType;
     tableId?: string;
     generalComments?: string;
@@ -142,7 +142,6 @@ export interface Table {
     height: number; // How many rows it spans
     shape: 'square' | 'round';
     status: 'available' | 'occupied';
-    // Fix: Add created_at property to match the database schema and fix destructuring error.
     created_at?: string;
 }
 

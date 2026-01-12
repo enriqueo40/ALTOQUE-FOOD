@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
+
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconMinus, IconClock, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconStore, IconCheck, IconDuplicate, IconUpload } from '../constants';
+import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck, IconDuplicate, IconUpload } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
@@ -504,9 +505,6 @@ const ProductDetailModal: React.FC<{
         return selectedOptions[pid]?.some(o => o.id === oid);
     };
 
-    // Validation is now optional as requested by user
-    const isValid = true; 
-
     // Correctly typed reduce
     const totalOptionsPrice = Object.values(selectedOptions).reduce((acc: number, options: PersonalizationOption[]) => {
         return acc + options.reduce((sum: number, opt: PersonalizationOption) => sum + (opt.price || 0), 0);
@@ -515,9 +513,8 @@ const ProductDetailModal: React.FC<{
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
 
     const handleAdd = () => {
-        // Removed check: if (!isValid) return;
         // Correctly typed concat and reduce
-        const flatOptions = (Object.values(selectedOptions) as PersonalizationOption[][]).reduce((acc: PersonalizationOption[], curr: PersonalizationOption[]) => acc.concat(curr), [] as PersonalizationOption[]);
+        const flatOptions = Object.values(selectedOptions).reduce((acc: PersonalizationOption[], curr: PersonalizationOption[]) => acc.concat(curr), []);
         onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptions);
     }
 
@@ -553,7 +550,6 @@ const ProductDetailModal: React.FC<{
                                 <div className="flex justify-between items-center mb-3">
                                     <div>
                                         <h4 className="font-bold text-white">{p.name}</h4>
-                                        {/* 'Obligatorio' label removed as requested */}
                                     </div>
                                     <span className="text-xs text-gray-400">
                                         {p.maxSelection === 1 ? 'Elige 1' : `Máx ${p.maxSelection || 'ilimitado'}`}
@@ -647,8 +643,10 @@ const CartSummaryView: React.FC<{
             <div className="space-y-4">
                 {cartItems.map(item => {
                     const options: PersonalizationOption[] = item.selectedOptions || [];
-                    const optionsTotal = options.reduce((acc: number, o: PersonalizationOption) => acc + o.price, 0);
-                    const itemTotal = (item.price + optionsTotal) * item.quantity;
+                    // FIX: Ensure prices are treated as numbers to prevent 'unknown' type errors during addition.
+                    const optionsTotal = options.reduce((acc: number, o: PersonalizationOption) => acc + Number(o.price || 0), 0);
+                    // FIX: Ensure item price is treated as a number.
+                    const itemTotal = (Number(item.price || 0) + optionsTotal) * item.quantity;
 
                     return (
                         <div key={item.cartItemId} className="flex gap-4 bg-gray-800/50 p-3 rounded-xl border border-gray-800">
@@ -901,7 +899,7 @@ const CheckoutView: React.FC<{
                                             <div className="relative w-full h-48 rounded-xl overflow-hidden border border-emerald-500/50 shadow-lg">
                                                 <img src={paymentProof} alt="Comprobante" className="w-full h-full object-cover" />
                                                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                                                     <button onClick={() => setPaymentProof(null)} className="bg-red-500 text-white p-3 rounded-full shadow-lg transform hover:scale-110 transition-transform">
+                                                     <button type="button" onClick={() => setPaymentProof(null)} className="bg-red-500 text-white p-3 rounded-full shadow-lg transform hover:scale-110 transition-transform">
                                                         <IconTrash className="h-6 w-6" />
                                                      </button>
                                                 </div>
