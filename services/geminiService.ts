@@ -1,8 +1,11 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { ChatMessage, Order, Product } from '../types';
 
-// Always use process.env.API_KEY directly when initializing the @google/genai client instance.
+// FIX: Always use the pre-configured API_KEY from process.env.API_KEY directly in the constructor.
+// Do not manually check for existence or define local constants for it.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
 
 export const generateProductDescription = async (productName: string, categoryName: string, currentDescription: string): Promise<string> => {
     try {
@@ -13,14 +16,14 @@ export const generateProductDescription = async (productName: string, categoryNa
         
         Focus on fresh ingredients, taste, and experience. Keep it under 15 words.`;
 
-        // Use gemini-3-flash-preview for basic text tasks.
+        // FIX: Using 'gemini-3-flash-preview' for basic text tasks as per guidelines.
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: prompt,
         });
 
-        // The simplest and most direct way to get the generated text content is by accessing the .text property.
-        return response.text?.trim() || "Delicious selection from our menu.";
+        // FIX: Directly access the .text property.
+        return response.text?.trim() || "Description unavailable.";
     } catch (error) {
         console.error("Error generating product description:", error);
         return "Failed to generate description.";
@@ -35,22 +38,23 @@ export const getChatbotResponse = async (history: ChatMessage[], newMessage: str
     Keep your answers concise and friendly.
     Here is the menu: Artisanal Coffees, Fresh Pastries, Savory Bites, Cold Brews & Teas.`;
 
-    const historyParts = history.map(msg => ({
+    const contents = history.map(msg => ({
         role: msg.sender === 'user' ? 'user' : 'model',
         parts: [{ text: msg.text }]
     }));
+    contents.push({ role: 'user', parts: [{ text: newMessage }] });
 
     try {
-        // Use gemini-3-flash-preview for chatbot interactions.
+        // FIX: Using 'gemini-3-flash-preview' for chatbot interactions.
         const chat = ai.chats.create({
             model: 'gemini-3-flash-preview',
             config: { systemInstruction },
-            history: historyParts,
+            history: contents.slice(0, -1), // Send previous history
         });
 
-        // chat.sendMessage only accepts the message parameter.
         const response = await chat.sendMessage({ message: newMessage });
-        return response.text?.trim() || "I'm having a bit of trouble understanding. Could you rephrase that?";
+        // FIX: Directly access the .text property.
+        return response.text?.trim() || "I'm not sure how to respond to that.";
 
     } catch (error) {
         console.error("Error getting chatbot response:", error);
@@ -75,7 +79,7 @@ export const getAdvancedInsights = async (query: string, orders: Order[]): Promi
     `;
     
     try {
-        // Use gemini-3-pro-preview for complex reasoning and insights.
+        // FIX: Using 'gemini-3-pro-preview' for complex analysis tasks.
         const response = await ai.models.generateContent({
             model: 'gemini-3-pro-preview',
             contents: prompt,
@@ -83,9 +87,10 @@ export const getAdvancedInsights = async (query: string, orders: Order[]): Promi
                 thinkingConfig: { thinkingBudget: 32768 }
             }
         });
-        return response.text || "I was unable to generate insights for this query.";
+        // FIX: Directly access the .text property.
+        return response.text || "Analysis results are unavailable.";
     } catch (error) {
         console.error("Error getting advanced insights:", error);
-        return `An error occurred while analyzing the data.`;
+        return `An error occurred while analyzing the data. ${error instanceof Error ? error.message : String(error)}`;
     }
 };
