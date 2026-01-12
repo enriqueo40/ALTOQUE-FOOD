@@ -56,11 +56,8 @@ const Sidebar: React.FC<{ currentPage: AdminViewPage; setCurrentPage: (page: Adm
                 ))}
             </nav>
             <div className="px-4 py-6 border-t dark:border-gray-700 text-sm">
-                <p className="text-gray-600 dark:text-gray-300">+52 (999) 452 3786</p>
+                <p className="text-gray-600 dark:text-gray-300">+584146945877</p>
                 <p className="text-gray-500 dark:text-gray-400">Atención rápida</p>
-                <button className="w-full mt-3 flex items-center justify-center space-x-2 px-4 py-2 border dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
-                    <span>Contactar soporte</span>
-                </button>
             </div>
         </aside>
     );
