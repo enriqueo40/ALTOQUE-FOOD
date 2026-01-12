@@ -514,12 +514,16 @@ const ProductDetailModal: React.FC<{
     // Validation is now optional as requested by user
     const isValid = true; 
 
-    const totalOptionsPrice = Object.values(selectedOptions).flat().reduce((acc: number, opt: PersonalizationOption) => acc + opt.price, 0);
+    // Avoid flat() for better TS compatibility and simpler reduction
+    const totalOptionsPrice = Object.values(selectedOptions).reduce((acc, options) => {
+        return acc + options.reduce((sum, opt) => sum + (opt.price || 0), 0);
+    }, 0);
+    
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
 
     const handleAdd = () => {
         // Removed check: if (!isValid) return;
-        const flatOptions = Object.values(selectedOptions).flat();
+        const flatOptions = Object.values(selectedOptions).reduce((acc, curr) => acc.concat(curr), [] as PersonalizationOption[]);
         onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptions);
     }
 
@@ -718,7 +722,7 @@ const CheckoutView: React.FC<{
     const [customer, setCustomer] = useState<Customer>({
         name: '', phone: '', address: { colonia: '', calle: '', numero: '', entreCalles: '', referencias: '' }
     });
-    const [tipAmount, setTipAmount] = useState(0);
+    const [tipAmount, setTipAmount] = useState<number>(0);
     const [paymentProof, setPaymentProof] = useState<string | null>(null);
     
     const isDelivery = orderType === OrderType.Delivery;
@@ -764,7 +768,7 @@ const CheckoutView: React.FC<{
     const labelClasses = "text-sm font-bold text-gray-400 mb-1 block";
 
     const shippingCost: number = (isDelivery && settings.shipping.costType === ShippingCostType.Fixed) ? (Number(settings.shipping.fixedCost) || 0) : 0;
-    const finalTotal = cartTotal + shippingCost + tipAmount;
+    const finalTotal = (Number(cartTotal) || 0) + shippingCost + (Number(tipAmount) || 0);
     
     return (
         <form onSubmit={handleSubmit} className="p-4 space-y-6 pb-44 animate-fade-in">
@@ -854,67 +858,40 @@ const CheckoutView: React.FC<{
                             </label>
                             
                             {/* Detailed Payment Info Display */}
-                            {selectedPaymentMethod === method && method === 'Pago Móvil' && settings.payment.pagoMovil && (
+                            {(selectedPaymentMethod === method && (method === 'Pago Móvil' || method === 'Transferencia')) && (
                                 <div className="mt-2 p-4 bg-gray-700/50 rounded-xl border border-gray-600 animate-fade-in">
                                     <div className="flex justify-between items-start mb-2">
-                                        <h4 className="text-emerald-400 font-bold text-sm uppercase">Datos Pago Móvil</h4>
+                                        <h4 className="text-emerald-400 font-bold text-sm uppercase">Datos {method}</h4>
                                         <button type="button" onClick={() => {
-                                            const text = `Banco: ${settings.payment.pagoMovil?.bank}\nTel: ${settings.payment.pagoMovil?.phone}\nCI/RIF: ${settings.payment.pagoMovil?.idNumber}`;
+                                            let text = '';
+                                            if (method === 'Pago Móvil' && settings.payment.pagoMovil) {
+                                                text = `Banco: ${settings.payment.pagoMovil.bank}\nTel: ${settings.payment.pagoMovil.phone}\nCI/RIF: ${settings.payment.pagoMovil.idNumber}`;
+                                            } else if (method === 'Transferencia' && settings.payment.transfer) {
+                                                text = `Banco: ${settings.payment.transfer.bank}\nCuenta: ${settings.payment.transfer.accountNumber}\nTitular: ${settings.payment.transfer.accountHolder}\nCI/RIF: ${settings.payment.transfer.idNumber}`;
+                                            }
                                             navigator.clipboard.writeText(text);
                                             alert('Datos copiados');
                                         }} className="text-xs text-gray-400 hover:text-white flex items-center gap-1"><IconDuplicate className="h-3 w-3"/> Copiar</button>
-                                    </div>
-                                    <div className="text-sm text-gray-200 space-y-1 font-mono mb-4">
-                                        <p><span className="text-gray-500">Banco:</span> {settings.payment.pagoMovil.bank}</p>
-                                        <p><span className="text-gray-500">Teléfono:</span> {settings.payment.pagoMovil.phone}</p>
-                                        <p><span className="text-gray-500">Cédula/RIF:</span> {settings.payment.pagoMovil.idNumber}</p>
                                     </div>
                                     
-                                    {/* Upload Capture Section */}
-                                    <div className="mt-4 border-t border-gray-700/50 pt-4">
-                                        <p className="text-xs font-bold text-gray-400 uppercase mb-2">Comprobante de pago</p>
-                                        {!paymentProof ? (
-                                            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:bg-gray-800 transition-colors bg-gray-800/30">
-                                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                                    <IconUpload className="w-8 h-8 text-gray-400 mb-2" />
-                                                    <p className="text-xs text-gray-400 font-medium">Toca para subir captura</p>
-                                                </div>
-                                                <input type="file" className="hidden" accept="image/*" onChange={handleProofUpload} />
-                                            </label>
-                                        ) : (
-                                            <div className="relative w-full h-48 rounded-xl overflow-hidden border border-emerald-500/50 shadow-lg">
-                                                <img src={paymentProof} alt="Comprobante" className="w-full h-full object-cover" />
-                                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                                                     <button onClick={() => setPaymentProof(null)} className="bg-red-500 text-white p-3 rounded-full shadow-lg transform hover:scale-110 transition-transform">
-                                                        <IconTrash className="h-6 w-6" />
-                                                     </button>
-                                                </div>
-                                                <div className="absolute bottom-2 right-2 bg-emerald-500 text-white text-[10px] px-3 py-1 rounded-full font-bold shadow-lg flex items-center gap-1">
-                                                    <IconCheck className="h-3 w-3" /> Cargado
-                                                </div>
-                                            </div>
+                                    <div className="text-sm text-gray-200 space-y-1 font-mono mb-4">
+                                        {method === 'Pago Móvil' && settings.payment.pagoMovil && (
+                                            <>
+                                                <p><span className="text-gray-500">Banco:</span> {settings.payment.pagoMovil.bank}</p>
+                                                <p><span className="text-gray-500">Teléfono:</span> {settings.payment.pagoMovil.phone}</p>
+                                                <p><span className="text-gray-500">Cédula/RIF:</span> {settings.payment.pagoMovil.idNumber}</p>
+                                            </>
+                                        )}
+                                        {method === 'Transferencia' && settings.payment.transfer && (
+                                            <>
+                                                <p><span className="text-gray-500">Banco:</span> {settings.payment.transfer.bank}</p>
+                                                <p><span className="text-gray-500">Cuenta:</span> {settings.payment.transfer.accountNumber}</p>
+                                                <p><span className="text-gray-500">Titular:</span> {settings.payment.transfer.accountHolder}</p>
+                                                <p><span className="text-gray-500">CI/RIF:</span> {settings.payment.transfer.idNumber}</p>
+                                            </>
                                         )}
                                     </div>
-                                </div>
-                            )}
-
-                            {selectedPaymentMethod === method && method === 'Transferencia' && settings.payment.transfer && (
-                                <div className="mt-2 p-4 bg-gray-700/50 rounded-xl border border-gray-600 animate-fade-in">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <h4 className="text-emerald-400 font-bold text-sm uppercase">Datos Transferencia</h4>
-                                        <button type="button" onClick={() => {
-                                            const text = `Banco: ${settings.payment.transfer?.bank}\nCuenta: ${settings.payment.transfer?.accountNumber}\nTitular: ${settings.payment.transfer?.accountHolder}\nCI/RIF: ${settings.payment.transfer?.idNumber}`;
-                                            navigator.clipboard.writeText(text);
-                                            alert('Datos copiados');
-                                        }} className="text-xs text-gray-400 hover:text-white flex items-center gap-1"><IconDuplicate className="h-3 w-3"/> Copiar</button>
-                                    </div>
-                                    <div className="text-sm text-gray-200 space-y-1 font-mono mb-4">
-                                        <p><span className="text-gray-500">Banco:</span> {settings.payment.transfer.bank}</p>
-                                        <p><span className="text-gray-500">Cuenta:</span> {settings.payment.transfer.accountNumber}</p>
-                                        <p><span className="text-gray-500">Titular:</span> {settings.payment.transfer.accountHolder}</p>
-                                        <p><span className="text-gray-500">CI/RIF:</span> {settings.payment.transfer.idNumber}</p>
-                                    </div>
-
+                                    
                                     {/* Upload Capture Section */}
                                     <div className="mt-4 border-t border-gray-700/50 pt-4">
                                         <p className="text-xs font-bold text-gray-400 uppercase mb-2">Comprobante de pago</p>
