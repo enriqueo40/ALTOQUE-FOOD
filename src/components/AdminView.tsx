@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { useTheme } from '../hooks/useTheme';
@@ -56,7 +55,7 @@ const Sidebar: React.FC<{ currentPage: AdminViewPage; setCurrentPage: (page: Adm
                 ))}
             </nav>
             <div className="px-4 py-6 border-t dark:border-gray-700 text-sm">
-                <p className="text-gray-600 dark:text-gray-300">+584146945877</p>
+                <p className="text-gray-600 dark:text-gray-300 font-medium">+584146945877</p>
                 <p className="text-gray-500 dark:text-gray-400">Atención rápida</p>
             </div>
         </aside>
@@ -151,6 +150,7 @@ const DashboardStatCard: React.FC<{ title: string; value: string; secondaryValue
 );
 
 const Dashboard: React.FC = () => {
+    // Connected to Real Data from Supabase
     const [orders, setOrders] = useState<Order[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     
@@ -164,11 +164,11 @@ const Dashboard: React.FC = () => {
     const totalSales = useMemo(() => orders.reduce((sum, order) => sum + order.total, 0), [orders]);
     const totalOrders = orders.length;
 
-    const previousDaySales = totalSales * 0.9; 
-    const previousDayOrders = Math.floor(totalOrders * 0.9); 
+    const previousDaySales = totalSales * 0.9; // Simulation for comparison
+    const previousDayOrders = Math.floor(totalOrders * 0.9); // Simulation for comparison
     
     const totalEnvios = orders.filter(o => o.orderType === OrderType.Delivery).length;
-    const totalPropinas = 0; 
+    const totalPropinas = 0; // This would need extraction from order details if stored separately
 
     if (isLoading) {
         return <div className="p-10 text-center animate-pulse text-gray-500">Cargando estadísticas...</div>;
@@ -541,7 +541,7 @@ const ProductsView: React.FC = () => {
     const handleSaveProduct = async (productData: Omit<Product, 'id' | 'created_at'> & { id?: string }) => {
         try {
             await saveProduct(productData);
-            await fetchData(); 
+            await fetchData(); // Refetch data to show changes
         } catch (error) {
             alert("No se pudo guardar el producto.");
         } finally {
@@ -562,7 +562,7 @@ const ProductsView: React.FC = () => {
     const handleSaveCategory = async (categoryData: Omit<Category, 'id' | 'created_at'> & { id?: string }) => {
         try {
             await saveCategory(categoryData);
-            await fetchData(); 
+            await fetchData(); // Refetch data
         } catch (error) {
             alert("No se pudo guardar la categoría.");
         } finally {
@@ -812,7 +812,7 @@ const PersonalizationModal: React.FC<{isOpen: boolean, onClose: () => void, onSa
                                             <IconGripVertical className="h-5 w-5 text-gray-400 cursor-grab flex-shrink-0" />
                                             <input type="text" placeholder="Nombre" value={opt.name} onChange={e => handleOptionChange(index, 'name', e.target.value)} required className={`${lightInputClasses} flex-1`}/>
                                             <div className="relative flex-shrink-0">
-                                                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500 dark:text-gray-400">$</span>
+                                                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500 dark:text-gray-400 text-sm">$</span>
                                                 <input type="number" step="0.01" placeholder="0" value={opt.price} onChange={e => handleOptionChange(index, 'price', e.target.value)} required className={`${lightInputClasses} w-28 pl-7`}/>
                                             </div>
                                             <button type="button" onClick={() => removeOption(index)} disabled={options.length <= 1} className="text-gray-500 hover:text-red-600 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed"><IconTrash className="h-4 w-4"/> Borrar</button>
@@ -1208,40 +1208,37 @@ const PromotionsView: React.FC = () => {
                     </div>
                     
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border dark:border-gray-700">
-                        <h3 className="text-lg font-semibold mb-4">Promociones Registradas</h3>
+                        <h3 className="text-lg font-semibold mb-4">Promociones Activas</h3>
                         <div className="space-y-4">
                             {promotions.map(promo => {
                                 const now = new Date();
                                 const startDate = promo.startDate ? new Date(promo.startDate) : null;
                                 const endDate = promo.endDate ? new Date(promo.endDate) : null;
                                 
+                                // Adjust end date to be end of day
                                 if (endDate) {
                                     endDate.setHours(23, 59, 59, 999);
                                 }
 
                                 let statusColor = 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400';
                                 let statusText = 'Inactiva';
-                                let nameColor = 'text-gray-400 dark:text-gray-500';
 
                                 if (startDate && startDate > now) {
                                     statusColor = 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400';
                                     statusText = 'Programada';
-                                    nameColor = 'text-blue-600 dark:text-blue-400';
                                 } else if (endDate && endDate < now) {
                                     statusColor = 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500';
                                     statusText = 'Finalizada';
-                                    nameColor = 'text-gray-400 dark:text-gray-600';
                                 } else {
                                     statusColor = 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400';
                                     statusText = 'Activa';
-                                    nameColor = 'text-emerald-600 dark:text-emerald-400 font-bold';
                                 }
 
                                 return (
                                     <div key={promo.id} className="p-4 border dark:border-gray-700 rounded-md flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                         <div>
                                             <div className="flex items-center gap-2 mb-1">
-                                                <p className={`text-lg transition-colors ${nameColor}`}>{promo.name}</p>
+                                                <p className="font-bold text-gray-800 dark:text-gray-200 text-lg">{promo.name}</p>
                                                 <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${statusColor}`}>
                                                     {statusText}
                                                 </span>
@@ -1251,8 +1248,12 @@ const PromotionsView: React.FC = () => {
                                             </p>
                                             <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
                                                 <div className="flex items-center gap-1">
-                                                    <IconCalendar className="h-3 w-3" />
-                                                    <span>{promo.startDate || 'Siempre'} - {promo.endDate || 'Indefinido'}</span>
+                                                    <span className="font-medium text-gray-400">Inicio:</span>
+                                                    <span>{promo.startDate || 'Inmediato'}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <span className="font-medium text-gray-400">Fin:</span>
+                                                    <span>{promo.endDate || 'Indefinido'}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -1537,7 +1538,7 @@ const TimeAgo: React.FC<{ date: Date; className?: string }> = ({ date, className
             else {
                 const mins = Math.floor(diffInSeconds / 60);
                 setText(`hace ${mins} min`);
-                setIsLate(mins > 15); 
+                setIsLate(mins > 15); // Mark as late after 15 mins
             }
         };
         update();
@@ -1690,6 +1691,7 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
     const [customerName, setCustomerName] = useState('');
     const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('pending');
     
+    // Cart logic
     const { cartItems, addToCart, removeFromCart, updateQuantity, cartTotal, clearCart } = useCart();
 
     useEffect(() => {
@@ -1731,8 +1733,8 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
             },
             items: cartItems,
             total: cartTotal,
-            status: OrderStatus.Confirmed, 
-            branchId: 'main-branch', 
+            status: OrderStatus.Confirmed, // Manual orders start as Confirmed
+            branchId: 'main-branch', // Default
             orderType: orderType,
             tableId: orderType === OrderType.DineIn ? selectedTable : undefined,
             paymentStatus: paymentStatus
@@ -1767,6 +1769,7 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
                          </div>
                     </div>
                     
+                    {/* Categories */}
                     <div className="flex gap-2 overflow-x-auto p-2 border-b dark:border-gray-700 bg-white dark:bg-gray-800">
                         <button 
                             onClick={() => setActiveCategory('all')}
@@ -1785,6 +1788,7 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
                         ))}
                     </div>
 
+                    {/* Grid */}
                     <div className="flex-1 overflow-y-auto p-4">
                         <div className="grid grid-cols-3 gap-4">
                             {filteredProducts.map(product => (
@@ -1809,6 +1813,7 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
                     </div>
                 </div>
 
+                {/* Right: Order Details */}
                 <div className="w-2/5 flex flex-col bg-white dark:bg-gray-900 h-full relative">
                     <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800">
                         <h3 className="font-bold text-lg">Nuevo Pedido</h3>
@@ -1816,6 +1821,7 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
                     </div>
 
                     <div className="p-4 space-y-4 border-b dark:border-gray-700">
+                        {/* Customer */}
                         <div>
                             <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Cliente</label>
                             <input 
@@ -1827,6 +1833,7 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
                             />
                         </div>
 
+                        {/* Type */}
                         <div className="grid grid-cols-2 gap-3">
                             <button 
                                 onClick={() => setOrderType(OrderType.TakeAway)}
@@ -1860,6 +1867,7 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
                         )}
                     </div>
 
+                    {/* Cart Items */}
                     <div className="flex-1 overflow-y-auto p-4 space-y-3">
                         {cartItems.length === 0 ? (
                             <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-2">
@@ -1890,6 +1898,7 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
                         )}
                     </div>
 
+                    {/* Footer / Checkout */}
                     <div className="p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
                         <div className="flex justify-between mb-4">
                             <span className="text-gray-500">Subtotal</span>
@@ -1930,12 +1939,15 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
     const [storeOpen, setStoreOpen] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
     
+    // State for Table Panel
     const [zones, setZones] = useState<Zone[]>([]);
     const [activeZoneId, setActiveZoneId] = useState<string>('');
 
 
+    // Initial Load
     useEffect(() => {
         const load = async () => {
+            // Fetch orders and zones
             const [activeOrders, fetchedZones] = await Promise.all([
                 getActiveOrders(),
                 getZones()
@@ -1950,8 +1962,10 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
         };
         load();
 
+        // Realtime Subscription
         const channel = subscribeToNewOrders(
             (newOrder) => {
+                // Play simple notification sound if possible (browser policy permitting)
                 try { const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); audio.volume=0.5; audio.play().catch(e=>{}); } catch(e){}
                 setOrders(prev => [newOrder, ...prev]);
             },
@@ -1966,22 +1980,27 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
     }, []);
 
     const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+        // Optimistic update
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
         try {
             await updateOrder(orderId, { status: newStatus });
         } catch (e: any) {
             console.error(e);
+            // Fix: Robust error handling to avoid [object Object]
             const errorMsg = e instanceof Error ? e.message : JSON.stringify(e);
             alert(`Error updating order status: ${errorMsg}`);
+            // Revert if failed (could be implemented by re-fetching)
         }
     };
     
     const updatePaymentStatus = async (orderId: string, newStatus: PaymentStatus) => {
+        // Optimistic update
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, paymentStatus: newStatus } : o));
         try {
              await updateOrder(orderId, { paymentStatus: newStatus });
         } catch (e: any) {
             console.error(e);
+             // Fix: Robust error handling to avoid [object Object]
              const errorMsg = e instanceof Error ? e.message : JSON.stringify(e);
              alert(`Error updating payment status: ${errorMsg}`);
         }
@@ -1989,6 +2008,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
     
     const activeZone = useMemo(() => zones.find(z => z.id === activeZoneId), [zones, activeZoneId]);
     
+    // Calculate Table Status
     const getTableStatus = (zoneName: string, tableName: string) => {
         const tableIdentifier = `${zoneName} - ${tableName}`;
         const activeOrder = orders.find(o => 
@@ -2001,12 +2021,14 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
     };
     
     const tableStats = useMemo(() => {
+         // Simple stats calculation based on current orders
          const activeTables = orders.filter(o => o.tableId && o.status !== OrderStatus.Completed && o.status !== OrderStatus.Cancelled).length;
+         // Mocking specific "Requesting Bill" states since backend doesn't support it yet, using PaymentStatus 'pending' + 'Ready' status as a proxy
          const requestingBill = orders.filter(o => o.tableId && o.status === OrderStatus.Ready && o.paymentStatus === 'pending').length;
          
          return {
              requestingBill: requestingBill,
-             requestingWaiter: 0, 
+             requestingWaiter: 0, // Feature not yet implemented in backend
              pendingOrders: orders.filter(o => o.tableId && o.status === OrderStatus.Pending).length,
              activeTables: activeTables
          }
@@ -2031,6 +2053,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                                 <button onClick={() => setViewMode('list')} className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`} title="Vista Lista"><IconMenu className="h-5 w-5"/></button>
                             </div>
                             
+                            {/* Updated Header Buttons matching screenshot */}
                             <div className="flex items-center gap-3">
                                 <div className="relative group">
                                      <button className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors shadow-sm ${storeOpen ? 'border-green-900/30 bg-green-900/20 text-green-400' : 'border-red-900/30 bg-red-900/20 text-red-400'}`}>
@@ -2068,6 +2091,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
             case 'panel-mesas':
                 return (
                     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900 p-4">
+                        {/* Header Actions */}
                         <div className="flex justify-end gap-3 mb-4">
                             <button className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
                                 Ver uso de suscripción
@@ -2077,6 +2101,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                             </button>
                         </div>
 
+                        {/* Stats Bar */}
                         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 mb-6 flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-gray-200 dark:divide-gray-700">
                             <div className="p-4 flex items-center justify-center md:justify-start md:w-48">
                                 <button className="flex items-center gap-2 text-gray-700 dark:text-gray-200 font-medium px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
@@ -2104,6 +2129,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                             </div>
                         </div>
 
+                        {/* Zone Selector */}
                         <div className="mb-6">
                             <div className="flex gap-2 overflow-x-auto pb-2">
                                 {zones.map(zone => (
@@ -2125,6 +2151,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                             </div>
                         </div>
 
+                        {/* Tables Grid */}
                         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex-1 p-8 overflow-auto relative min-h-[400px]">
                             {activeZone ? (
                                 <div 
@@ -2134,6 +2161,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                                         gridTemplateRows: `repeat(${activeZone.rows}, minmax(80px, 1fr))`
                                     }}
                                 >
+                                    {/* Render Tables */}
                                     {activeZone.tables.map(table => {
                                         const { status, order } = getTableStatus(activeZone.name, table.name);
                                         const isOccupied = status === 'occupied';
@@ -2176,10 +2204,12 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                                         );
                                     })}
                                     
+                                    {/* Render Grid Dots for Empty Spaces */}
                                     {Array.from({ length: activeZone.rows * activeZone.cols }).map((_, index) => {
                                         const row = Math.floor(index / activeZone.cols) + 1;
                                         const col = (index % activeZone.cols) + 1;
                                         
+                                        // Check if cell is occupied by any table
                                         const isOccupied = activeZone.tables.some(t => 
                                             row >= t.row && row < t.row + t.height &&
                                             col >= t.col && col < t.col + t.width
@@ -2204,6 +2234,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                                 </div>
                             )}
                             
+                             {/* Floating Status Badge */}
                             <div className="absolute bottom-4 right-4">
                                 <div className="bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2 cursor-pointer hover:bg-gray-800">
                                     Estás en tu periodo de prueba
@@ -2232,7 +2263,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                                 activeTab === tab.id
                                     ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
                                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600'
-                            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm focus:outline-none`}
                         >
                             {tab.title}
                         </button>
@@ -2253,10 +2284,13 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
     );
 };
 
+// ... (Analytics, Messages, AvailabilityView, etc. remain unchanged) ...
 
 // --- Analytics Components ---
 const Analytics: React.FC = () => {
-    const [orders] = usePersistentState<Order[]>('orders', []); 
+    const [orders] = usePersistentState<Order[]>('orders', []); // Keeping mock logic here for now as requested, or can be switched
+    // For full consistency, this should also be switched, but user asked for "Dashboard" specifically.
+    // Let's keep Analytics simple for now as it uses AI analysis on mock data in the original code.
     const [query, setQuery] = useState('');
     const [insights, setInsights] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -2389,6 +2423,7 @@ const Messages: React.FC = () => {
     );
 };
 
+// ... (AvailabilityView, Settings Components remain unchanged) ...
 const AvailabilityView: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -2531,7 +2566,7 @@ const AvailabilityView: React.FC = () => {
                             onClick={() => setActiveTab(tab.id)}
                             className={`${
                                 activeTab === tab.id
-                                    ? 'border-green-500 text-green-600 dark:text-green-400'
+                                    ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
                                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600'
                             } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm focus:outline-none`}
                         >
@@ -2624,6 +2659,8 @@ const AvailabilityView: React.FC = () => {
     );
 };
 
+// --- Settings Components, QR Modal, Share View and Main export remain...
+// (Including all settings components as they were, no logic change there)
 const SettingsCard: React.FC<{ title: string; description?: string; children: React.ReactNode; onSave?: () => void; onCancel?: () => void; noActions?: boolean }> = ({ title, description, children, onSave, onCancel, noActions }) => (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
         <div className="p-6">
@@ -2642,6 +2679,8 @@ const SettingsCard: React.FC<{ title: string; description?: string; children: Re
     </div>
 );
 
+// ... Include all remaining settings components (SearchableDropdown, GeneralSettings, BranchSettingsView, ShippingSettingsView, PaymentSettingsView, HoursSettings, ZonesAndTablesSettings, PrintingSettingsView, ZoneEditor, SettingsModal, QRModal, ShareView) ...
+// Re-adding necessary components for full functionality
 const SearchableDropdown: React.FC<{ options: Currency[], selected: Currency, onSelect: (option: Currency) => void }> = ({ options, selected, onSelect }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -2747,6 +2786,7 @@ const BranchSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppS
                 const imageUrl = reader.result as string;
                 setSettings(prev => {
                     const newSettings = {...prev, branch: {...prev.branch, [field]: imageUrl}};
+                    // Auto-save on image upload
                     saveAppSettings(newSettings).then(() => {
                         alert("Imagen cargada y guardada.");
                     }).catch(() => {
@@ -2997,7 +3037,7 @@ const PaymentSettingsView: React.FC<{ onSave: () => Promise<void>; settings: App
                             <input type="text" value={settings.payment.transfer?.accountHolder || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, accountHolder: e.target.value} as any}}))} className={inputClasses} placeholder="Nombre del titular"/>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">CI/RIF</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Cédula / RIF</label>
                             <input type="text" value={settings.payment.transfer?.idNumber || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, idNumber: e.target.value} as any}}))} className={inputClasses} placeholder="V-12345678"/>
                         </div>
                     </div>
@@ -3128,7 +3168,7 @@ const HoursSettings: React.FC<{ onSave: () => Promise<void>; settings: AppSettin
                     : schedule
                 )
             };
-            saveAppSettings(newSettings); 
+            saveAppSettings(newSettings); // Auto-save on change
             return newSettings;
         });
     };
@@ -3150,7 +3190,7 @@ const HoursSettings: React.FC<{ onSave: () => Promise<void>; settings: AppSettin
                     : schedule
                 )
             };
-            saveAppSettings(newSettings); 
+            saveAppSettings(newSettings); // Auto-save on change
             return newSettings;
         });
     };
@@ -3171,7 +3211,7 @@ const HoursSettings: React.FC<{ onSave: () => Promise<void>; settings: AppSettin
         };
         setSettings(prev => {
             const newSettings = { ...prev, schedules: [...prev.schedules, newSchedule]};
-            saveAppSettings(newSettings); 
+            saveAppSettings(newSettings); // Auto-save on change
             return newSettings;
         });
         setActiveScheduleId(newSchedule.id);
@@ -3352,6 +3392,7 @@ const ZoneEditor: React.FC<{
     onSave: (zone: Zone) => void;
     onExit: () => void;
 }> = ({ initialZone, onSave, onExit }) => {
+    // ... (Same ZoneEditor code)
     const [zone, setZone] = useState(initialZone);
     const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
     const gridRef = useRef<HTMLDivElement>(null);
@@ -3367,11 +3408,12 @@ const ZoneEditor: React.FC<{
     };
     
     const handleTableUpdate = (updatedTable: Table) => {
+        // Check for collisions before updating state
         for (let r = 0; r < updatedTable.height; r++) {
             for (let c = 0; c < updatedTable.width; c++) {
                 if (isCellOccupied(updatedTable.row + r, updatedTable.col + c, updatedTable.id)) {
                     alert("La mesa no puede superponerse con otra existente.");
-                    return; 
+                    return; // Abort update
                 }
             }
         }
@@ -3386,7 +3428,7 @@ const ZoneEditor: React.FC<{
         if (isCellOccupied(row, col)) return;
 
         const newTable: Table = {
-            id: crypto.randomUUID(), 
+            id: crypto.randomUUID(), // Use standard UUID generator for Supabase compatibility
             zoneId: zone.id,
             name: (zone.tables.length + 1).toString(),
             row,
@@ -3480,6 +3522,7 @@ const ZoneEditor: React.FC<{
                                 gap: '1rem'
                             }}
                         >
+                           {/* Render tables using pure CSS Grid positioning */}
                             {zone.tables.map(table => (
                                 <div
                                     key={table.id}
@@ -3496,6 +3539,7 @@ const ZoneEditor: React.FC<{
                                     {table.name}
                                 </div>
                             ))}
+                            {/* Render placeholders only in unoccupied cells */}
                             {Array.from({ length: zone.rows * zone.cols }).map((_, index) => {
                                 const row = Math.floor(index / zone.cols) + 1;
                                 const col = (index % zone.cols) + 1;
@@ -3580,6 +3624,7 @@ const SettingsModal: React.FC<{
 
     const handleEditLayout = (zone: Zone) => {
         onEditZoneLayout(zone);
+        // Don't close modal here, let parent handle it to switch views smoothly
     };
     
     if (!isOpen || !settings) return null;
@@ -3847,14 +3892,16 @@ const ShareView: React.FC<{ onGoToTableSettings: () => void }> = ({ onGoToTableS
 const AdminView: React.FC = () => {
     const [currentPage, setCurrentPage] = useState<AdminViewPage>('dashboard');
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [isPreviewOpen, setIsPreviewOpen] = useState(false); 
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false); // Placeholder for preview modal logic
     const [theme, toggleTheme] = useTheme();
     
+    // State for Zone Editor Logic
     const [isZoneEditorOpen, setIsZoneEditorOpen] = useState(false);
     const [zoneToEdit, setZoneToEdit] = useState<Zone | null>(null);
 
     const openTableSettings = () => {
         setIsSettingsOpen(true);
+        // In a real app, pass initialPage='zones-tables' prop to SettingsModal
     };
     
     const handleEditZoneLayout = (zone: Zone) => {
@@ -3868,7 +3915,7 @@ const AdminView: React.FC = () => {
             await saveZoneLayout(updatedZone);
             setIsZoneEditorOpen(false);
             setZoneToEdit(null);
-            setIsSettingsOpen(true); 
+            setIsSettingsOpen(true); // Return to settings
         } catch (error) {
             alert("Error al guardar la distribución: " + error);
         }
