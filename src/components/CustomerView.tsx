@@ -325,7 +325,7 @@ const MenuList: React.FC<{
     currency: string, 
     promotions: Promotion[]
 }> = ({ products, categories, onProductClick, cartItems, currency, promotions }) => {
-    const [searchTerm, setLocalSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState<string>('');
     
     // Initialize active category on load
@@ -396,7 +396,7 @@ const MenuList: React.FC<{
                             type="text" 
                             placeholder="Buscar productos..." 
                             value={searchTerm}
-                            onChange={(e) => setLocalSearchTerm(e.target.value)}
+                            onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full bg-gray-800 text-white rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder-gray-500"
                         />
                     </div>
@@ -851,7 +851,7 @@ const CheckoutView: React.FC<{
                  <div className="space-y-2 pt-2">
                     {availablePaymentMethods.map(method => (
                         <div key={method}>
-                            <label className={`flex justify-between items-center p-4 rounded-xl cursor-pointer transition-all border ${selectedPaymentMethod === method ? 'bg-emerald-900/20 border-emerald-500 ring-1 ring-emerald-500 shadow-lg shadow-emerald-900/10' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}>
+                            <label className={`flex justify-between items-center p-4 rounded-xl cursor-pointer transition-all border ${selectedPaymentMethod === method ? 'bg-emerald-900/20 border-emerald-500 ring-1 border-emerald-500 shadow-lg shadow-emerald-900/10' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}>
                                 <span className={`font-medium ${selectedPaymentMethod === method ? 'text-emerald-400' : 'text-white'}`}>{method}</span>
                                 <input type="radio" name="payment" value={method} checked={selectedPaymentMethod === method} onChange={() => {setSelectedPaymentMethod(method); setPaymentProof(null);}} className="h-5 w-5 accent-emerald-500" />
                             </label>
@@ -1071,7 +1071,7 @@ export default function CustomerView() {
         const finalTotal = cartTotal + shippingCost + tipAmount;
 
         const newOrder: Omit<Order, 'id' | 'createdAt'> = {
-            customer,
+            customer: { ...customer, paymentMethod }, // Add paymentMethod here
             items: cartItems,
             total: finalTotal,
             status: OrderStatus.Pending,

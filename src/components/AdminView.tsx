@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useTheme } from '../hooks/useTheme';
 import { Order, OrderStatus, OrderType } from '../types';
@@ -124,7 +125,7 @@ const Dashboard: React.FC = () => {
                 }
             });
 
-            return { sales, orderCount, shippingCount, tips };
+            return { sales, orderCount, shippingCount, tips, ordersList: validOrders };
         };
 
         const todayOrders = orders.filter(o => new Date(o.createdAt).getTime() >= startOfToday);
@@ -138,6 +139,30 @@ const Dashboard: React.FC = () => {
             previous: getStatsForRange(yesterdayOrders)
         };
     }, [orders]);
+
+    const paymentStats = useMemo(() => {
+        const methodCounts: {[key: string]: number} = {};
+        let total = 0;
+
+        // Use current day's orders for payment stats
+        dashboardStats.current.ordersList.forEach(o => {
+            // Check both root customer object and potentially nested location if structure varies
+            const method = o.customer.paymentMethod || 'Otros'; 
+            methodCounts[method] = (methodCounts[method] || 0) + 1;
+            total++;
+        });
+
+        const sortedMethods = Object.entries(methodCounts)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 3) // Top 3
+            .map(([name, count]) => ({
+                name,
+                count,
+                percentage: total > 0 ? Math.round((count / total) * 100) : 0
+            }));
+        
+        return sortedMethods;
+    }, [dashboardStats]);
 
     if (isLoading) return (
         <div className="flex items-center justify-center h-64">
@@ -207,26 +232,28 @@ const Dashboard: React.FC = () => {
                     </div>
                 </div>
                 <div className="bg-[#1e2533] p-10 rounded-[2.5rem] border border-gray-800/50 shadow-2xl flex flex-col justify-between group min-h-[16rem]">
-                    <p className="text-[11px] font-black text-gray-500 uppercase tracking-[0.2em]">Métodos de pago más usados</p>
-                    <div className="flex flex-col items-center justify-center py-6 space-y-6">
-                         <div className="w-full space-y-2">
-                             <div className="flex justify-between text-[10px] font-black text-gray-500 uppercase tracking-widest">
-                                 <span>Efectivo</span>
-                                 <span>66%</span>
+                    <p className="text-[11px] font-black text-gray-500 uppercase tracking-[0.2em]">Métodos de pago más usados (Hoy)</p>
+                    <div className="flex flex-col justify-center py-6 space-y-6 flex-1">
+                         {paymentStats.length > 0 ? (
+                             paymentStats.map((stat, idx) => (
+                                <div key={stat.name} className="w-full space-y-2">
+                                     <div className="flex justify-between text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                                         <span>{stat.name}</span>
+                                         <span>{stat.percentage}%</span>
+                                     </div>
+                                     <div className="w-full bg-gray-800/50 h-2.5 rounded-full overflow-hidden">
+                                        <div 
+                                            className={`h-full rounded-full transition-all duration-1000 ease-out ${idx === 0 ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-emerald-500/40'}`} 
+                                            style={{ width: `${stat.percentage}%` }}
+                                        ></div>
+                                     </div>
+                                 </div>
+                             ))
+                         ) : (
+                             <div className="text-center text-gray-500 text-xs font-bold uppercase tracking-widest opacity-50">
+                                 Sin datos de pago hoy
                              </div>
-                             <div className="w-full bg-gray-800/50 h-2.5 rounded-full overflow-hidden">
-                                <div className="bg-emerald-500 h-full w-[66%] shadow-[0_0_15px_rgba(16,185,129,0.2)]"></div>
-                             </div>
-                         </div>
-                         <div className="w-full space-y-2">
-                             <div className="flex justify-between text-[10px] font-black text-gray-500 uppercase tracking-widest">
-                                 <span>Digital / Transferencia</span>
-                                 <span>34%</span>
-                             </div>
-                             <div className="w-full bg-gray-800/50 h-2.5 rounded-full overflow-hidden">
-                                <div className="bg-emerald-400 h-full w-[34%] opacity-40"></div>
-                             </div>
-                         </div>
+                         )}
                     </div>
                 </div>
             </div>
