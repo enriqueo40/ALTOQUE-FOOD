@@ -1,20 +1,26 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { usePersistentState } from '../hooks/usePersistentState';
 import { useTheme } from '../hooks/useTheme';
-import { Order, OrderStatus, OrderType } from '../types';
-import { getActiveOrders, subscribeToNewOrders, unsubscribeFromChannel, updateOrder } from '../services/supabaseService';
-import { 
-    IconHome, IconMenu, IconAvailability, IconShare, IconTutorials, IconOrders, 
-    IconCalendar, IconChevronDown, IconX, IconReceipt, IconExternalLink, 
-    IconSettings, IconChevronUp, IconMoon, IconSun, IconSearch, IconCheck, IconTrash, IconPencil, IconDuplicate, IconStore, IconDelivery, IconPayment, IconClock, IconTableLayout, IconPrinter, IconToggleOff, IconWhatsapp, IconLocationMarker
-} from '../constants';
+import { useCart } from '../hooks/useCart';
+import { Product, Category, Order, OrderStatus, Conversation, AdminChatMessage, OrderType, Personalization, PersonalizationOption, Promotion, DiscountType, PromotionAppliesTo, Zone, Table, AppSettings, Currency, BranchSettings, PaymentSettings, ShippingSettings, PaymentMethod, DaySchedule, Schedule, ShippingCostType, TimeRange, PrintingMethod, PaymentStatus, Customer } from '../types';
+import { MOCK_CONVERSATIONS, CURRENCIES } from '../constants';
+import { generateProductDescription, getAdvancedInsights } from '../services/geminiService';
+import { getProducts, getCategories, saveProduct, deleteProduct, saveCategory, deleteCategory, getPersonalizations, savePersonalization, deletePersonalization, getPromotions, savePromotion, deletePromotion, updateProductAvailability, updatePersonalizationOptionAvailability, getZones, saveZone, deleteZone, saveZoneLayout, getAppSettings, saveAppSettings, subscribeToNewOrders, unsubscribeFromChannel, updateOrder, getActiveOrders, saveOrder } from '../services/supabaseService';
+import { IconComponent, IconHome, IconMenu, IconAvailability, IconShare, IconTutorials, IconOrders, IconAnalytics, IconChatAdmin, IconLogout, IconSearch, IconBell, IconEdit, IconPlus, IconTrash, IconSparkles, IconSend, IconMoreVertical, IconExternalLink, IconCalendar, IconChevronDown, IconX, IconReceipt, IconSettings, IconStore, IconDelivery, IconPayment, IconClock, IconTableLayout, IconPrinter, IconChevronUp, IconPencil, IconDuplicate, IconGripVertical, IconPercent, IconInfo, IconTag, IconLogoutAlt, IconSun, IconMoon, IconArrowLeft, IconWhatsapp, IconQR, IconLocationMarker, IconUpload, IconCheck, IconBluetooth, IconUSB, IconToggleOn, IconToggleOff } from '../constants';
 
-type AdminViewPage = 'dashboard' | 'products' | 'orders' | 'availability' | 'share' | 'tutorials';
+const IconEye: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.432 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" className={className} />;
+
+type AdminViewPage = 'dashboard' | 'products' | 'orders' | 'analytics' | 'messages' | 'availability' | 'share' | 'tutorials';
+type SettingsPage = 'general' | 'store-data' | 'shipping-costs' | 'payment-methods' | 'hours' | 'zones-tables' | 'printing';
+
 
 const PAGE_TITLES: { [key in AdminViewPage]: string } = {
     dashboard: 'Inicio',
     products: 'Menú',
     orders: 'Pedidos',
+    analytics: 'Analítica',
+    messages: 'Mensajes',
     availability: 'Disponibilidad',
     share: 'Compartir',
     tutorials: 'Tutoriales'
@@ -22,74 +28,154 @@ const PAGE_TITLES: { [key in AdminViewPage]: string } = {
 
 const Sidebar: React.FC<{ currentPage: AdminViewPage; setCurrentPage: (page: AdminViewPage) => void }> = ({ currentPage, setCurrentPage }) => {
     const navItems: { id: AdminViewPage; name: string; icon: React.ReactNode }[] = [
-        { id: 'dashboard', name: 'Inicio', icon: <IconHome className="h-5 w-5" /> },
-        { id: 'orders', name: 'Pedidos', icon: <IconOrders className="h-5 w-5" /> },
-        { id: 'products', name: 'Menú', icon: <IconMenu className="h-5 w-5" /> },
-        { id: 'availability', name: 'Disponibilidad', icon: <IconAvailability className="h-5 w-5" /> },
-        { id: 'share', name: 'Compartir', icon: <IconShare className="h-5 w-5" /> },
-        { id: 'tutorials', name: 'Tutoriales', icon: <IconTutorials className="h-5 w-5" /> },
+        { id: 'dashboard', name: 'Inicio', icon: <IconHome /> },
+        { id: 'orders', name: 'Pedidos', icon: <IconOrders /> },
+        { id: 'products', name: 'Menú', icon: <IconMenu /> },
+        { id: 'availability', name: 'Disponibilidad', icon: <IconAvailability /> },
+        { id: 'share', name: 'Compartir', icon: <IconShare /> },
+        { id: 'tutorials', name: 'Tutoriales', icon: <IconTutorials /> },
     ];
     return (
-        <aside className="w-64 bg-[#1e2533] dark:bg-[#111827] flex flex-col border-r border-gray-800/40 shrink-0">
-            <div className="h-20 flex items-center px-8 border-b border-gray-800/40">
-                 <div className="flex items-center space-x-3 cursor-pointer group">
-                    <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition-transform">
-                        <span className="text-white font-black text-xs">AF</span>
-                    </div>
-                    <h2 className="text-lg font-black text-white tracking-tighter uppercase">ALTOQUE FOOD</h2>
-                    <IconChevronDown className="h-4 w-4 text-gray-500" />
+        <aside className="w-64 bg-white dark:bg-gray-800 shadow-md flex flex-col">
+            <div className="h-20 flex items-center justify-center border-b dark:border-gray-700">
+                 <div className="flex items-center space-x-2">
+                    <h2 className="text-xl font-bold dark:text-gray-100">ALTOQUE FOOD</h2>
+                    <IconChevronDown className="h-4 w-4" />
                 </div>
             </div>
-            <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto">
+            <nav className="flex-1 px-4 py-6 space-y-2">
                 {navItems.map(item => (
                     <button
                         key={item.id}
                         onClick={() => setCurrentPage(item.id)}
-                        className={`w-full flex items-center space-x-4 px-5 py-3.5 rounded-xl transition-all duration-200 group ${currentPage === item.id ? 'bg-emerald-500/10 text-emerald-400 font-bold' : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'}`}
+                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${currentPage === item.id ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                     >
-                        <span className={currentPage === item.id ? 'text-emerald-400' : 'text-gray-500 group-hover:text-gray-300'}>{item.icon}</span>
-                        <span className="text-sm tracking-wide">{item.name}</span>
+                        {item.icon}
+                        <span className="font-semibold">{item.name}</span>
                     </button>
                 ))}
             </nav>
-            <div className="p-6 border-t border-gray-800/40">
-                <div className="bg-[#242e42] dark:bg-gray-800/50 rounded-2xl p-5 border border-gray-700/30">
-                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Soporte Directo</p>
-                    <p className="text-sm font-black text-white">+584146945877</p>
-                    <div className="flex items-center gap-2 mt-1.5">
-                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-                        <p className="text-[10px] text-emerald-500 font-bold uppercase">Atención activa</p>
-                    </div>
+            <div className="px-6 py-6 border-t dark:border-gray-700">
+                <div className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4 border dark:border-gray-700">
+                    <p className="text-[10px] font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">Soporte</p>
+                    <p className="text-sm font-bold text-gray-800 dark:text-gray-100">+584146945877</p>
+                    <p className="text-[10px] text-emerald-500 font-medium">Atención rápida</p>
                 </div>
             </div>
         </aside>
     );
 };
 
-const Header: React.FC<{ title: string; theme: 'light' | 'dark'; toggleTheme: () => void }> = ({ title, theme, toggleTheme }) => (
-    <header className="h-20 bg-[#1e2533] dark:bg-[#111827] border-b border-gray-800/40 flex items-center justify-between px-10 shrink-0">
-        <h2 className="text-xl font-black text-white uppercase tracking-tight">{title}</h2>
-        <div className="flex items-center space-x-8">
-            <a href="#/menu" target="_blank" className="flex items-center space-x-2 text-xs font-bold text-gray-400 hover:text-emerald-400 transition-colors uppercase tracking-widest">
+const Header: React.FC<{ title: string; onSettingsClick: () => void; onPreviewClick: () => void; theme: 'light' | 'dark'; toggleTheme: () => void; }> = ({ title, onSettingsClick, onPreviewClick, theme, toggleTheme }) => (
+    <header className="h-20 bg-white dark:bg-gray-800 border-b dark:border-gray-700 flex items-center justify-between px-8 shrink-0">
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{title}</h2>
+        <div className="flex items-center space-x-6">
+            <a href="#/menu" target="_blank" rel="noopener noreferrer" className="flex items-center space-x-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
                 <span>Menú digital</span>
                 <IconExternalLink className="h-4 w-4" />
             </a>
-            <div className="flex items-center space-x-4 border-l border-gray-800 pl-8">
-                 <span className="text-xs font-bold text-gray-400 hover:text-white cursor-pointer uppercase tracking-widest">Configuración</span>
-                <button onClick={toggleTheme} className="p-2.5 text-gray-400 hover:bg-gray-800 rounded-xl transition-all">
-                    {theme === 'light' ? <IconMoon className="h-5 w-5" /> : <IconSun className="h-5 w-5" />}
-                </button>
-                <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center border border-emerald-500/30">
-                    <span className="text-emerald-500 font-black text-sm">A</span>
-                </div>
-            </div>
+            <button onClick={onSettingsClick} className="flex items-center space-x-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
+                <span>Configuración</span>
+                <IconSettings className="h-5 w-5" />
+            </button>
+             <button onClick={toggleTheme} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
+                {theme === 'light' ? <IconMoon className="h-5 w-5" /> : <IconSun className="h-5 w-5" />}
+            </button>
         </div>
     </header>
+);
+
+const FeatureBanner: React.FC = () => {
+    const [isVisible, setIsVisible] = useState(true);
+    if (!isVisible) return null;
+
+    return (
+        <div className="bg-emerald-50 border border-emerald-200 dark:bg-emerald-900/50 dark:border-emerald-800 p-4 rounded-lg flex items-center justify-between">
+            <div>
+                <h3 className="font-semibold text-emerald-900 dark:text-emerald-200">Nueva funcionalidad</h3>
+                <p className="text-sm text-emerald-800 dark:text-emerald-300">Conoce las comandas digitales (KDS).</p>
+            </div>
+            <div className="flex items-center space-x-4">
+                 <button className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors">
+                    Ver detalles de actualización
+                </button>
+                <button onClick={() => setIsVisible(false)} className="text-emerald-800 dark:text-emerald-300 hover:text-emerald-900 dark:hover:text-emerald-200" aria-label="Cerrar">
+                    <IconX className="h-5 w-5"/>
+                </button>
+            </div>
+        </div>
+    );
+};
+
+const FilterDropdown: React.FC<{ 
+    options: string[]; 
+    icon?: React.ReactNode; 
+    selected: string; 
+    onSelect: (val: string) => void;
+    prefix?: string;
+}> = ({ options, icon, selected, onSelect, prefix }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    return (
+        <div className="relative" ref={containerRef}>
+            <button onClick={() => setIsOpen(!isOpen)} className="flex items-center space-x-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all">
+                {icon}
+                <span className="whitespace-nowrap">{prefix ? `${prefix}: ${selected}` : selected}</span>
+                <IconChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isOpen && (
+                <div className="origin-top-left absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-20 animate-fade-in-up">
+                    <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                        {options.map(option => (
+                            <button
+                                key={option}
+                                onClick={() => {
+                                    onSelect(option);
+                                    setIsOpen(false);
+                                }}
+                                className={`block w-full text-left px-4 py-2 text-sm transition-colors ${selected === option ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 font-bold' : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                                role="menuitem"
+                            >
+                                {option}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const DashboardStatCard: React.FC<{ title: string; value: string; secondaryValue: string; }> = ({ title, value, secondaryValue }) => (
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 transition-all hover:shadow-md">
+        <h4 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">{title}</h4>
+        <div className="mt-3">
+            <p className="text-4xl font-black text-gray-900 dark:text-gray-100 tracking-tighter">{value}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 font-medium flex items-center gap-1">
+               <span className="font-bold">{secondaryValue}</span> <span className="opacity-60">vs anterior</span>
+            </p>
+        </div>
+    </div>
 );
 
 const Dashboard: React.FC = () => {
     const [orders, setOrders] = useState<Order[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    
+    // Controlled Filter State
+    const [dateRange, setDateRange] = useState('Hoy');
+    const [salesChannel, setSalesChannel] = useState('Todos');
 
     useEffect(() => {
         getActiveOrders().then(data => {
@@ -104,276 +190,237 @@ const Dashboard: React.FC = () => {
         return () => unsubscribeFromChannel();
     }, []);
 
-    // Lógica de cálculo inteligente para el Dashboard basada en los screenshots
-    const dashboardStats = useMemo(() => {
+    // Advanced Filtering and Recalculation Logic
+    const stats = useMemo(() => {
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-        const startOfYesterday = startOfToday - (24 * 60 * 60 * 1000);
+        const msPerDay = 24 * 60 * 60 * 1000;
 
-        const getStatsForRange = (rangeOrders: Order[]) => {
-            const validOrders = rangeOrders.filter(o => o.status !== OrderStatus.Cancelled);
-            const sales = validOrders.reduce((acc, o) => acc + o.total, 0);
-            const orderCount = validOrders.length;
-            const shippingCount = validOrders.filter(o => o.orderType === OrderType.Delivery).length;
+        let startTime: number;
+        let endTime: number = now.getTime();
+        let prevStartTime: number;
+        let prevEndTime: number;
+
+        // Date Range Logic
+        switch (dateRange) {
+            case 'Ayer':
+                startTime = startOfToday - msPerDay;
+                endTime = startOfToday;
+                prevStartTime = startTime - msPerDay;
+                prevEndTime = startTime;
+                break;
+            case 'Últimos 7 días':
+                startTime = now.getTime() - (7 * msPerDay);
+                prevStartTime = startTime - (7 * msPerDay);
+                prevEndTime = startTime;
+                break;
+            case 'Últimos 30 días':
+                startTime = now.getTime() - (30 * msPerDay);
+                prevStartTime = startTime - (30 * msPerDay);
+                prevEndTime = startTime;
+                break;
+            case 'Hoy':
+            default:
+                startTime = startOfToday;
+                prevStartTime = startOfToday - msPerDay;
+                prevEndTime = startOfToday; 
+                break;
+        }
+
+        // Filter Function for Sales Channel
+        const channelFilter = (o: Order) => {
+            if (salesChannel === 'Todos') return true;
+            if (salesChannel === 'Domicilio') return o.orderType === OrderType.Delivery;
+            if (salesChannel === 'Para llevar') return o.orderType === OrderType.TakeAway;
+            if (salesChannel === 'Para comer aqui') return o.orderType === OrderType.DineIn;
+            return true;
+        };
+
+        const currentPeriodOrders = orders.filter(o => {
+            const t = new Date(o.createdAt).getTime();
+            return t >= startTime && t < endTime && channelFilter(o);
+        });
+
+        const previousPeriodOrders = orders.filter(o => {
+            const t = new Date(o.createdAt).getTime();
+            return t >= prevStartTime && t < prevEndTime && channelFilter(o);
+        });
+
+        const calcStats = (orderList: Order[]) => {
+            const valid = orderList.filter(o => o.status !== OrderStatus.Cancelled);
+            const sales = valid.reduce((sum, o) => sum + o.total, 0);
+            const count = valid.length;
+            const shipping = valid.filter(o => o.orderType === OrderType.Delivery).length;
             
-            // Intentar extraer propinas de los comentarios si existe un patrón como "Propina: $XX.XX"
+            // Extract tips from comments if formatted as "Propina: $XX.XX"
             let tips = 0;
-            validOrders.forEach(o => {
+            valid.forEach(o => {
                 if (o.generalComments) {
                     const match = o.generalComments.match(/Propina:?\s*[A-Z$]*\s*([\d.]+)/i);
                     if (match && match[1]) tips += parseFloat(match[1]);
                 }
             });
 
-            return { sales, orderCount, shippingCount, tips, ordersList: validOrders };
-        };
+            const methodCounts: {[key: string]: number} = {};
+            valid.forEach(o => {
+                const method = o.customer.paymentMethod || 'Efectivo';
+                methodCounts[method] = (methodCounts[method] || 0) + 1;
+            });
 
-        const todayOrders = orders.filter(o => new Date(o.createdAt).getTime() >= startOfToday);
-        const yesterdayOrders = orders.filter(o => {
-            const time = new Date(o.createdAt).getTime();
-            return time >= startOfYesterday && time < startOfToday;
-        });
+            const paymentMethods = Object.entries(methodCounts)
+                .sort(([,a], [,b]) => b - a)
+                .slice(0, 3)
+                .map(([name, val]) => ({
+                    name,
+                    percentage: count > 0 ? Math.round((val / count) * 100) : 0
+                }));
+
+            return { sales, count, shipping, tips, paymentMethods };
+        };
 
         return {
-            current: getStatsForRange(todayOrders),
-            previous: getStatsForRange(yesterdayOrders)
+            current: calcStats(currentPeriodOrders),
+            previous: calcStats(previousPeriodOrders)
         };
-    }, [orders]);
+    }, [orders, dateRange, salesChannel]);
 
-    const paymentStats = useMemo(() => {
-        const methodCounts: {[key: string]: number} = {};
-        let total = 0;
+    if (isLoading) {
+        return <div className="p-20 text-center animate-pulse text-gray-500 font-bold uppercase tracking-widest">Sincronizando Dashboard...</div>;
+    }
 
-        // Use current day's orders for payment stats
-        dashboardStats.current.ordersList.forEach(o => {
-            // Check both root customer object and potentially nested location if structure varies
-            const method = o.customer.paymentMethod || 'Otros'; 
-            methodCounts[method] = (methodCounts[method] || 0) + 1;
-            total++;
-        });
-
-        const sortedMethods = Object.entries(methodCounts)
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 3) // Top 3
-            .map(([name, count]) => ({
-                name,
-                count,
-                percentage: total > 0 ? Math.round((count / total) * 100) : 0
-            }));
-        
-        return sortedMethods;
-    }, [dashboardStats]);
-
-    if (isLoading) return (
-        <div className="flex items-center justify-center h-64">
-            <div className="animate-spin h-10 w-10 border-4 border-emerald-500 border-t-transparent rounded-full shadow-lg shadow-emerald-500/20"></div>
-        </div>
-    );
-
-    const ticketPromedio = dashboardStats.current.orderCount > 0 
-        ? (dashboardStats.current.sales / dashboardStats.current.orderCount).toFixed(2) 
+    const ticketPromedio = stats.current.count > 0 
+        ? (stats.current.sales / stats.current.count).toFixed(2) 
         : "0.00";
 
     return (
-        <div className="space-y-8 animate-fade-in pb-24">
-            {/* Banner de Nueva Funcionalidad */}
-            <div className="bg-[#042f2e]/40 border border-emerald-500/20 p-5 rounded-2xl flex items-center justify-between shadow-xl">
-                <div className="space-y-1">
-                    <h3 className="text-white font-bold text-base leading-tight">Nueva funcionalidad</h3>
-                    <p className="text-emerald-500/70 text-xs font-medium">Conoce las comandas digitales (KDS).</p>
-                </div>
-                <div className="flex items-center gap-4">
-                    <button className="bg-[#008f68] hover:bg-[#007a59] text-white px-6 py-2.5 rounded-xl text-xs font-black transition-all shadow-lg active:scale-95 uppercase tracking-wide">
-                        Ver detalles de actualización
-                    </button>
-                    <button className="text-gray-500 hover:text-white p-2 transition-colors"><IconX className="h-5 w-5"/></button>
-                </div>
+        <div className="space-y-8 pb-20 animate-fade-in">
+            <FeatureBanner />
+            
+            <div className="flex flex-wrap items-center gap-4">
+                <FilterDropdown 
+                    options={['Hoy', 'Ayer', 'Últimos 7 días', 'Últimos 30 días']} 
+                    icon={<IconCalendar className="h-5 w-5 text-gray-500" />} 
+                    selected={dateRange}
+                    onSelect={setDateRange}
+                />
+                <FilterDropdown 
+                    prefix="Canal de venta"
+                    options={['Todos', 'Domicilio', 'Para llevar', 'Para comer aqui']} 
+                    selected={salesChannel}
+                    onSelect={setSalesChannel}
+                />
             </div>
 
-            {/* Filtros */}
-            <div className="flex gap-4">
-                <button className="flex items-center gap-2 bg-[#2a3447] border border-gray-700/50 px-5 py-3 rounded-2xl text-sm text-gray-200 font-bold hover:bg-[#323d54] transition-all">
-                    <IconCalendar className="h-4 w-4 text-gray-400" />
-                    Hoy
-                    <IconChevronDown className="h-4 w-4 text-gray-500 ml-1 opacity-50" />
-                </button>
-                <button className="flex items-center gap-2 bg-[#2a3447] border border-gray-700/50 px-5 py-3 rounded-2xl text-sm text-gray-200 font-bold hover:bg-[#323d54] transition-all">
-                    Canal de venta: Todos
-                    <IconChevronDown className="h-4 w-4 text-gray-500 ml-1 opacity-50" />
-                </button>
-            </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <DashboardStatCard 
+                    title="Ventas" 
+                    value={`$${stats.current.sales.toFixed(2)}`} 
+                    secondaryValue={`$${stats.previous.sales.toFixed(2)}`} 
+                />
+                <DashboardStatCard 
+                    title="Pedidos" 
+                    value={stats.current.count.toString()} 
+                    secondaryValue={stats.previous.count.toString()} 
+                />
+                <DashboardStatCard 
+                    title="Envíos" 
+                    value={stats.current.shipping.toString()} 
+                    secondaryValue={stats.previous.shipping.toString()} 
+                />
+                <DashboardStatCard 
+                    title="Propinas" 
+                    value={`$${stats.current.tips.toFixed(2)}`} 
+                    secondaryValue={`$${stats.previous.tips.toFixed(2)}`} 
+                />
 
-            {/* Grid de KPIs principales */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[
-                    { label: 'Ventas', value: `$${dashboardStats.current.sales.toFixed(2)}`, prev: `$${dashboardStats.previous.sales.toFixed(2)}` },
-                    { label: 'Pedidos', value: dashboardStats.current.orderCount.toString(), prev: dashboardStats.previous.orderCount.toString() },
-                    { label: 'Envíos', value: dashboardStats.current.shippingCount.toString(), prev: dashboardStats.previous.shippingCount.toString() },
-                    { label: 'Propinas', value: `$${dashboardStats.current.tips.toFixed(2)}`, prev: `$${dashboardStats.previous.tips.toFixed(2)}` },
-                ].map((stat, i) => (
-                    <div key={i} className="bg-[#1e2533] p-8 rounded-[2rem] border border-gray-800/50 shadow-2xl transition-all hover:border-emerald-500/20 group">
-                        <p className="text-[11px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4 group-hover:text-gray-400 transition-colors">{stat.label}</p>
-                        <div className="space-y-1">
-                            <h4 className="text-5xl font-black text-white tracking-tighter">{stat.value}</h4>
-                            <p className="text-xs font-bold text-gray-500/60">{stat.prev}</p>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {/* Insights secundarios */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-[#1e2533] p-10 rounded-[2.5rem] border border-gray-800/50 shadow-2xl flex flex-col justify-between group min-h-[16rem] relative overflow-hidden">
-                    <p className="text-[11px] font-black text-gray-500 uppercase tracking-[0.2em] relative z-10">Ticket promedio</p>
-                    <div className="flex items-center justify-center py-4 relative z-10">
-                         <span className="text-8xl font-black text-gray-800/20 tracking-tighter group-hover:text-emerald-500/5 transition-colors duration-700">
-                            ${ticketPromedio}
-                         </span>
+                {/* Insight Analytics */}
+                <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 lg:col-span-2 flex flex-col justify-between group">
+                    <h4 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Ticket promedio</h4>
+                    <div className="flex items-center justify-center py-10">
+                        <div className="text-7xl font-black text-gray-200 dark:text-gray-700/50 tracking-tighter group-hover:text-emerald-500/10 transition-colors duration-500">${ticketPromedio}</div>
                     </div>
                 </div>
-                <div className="bg-[#1e2533] p-10 rounded-[2.5rem] border border-gray-800/50 shadow-2xl flex flex-col justify-between group min-h-[16rem]">
-                    <p className="text-[11px] font-black text-gray-500 uppercase tracking-[0.2em]">Métodos de pago más usados (Hoy)</p>
-                    <div className="flex flex-col justify-center py-6 space-y-6 flex-1">
-                         {paymentStats.length > 0 ? (
-                             paymentStats.map((stat, idx) => (
-                                <div key={stat.name} className="w-full space-y-2">
-                                     <div className="flex justify-between text-[10px] font-black text-gray-500 uppercase tracking-widest">
-                                         <span>{stat.name}</span>
-                                         <span>{stat.percentage}%</span>
+
+                <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 lg:col-span-2">
+                    <h4 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-8">Métodos de pago más usados ({dateRange})</h4>
+                    <div className="space-y-6">
+                         {stats.current.paymentMethods.length > 0 ? (
+                             stats.current.paymentMethods.map((method, idx) => (
+                                <div key={method.name} className="w-full space-y-2">
+                                     <div className="flex justify-between text-[10px] font-black text-gray-500 uppercase">
+                                         <span>{method.name}</span>
+                                         <span>{method.percentage}%</span>
                                      </div>
-                                     <div className="w-full bg-gray-800/50 h-2.5 rounded-full overflow-hidden">
+                                     <div className="w-full bg-gray-100 dark:bg-gray-700 h-2.5 rounded-full overflow-hidden">
                                         <div 
-                                            className={`h-full rounded-full transition-all duration-1000 ease-out ${idx === 0 ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-emerald-500/40'}`} 
-                                            style={{ width: `${stat.percentage}%` }}
+                                            className={`h-full rounded-full transition-all duration-1000 ease-out ${idx === 0 ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-emerald-500/40'}`} 
+                                            style={{ width: `${method.percentage}%` }}
                                         ></div>
                                      </div>
                                  </div>
                              ))
                          ) : (
-                             <div className="text-center text-gray-500 text-xs font-bold uppercase tracking-widest opacity-50">
-                                 Sin datos de pago hoy
+                             <div className="text-center py-10 text-gray-400 text-xs font-bold uppercase tracking-widest opacity-50">
+                                 Sin datos para mostrar
                              </div>
                          )}
                     </div>
                 </div>
             </div>
 
-            {/* Badge flotante inferior */}
-            <div className="fixed bottom-8 right-10 z-[100]">
-                <button className="bg-[#242e42] hover:bg-[#2c3851] text-gray-300 px-6 py-4 rounded-2xl flex items-center gap-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-gray-700/60 transition-all active:scale-95 group">
-                    <span className="text-sm font-black text-white/90 uppercase tracking-tight">Estás en tu periodo de prueba</span>
-                    <IconChevronUp className="h-5 w-5 text-emerald-500 group-hover:-translate-y-1 transition-transform duration-300" />
+             <div className="fixed bottom-6 right-8 z-50">
+                <button className="bg-gray-900 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-3 text-sm dark:bg-gray-700 dark:text-gray-200 border border-gray-700/50 transition-transform active:scale-95">
+                    <span className="font-black uppercase tracking-tight opacity-90">Estás en tu periodo de prueba</span>
+                    <IconChevronUp className="h-4 w-4 text-emerald-500" />
                 </button>
             </div>
-        </div>
-    );
-};
-
-// Componente de pedidos rediseñado para la pestaña de pedidos
-const OrderBoardView: React.FC = () => {
-    const [orders, setOrders] = useState<Order[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        getActiveOrders().then(data => { setOrders(data); setIsLoading(false); });
-        subscribeToNewOrders((o) => setOrders(prev => [o, ...prev]), (u) => setOrders(prev => prev.map(o => o.id === u.id ? u : o)));
-        return () => unsubscribeFromChannel();
-    }, []);
-
-    if (isLoading) return <div className="p-20 text-center text-gray-500 uppercase font-black tracking-widest animate-pulse">Sincronizando...</div>;
-
-    return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {orders.map(o => (
-                <div key={o.id} className="bg-[#1e2533] p-8 rounded-[2.5rem] border border-gray-800/60 shadow-2xl transition-all hover:border-emerald-500/30 hover:-translate-y-1 group">
-                    <div className="flex justify-between items-start mb-6">
-                        <div className="space-y-1">
-                             <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-500/10 px-2 py-0.5 rounded">#{o.id.slice(0,6).toUpperCase()}</span>
-                                <span className="text-[10px] font-bold text-gray-500">{new Date(o.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                             </div>
-                             <h3 className="text-xl font-black text-white tracking-tight group-hover:text-emerald-400 transition-colors">{o.customer.name}</h3>
-                        </div>
-                        <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${
-                            o.status === OrderStatus.Pending ? 'bg-orange-500/20 text-orange-400 border border-orange-500/20' : 
-                            o.status === OrderStatus.Confirmed ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20' :
-                            'bg-gray-800 text-gray-400 border border-gray-700'
-                        }`}>{o.status}</span>
-                    </div>
-                    <div className="space-y-3 mb-8">
-                        {o.items.map(i => (
-                            <div key={i.cartItemId} className="flex justify-between items-center text-sm font-bold">
-                                <span className="text-gray-400">{i.quantity}x {i.name}</span>
-                                <span className="text-gray-200">${(i.price * i.quantity).toFixed(2)}</span>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="flex justify-between items-center pt-6 border-t border-gray-800">
-                        <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Total</span>
-                            <span className="text-2xl font-black text-white tracking-tighter">${o.total.toFixed(2)}</span>
-                        </div>
-                        <div className="flex gap-2">
-                            <button onClick={() => updateOrder(o.id, {status: OrderStatus.Confirmed})} className="bg-emerald-600 hover:bg-emerald-500 text-white p-3 rounded-2xl transition-all shadow-lg shadow-emerald-900/40">
-                                <IconCheck className="h-5 w-5"/>
-                            </button>
-                            <button onClick={() => updateOrder(o.id, {status: OrderStatus.Cancelled})} className="bg-[#1e2533] border border-gray-700 hover:border-red-500 text-gray-500 hover:text-red-500 p-3 rounded-2xl transition-all">
-                                <IconTrash className="h-5 w-5"/>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            ))}
-            {orders.length === 0 && (
-                <div className="col-span-full py-40 text-center bg-[#1e2533] rounded-[3rem] border border-dashed border-gray-700">
-                    <p className="text-gray-500 font-bold uppercase tracking-[0.3em]">Sin pedidos por el momento</p>
-                </div>
-            )}
-        </div>
-    );
-};
-
-const AdminView: React.FC = () => {
-    const [currentPage, setCurrentPage] = useState<AdminViewPage>('dashboard');
-    const [theme, toggleTheme] = useTheme();
-
-    const renderContent = () => {
-        switch(currentPage) {
-            case 'dashboard': return <Dashboard />;
-            case 'orders': return <OrderBoardView />;
-            default: return (
-                <div className="py-40 text-center animate-fade-in">
-                    <div className="w-24 h-24 bg-emerald-500/10 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 border border-emerald-500/20">
-                        <IconSettings className="h-12 w-12 text-emerald-500 animate-spin-slow" />
-                    </div>
-                    <h2 className="text-2xl font-black text-white uppercase tracking-[0.3em] mb-4">Módulo en Desarrollo</h2>
-                    <p className="text-gray-500 max-w-sm mx-auto font-bold uppercase text-[10px] tracking-widest opacity-50">Estamos construyendo la mejor experiencia para gestionar tu negocio.</p>
-                </div>
-            );
-        }
-    };
-
-    return (
-        <div className="flex h-screen bg-[#111827] font-sans selection:bg-emerald-500 selection:text-white overflow-hidden text-gray-200">
-            <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
-            <div className="flex-1 flex flex-col min-w-0">
-                <Header title={PAGE_TITLES[currentPage]} theme={theme} toggleTheme={toggleTheme} />
-                <main className="flex-1 overflow-auto p-10 bg-[#161d2a] relative">
-                    <div className="max-w-6xl mx-auto h-full">{renderContent()}</div>
-                </main>
-            </div>
+            
             <style>{`
-                @keyframes fade-in { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-                .animate-fade-in { animation: fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-                .animate-spin-slow { animation: spin 8s linear infinite; }
-                @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-                ::-webkit-scrollbar { width: 8px; height: 8px; }
-                ::-webkit-scrollbar-track { background: transparent; }
-                ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 10px; border: 2px solid #161d2a; }
-                ::-webkit-scrollbar-thumb:hover { background: #374151; }
+                @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+                .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
+                @keyframes fade-in-up { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+                .animate-fade-in-up { animation: fade-in-up 0.2s ease-out forwards; }
             `}</style>
         </div>
     );
 };
 
-export default AdminView;
+const ProductListItem: React.FC<{product: Product, onEdit: () => void, onDuplicate: () => void, onDelete: () => void}> = ({product, onEdit, onDuplicate, onDelete}) => {
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsMenuOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+    
+    return (
+        <div className="flex items-center justify-between p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/50">
+            <div className="flex items-center gap-x-4">
+                <IconGripVertical className="h-5 w-5 text-gray-400 cursor-grab" />
+                <img src={product.imageUrl} alt={product.name} className="w-12 h-12 rounded-md object-cover"/>
+                <span className="font-medium text-gray-800 dark:text-gray-100">{product.name}</span>
+            </div>
+            <div className="relative" ref={menuRef}>
+                <button onClick={() => setIsMenuOpen(prev => !prev)} className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 p-1 rounded-full">
+                    <IconMoreVertical />
+                </button>
+                {isMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-900 rounded-md shadow-lg z-10 border dark:border-gray-700">
+                        <div className="p-2">
+                            <p className="px-2 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Acciones</p>
+                            <button onClick={() => { onEdit(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-x-3 px-2 py-2 text-sm text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"><IconPencil className="h-4 w-4" /> Editar</button>
+                            <button onClick={() => { onDuplicate(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-x-3 px-2 py-2 text-sm text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"><IconDuplicate className="h-4 w-4" /> Duplicar</button>
+                            <button onClick={() => { onDelete(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-x-3 px-2 py-2 text-sm text-red-600 dark:text-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-900/50"><IconTrash className="h-4 w-4" /> Borrar</button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
