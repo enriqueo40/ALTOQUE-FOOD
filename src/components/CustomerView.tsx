@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
@@ -190,23 +191,26 @@ const RestaurantHero: React.FC<{
     );
 };
 
-// Helper function to calculate price after active promotions
+/**
+ * Helper para calcular el precio final basándose en promociones activas
+ */
 const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price: number, promotion?: Promotion } => {
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
 
-    // Filter active promotions based on date and product mapping
+    // Filtrar promociones activas para la fecha de hoy
     const activePromos = promotions.filter(p => {
         const isDateActive = (!p.startDate || todayStr >= p.startDate) && (!p.endDate || todayStr <= p.endDate);
         if (!isDateActive) return false;
 
+        // Si aplica a todos o si el producto está en la lista
         if (p.appliesTo === PromotionAppliesTo.AllProducts) return true;
         return p.productIds?.includes(product.id);
     });
 
     if (activePromos.length === 0) return { price: product.price };
 
-    // Find the promotion that gives the best discount
+    // Buscar la promoción que otorgue el mejor descuento
     let bestPrice = product.price;
     let bestPromo: Promotion | undefined;
 
@@ -233,6 +237,7 @@ const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: 
 
     return (
         <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group relative overflow-hidden">
+            {/* Listón de Oferta */}
             {hasDiscount && (
                 <div className="absolute top-0 left-0 bg-rose-600 text-white text-[10px] font-black px-2.5 py-1 rounded-br-lg z-10 shadow-lg flex items-center gap-1">
                     <IconTag className="h-3 w-3" />
@@ -255,7 +260,7 @@ const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: 
                 <div className="flex justify-between items-end mt-2">
                     <div className="flex flex-col">
                         {hasDiscount && (
-                            <span className="text-xs text-gray-500 line-through mb-0.5">
+                            <span className="text-[10px] text-gray-500 line-through mb-0.5">
                                 {currency} ${product.price.toFixed(2)}
                             </span>
                         )}
@@ -425,7 +430,14 @@ const ProductDetailModal: React.FC<{
                 </div>
 
                 <div className="p-6 flex-grow overflow-y-auto -mt-12 relative z-10">
-                    <h2 className="text-3xl font-black text-white mb-2">{product.name}</h2>
+                    <div className="flex justify-between items-start mb-2">
+                        <h2 className="text-3xl font-black text-white">{product.name}</h2>
+                    </div>
+                    {promotion && (
+                        <div className="mb-4 flex items-center gap-2 bg-rose-900/20 border border-rose-500/30 p-2.5 rounded-xl">
+                            <p className="text-xs font-bold text-rose-400">Promoción activa: {promotion.name}</p>
+                        </div>
+                    )}
                     <p className="text-gray-300 leading-relaxed mb-8">{product.description}</p>
                     
                     <div className="space-y-6">
@@ -479,6 +491,7 @@ const ProductDetailModal: React.FC<{
                     </div>
                     <button onClick={() => {
                         const flatOptions = (Object.values(selectedOptions) as PersonalizationOption[][]).reduce((acc: PersonalizationOption[], curr: PersonalizationOption[]) => acc.concat(curr), []);
+                        // Pasar el producto con el precio descontado al carrito
                         onAddToCart({ ...product, price: discountedPrice }, quantity, comments, flatOptions);
                     }} className="w-full font-black py-4 px-6 rounded-xl transition-all transform active:scale-[0.98] shadow-2xl flex justify-between items-center bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-900/50">
                         <span className="uppercase tracking-tight">Agregar al pedido</span>
@@ -852,6 +865,8 @@ export default function CustomerView() {
 
     const handleProductClick = (product: Product) => setSelectedProduct(product);
     const handleAddToCart = (product: Product, quantity: number, comments?: string, options: PersonalizationOption[] = []) => {
+        // La lógica de addToCart ya maneja el objeto Product completo.
+        // El precio promocional ya viene incluido en el objeto product pasado desde el Modal de detalle.
         addToCart(product, quantity, comments, options);
         setSelectedProduct(null);
     };
