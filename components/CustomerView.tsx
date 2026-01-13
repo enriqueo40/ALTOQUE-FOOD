@@ -502,19 +502,24 @@ const ProductDetailModal: React.FC<{
     };
 
     const isOptionSelected = (pid: string, oid: string) => {
-        return selectedOptions[pid]?.some(o => o.id === oid);
+        return (selectedOptions[pid] || []).some(o => o.id === oid);
     };
 
-    // Correctly typed reduce
-    const totalOptionsPrice = Object.values(selectedOptions).reduce((acc: number, options: PersonalizationOption[]) => {
-        return acc + options.reduce((sum: number, opt: PersonalizationOption) => sum + (opt.price || 0), 0);
-    }, 0);
+    // Fix: Using a loop to avoid '+' operator type inference issues with 'unknown' in reduce
+    let totalOptionsPrice = 0;
+    const optionGroups = Object.values(selectedOptions);
+    for (const group of optionGroups) {
+        const options = group as PersonalizationOption[];
+        for (const opt of options) {
+            totalOptionsPrice += (Number(opt.price) || 0);
+        }
+    }
     
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
 
     const handleAdd = () => {
         // Correctly typed concat and reduce
-        const flatOptions = Object.values(selectedOptions).reduce((acc: PersonalizationOption[], curr: PersonalizationOption[]) => acc.concat(curr), []);
+        const flatOptions = (Object.values(selectedOptions) as PersonalizationOption[][]).reduce((acc, curr) => acc.concat(curr), []);
         onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptions);
     }
 
