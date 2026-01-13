@@ -1,5 +1,4 @@
 
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
@@ -24,7 +23,7 @@ const ScheduleModal: React.FC<{ isOpen: boolean; onClose: () => void; schedule: 
     if (!isOpen) return null;
     
     const daysOrder = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-    const todayIndex = new Date().getDay(); // 0 is Sunday, 1 is Monday
+    const todayIndex = new Date().getDay(); 
     const adjustedTodayIndex = todayIndex === 0 ? 6 : todayIndex - 1; 
     const todayName = daysOrder[adjustedTodayIndex];
 
@@ -37,7 +36,7 @@ const ScheduleModal: React.FC<{ isOpen: boolean; onClose: () => void; schedule: 
                     <button onClick={onClose} className="p-1 text-gray-400 hover:text-white"><IconX className="h-5 w-5"/></button>
                 </div>
                 <div className="p-4 overflow-y-auto">
-                    {schedule.days.map((day, index) => {
+                    {schedule.days.map((day) => {
                         const isToday = day.day === todayName;
                         return (
                             <div key={day.day} className={`flex justify-between items-center py-3 px-4 rounded-xl mb-2 ${isToday ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-gray-800/50 border border-gray-800'}`}>
@@ -394,7 +393,6 @@ const ProductDetailModal: React.FC<{
         });
     };
 
-    // FIX: Property 'forEach' does not exist on type 'unknown'. Added explicit typing to selection groups.
     let totalOptionsPrice = 0;
     (Object.values(selectedOptions) as PersonalizationOption[][]).forEach(group => group.forEach(opt => { totalOptionsPrice += Number(opt.price || 0); }));
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
@@ -461,7 +459,6 @@ const ProductDetailModal: React.FC<{
                         </div>
                     </div>
                     <button onClick={() => {
-                        // FIX: Added explicit cast to selection groups for correctly typing concat and reduce.
                         const flatOptions = (Object.values(selectedOptions) as PersonalizationOption[][]).reduce((acc: PersonalizationOption[], curr: PersonalizationOption[]) => acc.concat(curr), []);
                         onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptions);
                     }} className="w-full font-black py-4 px-6 rounded-xl transition-all transform active:scale-[0.98] shadow-2xl flex justify-between items-center bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-900/50">
