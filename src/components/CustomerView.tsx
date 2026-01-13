@@ -405,16 +405,11 @@ const ProductDetailModal: React.FC<{
     };
 
     let totalOptionsPrice = 0;
-    Object.values(selectedOptions).forEach(group => {
-        (group as PersonalizationOption[]).forEach(opt => {
-            totalOptionsPrice += (Number(opt.price) || 0);
-        });
-    });
-    
+    (Object.values(selectedOptions) as PersonalizationOption[][]).forEach(group => group.forEach(opt => { totalOptionsPrice += Number(opt.price || 0); }));
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
 
     const handleAdd = () => {
-        const flatOptions = (Object.values(selectedOptions) as PersonalizationOption[][]).reduce((acc, curr) => acc.concat(curr), []);
+        const flatOptions = (Object.values(selectedOptions) as PersonalizationOption[][]).reduce((acc: PersonalizationOption[], curr: PersonalizationOption[]) => acc.concat(curr), []);
         onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptions);
     }
 
@@ -856,13 +851,19 @@ export default function CustomerView() {
 
     useEffect(() => {
         fetchMenuData();
+        // Setup real-time subscription for all menu-related changes
         subscribeToMenuUpdates(fetchMenuData);
+        
         const intervalId = setInterval(fetchMenuData, 30000);
         const params = new URLSearchParams(window.location.hash.split('?')[1]);
         const table = params.get('table');
         const zone = params.get('zone');
         if (table && zone) { setTableInfo({ table, zone }); setOrderType(OrderType.DineIn); }
-        return () => { unsubscribeFromChannel(); clearInterval(intervalId); };
+        
+        return () => { 
+            unsubscribeFromChannel(); 
+            clearInterval(intervalId); 
+        };
     }, []);
 
     const handleProductClick = (product: Product) => setSelectedProduct(product);
