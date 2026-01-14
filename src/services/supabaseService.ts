@@ -17,7 +17,9 @@ let supabase: SupabaseClient | null = null;
 let ordersChannel: RealtimeChannel | null = null;
 let menuChannel: RealtimeChannel | null = null;
 
-// Event Listeners for Orders (Observer Pattern)
+// --- OBSERVER PATTERN FOR ORDERS ---
+// Allows multiple components (AdminView for sound, OrderManagement for list) 
+// to listen to the same Supabase channel without disconnecting each other.
 type OrderCallback = (payload: any) => void;
 const orderInsertListeners: OrderCallback[] = [];
 const orderUpdateListeners: OrderCallback[] = [];
@@ -485,9 +487,11 @@ export const subscribeToNewOrders = (
 
     // Initialize channel only if not active
     if (!ordersChannel) {
+        console.log("Initializing shared Orders Realtime Channel...");
         ordersChannel = client.channel('orders-channel');
         ordersChannel
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
+                 console.log("New Order Inserted:", payload.new);
                  const transformed = transformOrderPayload(payload.new);
                  // Broadcast to all insert listeners
                  orderInsertListeners.forEach(listener => listener(transformed));
@@ -497,7 +501,11 @@ export const subscribeToNewOrders = (
                  // Broadcast to all update listeners
                  orderUpdateListeners.forEach(listener => listener(transformed));
             })
-            .subscribe();
+            .subscribe((status) => {
+                if(status === 'SUBSCRIBED') {
+                    console.log("Subscribed to Orders Channel");
+                }
+            });
     }
     
     // Return a unsubscribe function for the *specific* listener passed
