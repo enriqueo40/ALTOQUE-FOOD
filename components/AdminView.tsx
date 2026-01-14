@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { useTheme } from '../hooks/useTheme';
@@ -248,7 +249,7 @@ const ProductListItem: React.FC<{product: Product, onEdit: () => void, onDuplica
                         <div className="p-2">
                             <p className="px-2 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Acciones</p>
                             <button onClick={() => { onEdit(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-x-3 px-2 py-2 text-sm text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"><IconPencil className="h-4 w-4" /> Editar</button>
-                            <button onClick={() => { onDuplicate(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-x-3 px-2 py-2 text-sm text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"><IconDuplicate className="h-4 w-4" /> Duplicar</button>
+                            <button onClick={() => { onDuplicate(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-x-3 px-2 py-2 text-sm text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"><IconDuplicate className="h-4 w-4" /> Duplicar</button>
                             <button onClick={() => { onDelete(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-x-3 px-2 py-2 text-sm text-red-600 dark:text-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-900/50"><IconTrash className="h-4 w-4" /> Borrar</button>
                         </div>
                     </div>
@@ -1040,14 +1041,16 @@ const PromotionModal: React.FC<{
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-start justify-end">
             <div className="bg-white dark:bg-gray-800 h-full w-full max-w-3xl flex flex-col relative">
                 <header className="p-6 border-b dark:border-gray-700 flex justify-between items-center sticky top-0 bg-white dark:bg-gray-800 z-10 shrink-0">
-                    <h2 className="text-xl font-semibold">{personalization ? 'Editar' : 'Agregar'} una promoción</h2>
+                    <h2 className="text-xl font-semibold">{promotion ? 'Editar' : 'Agregar'} una promoción</h2>
                     <div className="flex items-center gap-x-4">
-                        <button className="text-sm font-medium text-gray-700 dark:text-gray-200 px-3 py-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 border dark:border-gray-600">Vista previa</button>
+                        <button className="text-sm font-medium text-gray-700 dark:text-gray-200 px-3 py-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 border dark:border-gray-600 flex items-center gap-1">
+                            <IconEye className="w-4 h-4" /> Vista previa
+                        </button>
                         <button onClick={onClose} className="text-gray-500 hover:text-gray-800 p-1"><IconX /></button>
                     </div>
                 </header>
                 <div className="flex flex-1 overflow-hidden">
-                    <form onSubmit={handleSubmit} className="flex-1 flex flex-col w-2/3">
+                    <form onSubmit={handleSubmit} className="flex-1 flex flex-col lg:w-2/3">
                         <div className="p-6 flex-1 overflow-y-auto space-y-6">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre</label>
