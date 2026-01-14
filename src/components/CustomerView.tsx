@@ -629,9 +629,9 @@ const CheckoutView: React.FC<{
         }));
     };
 
-    const handleGetLocation = () => {
+    const handleGetGPS = () => {
         if (!navigator.geolocation) {
-            alert("La geolocalización no es compatible con tu navegador.");
+            alert("La geolocalización no es soportada por tu navegador.");
             return;
         }
 
@@ -647,12 +647,12 @@ const CheckoutView: React.FC<{
                     }
                 }));
                 setIsLocating(false);
-                alert("Ubicación exacta guardada correctamente.");
+                alert("Ubicación exacta guardada con éxito.");
             },
             (error) => {
-                console.error("Error obteniendo ubicación:", error);
+                console.error("GPS error:", error);
                 setIsLocating(false);
-                alert("No se pudo obtener la ubicación. Asegúrate de dar permisos.");
+                alert("No se pudo obtener la ubicación. Por favor, asegúrate de dar permisos de GPS.");
             },
             { enableHighAccuracy: true }
         );
@@ -704,14 +704,14 @@ const CheckoutView: React.FC<{
                 <div className="space-y-4 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
                     <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Entrega</h3>
                     
-                    <button 
-                        type="button" 
-                        onClick={handleGetLocation}
+                    <button
+                        type="button"
+                        onClick={handleGetGPS}
                         disabled={isLocating}
-                        className={`w-full py-3 mb-2 rounded-xl border flex items-center justify-center gap-2 font-bold transition-all ${customer.address.latitude ? 'bg-emerald-900/40 border-emerald-500 text-emerald-400' : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-750'}`}
+                        className={`w-full py-3 mb-2 flex items-center justify-center gap-2 rounded-xl border font-bold transition-all ${customer.address.latitude ? 'bg-emerald-900/30 border-emerald-500 text-emerald-400' : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-750'}`}
                     >
                         <IconLocationMarker className={`h-5 w-5 ${isLocating ? 'animate-bounce' : ''}`} />
-                        {isLocating ? 'Obteniendo GPS...' : customer.address.latitude ? 'Ubicación GPS capturada' : 'Compartir ubicación exacta (GPS)'}
+                        {isLocating ? 'Capturando GPS...' : customer.address.latitude ? 'Ubicación GPS Guardada' : 'Compartir ubicación exacta (GPS)'}
                     </button>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -934,12 +934,15 @@ export default function CustomerView() {
         let messageParts = [`🧾 *TICKET DE PEDIDO*`, `📍 *${settings.company.name.toUpperCase()}*`, lineSeparator, `🗓️ Fecha: ${new Date().toLocaleDateString()}`, `⏰ Hora: ${new Date().toLocaleTimeString()}`, lineSeparator];
         if (orderType === OrderType.DineIn) messageParts.push(`🪑 *UBICACIÓN*\nZona: ${tableInfo?.zone}\nMesa: ${tableInfo?.table}\n👤 Cliente: ${customer.name}`, lineSeparator);
         else messageParts.push(`👤 *CLIENTE*\nNombre: ${customer.name}\nTel: ${customer.phone}\n🏷️ Tipo: ${orderType === OrderType.TakeAway ? 'Para llevar' : 'Domicilio'}`, lineSeparator);
+        
         if (orderType === OrderType.Delivery) {
             messageParts.push(`📍 *DIRECCIÓN*\n🏠 ${customer.address.calle} #${customer.address.numero}\n🏙️ Col. ${customer.address.colonia}${customer.address.referencias ? `\nRef: ${customer.address.referencias}` : ''}`, lineSeparator);
+            
             if (customer.address.latitude && customer.address.longitude) {
-                messageParts.push(`🌍 *UBICACIÓN EXACTA (GPS)*\nhttps://www.google.com/maps?q=${customer.address.latitude},${customer.address.longitude}`, lineSeparator);
+                messageParts.push(`🌍 *UBICACIÓN GPS EXACTA*\nhttps://www.google.com/maps?q=${customer.address.latitude},${customer.address.longitude}`, lineSeparator);
             }
         }
+        
         messageParts.push(`🛒 *DETALLE*`, ...itemDetails, ``, generalComments ? `📝 *NOTAS:* ${generalComments}` : '', lineSeparator, `💰 *RESUMEN*\nSubtotal: ${currency} $${cartTotal.toFixed(2)}`, orderType === OrderType.Delivery ? `Envío: ${shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : 'Por cotizar'}` : '', tipAmount > 0 ? `Propina: ${currency} $${tipAmount.toFixed(2)}` : '', `*TOTAL A PAGAR: ${currency} $${finalTotal.toFixed(2)}*`, lineSeparator, `💳 Método: ${paymentMethod}`, paymentProof ? "\n📸 *Comprobante adjunto*" : "", `✅ Estado: PENDIENTE`);
         window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(messageParts.filter(p => p !== '').join('\n'))}`, '_blank');
         setView('confirmation');
