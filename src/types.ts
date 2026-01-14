@@ -47,8 +47,6 @@ export interface Address {
     numero: string;
     entreCalles?: string;
     referencias?: string;
-    latitude?: number;
-    longitude?: number;
 }
 
 export interface Customer {

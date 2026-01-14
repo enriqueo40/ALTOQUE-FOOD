@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
@@ -191,35 +190,30 @@ const RestaurantHero: React.FC<{
     );
 };
 
-// --- Lógica de Promociones mejorada ---
-
-/**
- * Helper para calcular el precio final basándose en promociones activas.
- * Compara todas las promociones aplicables y devuelve el precio más bajo.
- */
-const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price: number, promotion?: Promotion, hasSavings: boolean } => {
+const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price: number, promotion?: Promotion } => {
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-
-    // Filtrar promociones activas para hoy
-    const activePromos = promotions.filter(p => {
-        const isDateActive = (!p.startDate || todayStr >= p.startDate) && (!p.endDate || todayStr <= p.endDate);
-        if (!isDateActive) return false;
-
-        // Verifica si aplica a todos o si el ID del producto está vinculado
+    // Filter active promotions based on dates and product applicability
+    const activePromotions = promotions.filter(p => {
+        const startDate = p.startDate ? new Date(p.startDate + 'T00:00:00') : null;
+        const endDate = p.endDate ? new Date(p.endDate + 'T23:59:59') : null;
+        
+        if (startDate && now < startDate) return false;
+        if (endDate && now > endDate) return false;
+        
         if (p.appliesTo === PromotionAppliesTo.AllProducts) return true;
         return p.productIds?.includes(product.id);
     });
 
-    if (activePromos.length === 0) return { price: product.price, hasSavings: false };
+    if (activePromotions.length === 0) return { price: product.price };
 
+    // Find best discount
     let bestPrice = product.price;
     let bestPromo: Promotion | undefined;
 
-    activePromos.forEach(promo => {
+    activePromotions.forEach(promo => {
         let currentPrice = product.price;
         if (promo.discountType === DiscountType.Percentage) {
-            currentPrice = product.price * (1 - (promo.discountValue / 100));
+            currentPrice = product.price * (1 - promo.discountValue / 100);
         } else {
             currentPrice = Math.max(0, product.price - promo.discountValue);
         }
@@ -230,26 +224,22 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
         }
     });
 
-    const hasSavings = bestPrice < product.price;
-    return { price: bestPrice, promotion: bestPromo, hasSavings };
+    return { price: bestPrice, promotion: bestPromo };
 };
 
 const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: () => void; currency: string; promotions: Promotion[] }> = ({ product, quantityInCart, onClick, currency, promotions }) => {
-    const { price: finalPrice, promotion, hasSavings } = getDiscountedPrice(product, promotions);
+    const { price: discountedPrice, promotion } = getDiscountedPrice(product, promotions);
+    const hasDiscount = promotion !== undefined;
 
     return (
         <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group relative overflow-hidden">
-            {/* Cinta de Oferta (Ribbon) */}
-            {hasSavings && promotion && (
-                <div className="absolute top-0 left-0 bg-rose-600 text-white text-[10px] font-black px-2 py-1.5 rounded-br-lg z-10 shadow-lg flex flex-col items-center leading-none">
-                    <span className="flex items-center gap-0.5">
-                        <IconTag className="h-2 w-2" />
-                        {promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}
-                    </span>
-                    <span className="text-[6px] uppercase opacity-90 mt-0.5 tracking-tighter">OFF</span>
+            {/* Promotion Ribbon */}
+            {hasDiscount && (
+                <div className="absolute top-0 left-0 bg-rose-600 text-white text-[10px] font-black px-2.5 py-1 rounded-br-lg z-10 shadow-lg flex flex-col items-center">
+                    <span>-{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}</span>
+                    <span className="text-[6px] opacity-80 uppercase -mt-0.5 font-bold">OFERTA</span>
                 </div>
             )}
-            
             <div className="relative h-24 w-24 flex-shrink-0">
                 <img src={product.imageUrl} alt={product.name} className="w-full h-full rounded-lg object-cover" />
                 {quantityInCart > 0 && (
@@ -258,26 +248,23 @@ const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: 
                     </div>
                 )}
             </div>
-            
             <div className="flex-1 flex flex-col justify-between py-1">
                 <div>
-                    <h3 className={`font-bold leading-tight group-hover:text-emerald-400 transition-colors ${hasSavings ? 'text-rose-100' : 'text-gray-100'}`}>
+                    <h3 className="font-bold text-gray-100 leading-tight group-hover:text-emerald-400 transition-colors flex items-center gap-1.5">
                         {product.name}
+                        {hasDiscount && <IconTag className="h-3 w-3 text-rose-500" />}
                     </h3>
                     <p className="text-sm text-gray-400 line-clamp-2 mt-1 leading-snug">{product.description}</p>
                 </div>
                 <div className="flex justify-between items-end mt-2">
+                    {/* Price Hierarchy */}
                     <div className="flex flex-col">
-                        {hasSavings && (
-                            <span className="text-[10px] text-gray-500 line-through font-medium opacity-70 mb-0.5">
-                                {currency} ${product.price.toFixed(2)}
-                            </span>
+                        {hasDiscount && (
+                            <span className="text-[10px] text-gray-500 line-through font-medium opacity-60">{currency} ${product.price.toFixed(2)}</span>
                         )}
-                        <p className={`font-black text-lg ${hasSavings ? 'text-rose-500' : 'text-white'}`}>
-                            {currency} ${finalPrice.toFixed(2)}
-                        </p>
+                        <p className={`font-black text-lg ${hasDiscount ? 'text-rose-500' : 'text-white'}`}>{currency} ${discountedPrice.toFixed(2)}</p>
                     </div>
-                    <div className={`p-1.5 rounded-full shadow-sm transition-colors ${hasSavings ? 'bg-rose-900/40 text-rose-400 group-hover:bg-rose-600 group-hover:text-white' : 'bg-gray-700 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white'}`}>
+                    <div className="bg-gray-700 p-1.5 rounded-full text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors shadow-sm">
                         <IconPlus className="h-4 w-4" />
                     </div>
                 </div>
@@ -291,7 +278,7 @@ const MenuList: React.FC<{
     categories: Category[],
     onProductClick: (product: Product) => void, 
     cartItems: CartItem[], 
-    currency: string,
+    currency: string, 
     promotions: Promotion[]
 }> = ({ products, categories, onProductClick, cartItems, currency, promotions }) => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -397,7 +384,7 @@ const ProductDetailModal: React.FC<{
         setTimeout(onClose, 300);
     };
 
-    const { price: discountedPrice, promotion, hasSavings } = getDiscountedPrice(product, promotions);
+    const { price: basePrice, promotion } = getDiscountedPrice(product, promotions);
 
     const handleOptionToggle = (personalization: Personalization, option: PersonalizationOption) => {
         setSelectedOptions(prev => {
@@ -416,7 +403,12 @@ const ProductDetailModal: React.FC<{
 
     let totalOptionsPrice = 0;
     (Object.values(selectedOptions) as PersonalizationOption[][]).forEach(group => group.forEach(opt => { totalOptionsPrice += Number(opt.price || 0); }));
-    const totalPrice = (discountedPrice + totalOptionsPrice) * quantity;
+    const totalPrice = (basePrice + totalOptionsPrice) * quantity;
+
+    const handleAdd = () => {
+        const flatOptions = (Object.values(selectedOptions) as PersonalizationOption[][]).reduce((acc: PersonalizationOption[], curr: PersonalizationOption[]) => acc.concat(curr), []);
+        onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptions);
+    }
 
     return (
         <div className={`fixed inset-0 z-50 flex items-end justify-center sm:items-center transition-opacity duration-300 ${isClosing ? 'opacity-0' : 'opacity-100'}`}>
@@ -430,10 +422,8 @@ const ProductDetailModal: React.FC<{
                 <div className="h-64 w-full flex-shrink-0 relative">
                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover rounded-t-3xl sm:rounded-t-2xl" />
                      <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent h-full w-full pointer-events-none"></div>
-                     
-                     {hasSavings && (
-                        <div className="absolute top-6 left-6 bg-rose-600 text-white px-3 py-1.5 rounded-full text-xs font-black shadow-xl z-10 flex items-center gap-1.5 animate-pulse uppercase tracking-wider">
-                            <IconTag className="h-3 w-3" />
+                     {promotion && (
+                        <div className="absolute top-6 left-6 bg-rose-600 text-white px-3 py-1.5 rounded-full text-xs font-black shadow-xl z-10 animate-bounce-short uppercase tracking-wider">
                             ¡Super Oferta!
                         </div>
                      )}
@@ -442,12 +432,22 @@ const ProductDetailModal: React.FC<{
                 <div className="p-6 flex-grow overflow-y-auto -mt-12 relative z-10">
                     <div className="flex justify-between items-start mb-2">
                         <h2 className="text-3xl font-black text-white">{product.name}</h2>
+                        {promotion && (
+                            <div className="text-right">
+                                <span className="text-gray-500 line-through text-sm font-medium">{currency} ${product.price.toFixed(2)}</span>
+                                <p className="text-rose-500 text-xl font-black">-{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}</p>
+                            </div>
+                        )}
                     </div>
-                    {hasSavings && promotion && (
-                        <div className="mb-4 flex items-center gap-2 bg-rose-900/20 border border-rose-500/30 p-2.5 rounded-xl">
+                    
+                    {/* Active Promotion Banner */}
+                    {promotion && (
+                        <div className="mb-4 flex items-center gap-2 bg-rose-900/20 border border-rose-500/30 p-2.5 rounded-xl animate-pulse-subtle">
+                            <IconTag className="h-4 w-4 text-rose-500" />
                             <p className="text-xs font-bold text-rose-400">Promoción activa: {promotion.name}</p>
                         </div>
                     )}
+
                     <p className="text-gray-300 leading-relaxed mb-8">{product.description}</p>
                     
                     <div className="space-y-6">
@@ -485,30 +485,20 @@ const ProductDetailModal: React.FC<{
 
                 <div className="p-4 border-t border-gray-800 bg-gray-900 rounded-b-3xl sm:rounded-b-2xl safe-bottom">
                     <div className="flex items-center justify-between gap-4 mb-4">
-                         <div className="flex flex-col">
-                            {hasSavings && (
-                                <span className="text-xs text-gray-500 line-through font-medium opacity-60">
-                                    {currency} ${product.price.toFixed(2)}
-                                </span>
-                            )}
-                            <span className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">Total Unitario: <span className={hasSavings ? 'text-rose-400' : 'text-emerald-400'}>${(totalPrice / quantity).toFixed(2)}</span></span>
-                         </div>
+                         <span className="text-gray-400 font-bold uppercase text-xs tracking-widest">Cantidad</span>
                          <div className="flex items-center gap-6 bg-gray-800 rounded-full px-2 py-1 border border-gray-700">
                             <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="p-2 rounded-full hover:bg-gray-700 text-white transition-colors"><IconMinus className="h-5 w-5"/></button>
                             <span className="font-bold text-xl text-white w-6 text-center">{quantity}</span>
                             <button onClick={() => setQuantity(q => q + 1)} className="p-2 rounded-full hover:bg-gray-700 text-white transition-colors"><IconPlus className="h-5 w-5"/></button>
                         </div>
                     </div>
-                    <button onClick={() => {
-                        const flatOptions = (Object.values(selectedOptions) as PersonalizationOption[][]).reduce((acc: PersonalizationOption[], curr: PersonalizationOption[]) => acc.concat(curr), []);
-                        // Pasar el producto con el precio descontado al carrito
-                        onAddToCart({ ...product, price: discountedPrice }, quantity, comments, flatOptions);
-                    }} className={`w-full font-black py-4 px-6 rounded-xl transition-all transform active:scale-[0.98] shadow-2xl flex justify-between items-center text-white ${hasSavings ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-900/50' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-900/50'}`}>
+                    <button onClick={handleAdd} className="w-full font-black py-4 px-6 rounded-xl transition-all transform active:scale-[0.98] shadow-2xl flex justify-between items-center bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-900/50">
                         <span className="uppercase tracking-tight">Agregar al pedido</span>
                         <span className="text-xl">${totalPrice.toFixed(2)}</span>
                     </button>
                 </div>
             </div>
+            <style>{`@keyframes bounce-short { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } } .animate-bounce-short { animation: bounce-short 2s infinite ease-in-out; } @keyframes pulse-subtle { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } } .animate-pulse-subtle { animation: pulse-subtle 3s infinite ease-in-out; }`}</style>
         </div>
     );
 }
@@ -609,7 +599,6 @@ const CheckoutView: React.FC<{
     });
     const [tipAmount, setTipAmount] = useState<number>(0);
     const [paymentProof, setPaymentProof] = useState<string | null>(null);
-    const [isLocating, setIsLocating] = useState(false);
     
     const isDelivery = orderType === OrderType.Delivery;
     const isPickup = orderType === OrderType.TakeAway;
@@ -627,35 +616,6 @@ const CheckoutView: React.FC<{
             ...prev,
             address: { ...prev.address, [name]: value }
         }));
-    };
-
-    const handleGetGPS = () => {
-        if (!navigator.geolocation) {
-            alert("La geolocalización no es soportada por tu navegador.");
-            return;
-        }
-
-        setIsLocating(true);
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                setCustomer(prev => ({
-                    ...prev,
-                    address: {
-                        ...prev.address,
-                        latitude: position.coords.latitude,
-                        longitude: position.coords.longitude
-                    }
-                }));
-                setIsLocating(false);
-                alert("Ubicación exacta guardada con éxito.");
-            },
-            (error) => {
-                console.error("GPS error:", error);
-                setIsLocating(false);
-                alert("No se pudo obtener la ubicación. Por favor, asegúrate de dar permisos de GPS.");
-            },
-            { enableHighAccuracy: true }
-        );
     };
 
     const handleTipSelection = (percentage: number) => {
@@ -703,17 +663,6 @@ const CheckoutView: React.FC<{
             {isDelivery && (
                 <div className="space-y-4 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
                     <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Entrega</h3>
-                    
-                    <button
-                        type="button"
-                        onClick={handleGetGPS}
-                        disabled={isLocating}
-                        className={`w-full py-3 mb-2 flex items-center justify-center gap-2 rounded-xl border font-bold transition-all ${customer.address.latitude ? 'bg-emerald-900/30 border-emerald-500 text-emerald-400' : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-750'}`}
-                    >
-                        <IconLocationMarker className={`h-5 w-5 ${isLocating ? 'animate-bounce' : ''}`} />
-                        {isLocating ? 'Capturando GPS...' : customer.address.latitude ? 'Ubicación GPS Guardada' : 'Compartir ubicación exacta (GPS)'}
-                    </button>
-
                     <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-2">
                             <label className={labelClasses}>Calle</label>
@@ -916,8 +865,6 @@ export default function CustomerView() {
 
     const handleProductClick = (product: Product) => setSelectedProduct(product);
     const handleAddToCart = (product: Product, quantity: number, comments?: string, options: PersonalizationOption[] = []) => {
-        // La lógica de addToCart ya maneja el objeto Product completo.
-        // El precio promocional ya viene incluido en el objeto product pasado desde el Modal de detalle.
         addToCart(product, quantity, comments, options);
         setSelectedProduct(null);
     };
@@ -934,15 +881,7 @@ export default function CustomerView() {
         let messageParts = [`🧾 *TICKET DE PEDIDO*`, `📍 *${settings.company.name.toUpperCase()}*`, lineSeparator, `🗓️ Fecha: ${new Date().toLocaleDateString()}`, `⏰ Hora: ${new Date().toLocaleTimeString()}`, lineSeparator];
         if (orderType === OrderType.DineIn) messageParts.push(`🪑 *UBICACIÓN*\nZona: ${tableInfo?.zone}\nMesa: ${tableInfo?.table}\n👤 Cliente: ${customer.name}`, lineSeparator);
         else messageParts.push(`👤 *CLIENTE*\nNombre: ${customer.name}\nTel: ${customer.phone}\n🏷️ Tipo: ${orderType === OrderType.TakeAway ? 'Para llevar' : 'Domicilio'}`, lineSeparator);
-        
-        if (orderType === OrderType.Delivery) {
-            messageParts.push(`📍 *DIRECCIÓN*\n🏠 ${customer.address.calle} #${customer.address.numero}\n🏙️ Col. ${customer.address.colonia}${customer.address.referencias ? `\nRef: ${customer.address.referencias}` : ''}`, lineSeparator);
-            
-            if (customer.address.latitude && customer.address.longitude) {
-                messageParts.push(`🌍 *UBICACIÓN GPS EXACTA*\nhttps://www.google.com/maps?q=${customer.address.latitude},${customer.address.longitude}`, lineSeparator);
-            }
-        }
-        
+        if (orderType === OrderType.Delivery) messageParts.push(`📍 *DIRECCIÓN*\n🏠 ${customer.address.calle} #${customer.address.numero}\n🏙️ Col. ${customer.address.colonia}${customer.address.referencias ? `\nRef: ${customer.address.referencias}` : ''}`, lineSeparator);
         messageParts.push(`🛒 *DETALLE*`, ...itemDetails, ``, generalComments ? `📝 *NOTAS:* ${generalComments}` : '', lineSeparator, `💰 *RESUMEN*\nSubtotal: ${currency} $${cartTotal.toFixed(2)}`, orderType === OrderType.Delivery ? `Envío: ${shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : 'Por cotizar'}` : '', tipAmount > 0 ? `Propina: ${currency} $${tipAmount.toFixed(2)}` : '', `*TOTAL A PAGAR: ${currency} $${finalTotal.toFixed(2)}*`, lineSeparator, `💳 Método: ${paymentMethod}`, paymentProof ? "\n📸 *Comprobante adjunto*" : "", `✅ Estado: PENDIENTE`);
         window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(messageParts.filter(p => p !== '').join('\n'))}`, '_blank');
         setView('confirmation');

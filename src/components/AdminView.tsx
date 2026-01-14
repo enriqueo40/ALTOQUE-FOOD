@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { useTheme } from '../hooks/useTheme';
@@ -67,7 +66,7 @@ const Header: React.FC<{ title: string; onSettingsClick: () => void; onPreviewCl
     <header className="h-20 bg-white dark:bg-gray-800 border-b dark:border-gray-700 flex items-center justify-between px-8 shrink-0">
         <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{title}</h2>
         <div className="flex items-center space-x-6">
-            <a href="#/menu" target="_blank" rel="noopener noreferrer" className="flex items-center space-x-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:white">
+            <a href="#/menu" target="_blank" rel="noopener noreferrer" className="flex items-center space-x-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
                 <span>Menú digital</span>
                 <IconExternalLink className="h-4 w-4" />
             </a>
@@ -319,7 +318,7 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
             );
             setFormData(prev => ({ ...prev, description }));
         } catch (error) {
-            console.error("Error generating description:", error);
+            console.error("Failed to generate description:", error);
             alert("No se pudo generar la descripción.");
         } finally {
             setIsGenerating(false);
@@ -1240,7 +1239,7 @@ const PromotionsView: React.FC = () => {
                                 } else {
                                     statusColor = 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400';
                                     statusText = 'Activa';
-                                    nameColor = 'text-emerald-500 dark:text-emerald-400 font-black'; // Vibrant highlight for active ones
+                                    nameColor = 'text-emerald-600 dark:text-emerald-400 font-black';
                                 }
 
                                 return (
@@ -1396,37 +1395,6 @@ const OrderDetailModal: React.FC<{ order: Order | null, onClose: () => void, onU
                             </select>
                         </div>
                     </div>
-                    
-                    {order.customer.address && order.customer.address.latitude && (
-                        <div className="p-4 bg-emerald-900/10 border border-emerald-500/20 rounded-xl flex items-center justify-between">
-                            <div>
-                                <h3 className="text-xs font-bold text-emerald-600 uppercase mb-1">Localización GPS</h3>
-                                <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Coordenadas exactas disponibles</p>
-                            </div>
-                            <a 
-                                href={`https://www.google.com/maps?q=${order.customer.address.latitude},${order.customer.address.longitude}`} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700 transition-colors shadow-sm"
-                            >
-                                <IconLocationMarker className="h-4 w-4" />
-                                Ver en Google Maps
-                            </a>
-                        </div>
-                    )}
-
-                    <div>
-                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Dirección Informada</h3>
-                        <p className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                            {order.customer.address.calle} #{order.customer.address.numero}, {order.customer.address.colonia}
-                        </p>
-                        {order.customer.address.referencias && (
-                            <p className="text-xs text-gray-500 mt-1 italic italic italic">
-                                "{order.customer.address.referencias}"
-                            </p>
-                        )}
-                    </div>
-
                     <div>
                         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Detalle de productos</h3>
                         <div className="space-y-2">
@@ -1443,7 +1411,7 @@ const OrderDetailModal: React.FC<{ order: Order | null, onClose: () => void, onU
                         <span className="text-2xl font-black text-emerald-600">${order.total.toFixed(2)}</span>
                     </div>
                 </div>
-                <button onClick={onClose} className="mt-8 w-full py-3 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Cerrar</button>
+                <button onClick={onClose} className="mt-8 w-full py-3 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-bold">Cerrar</button>
             </div>
         </div>
     );
