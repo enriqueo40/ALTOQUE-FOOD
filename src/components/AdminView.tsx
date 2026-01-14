@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { useTheme } from '../hooks/useTheme';
@@ -1395,6 +1396,28 @@ const OrderDetailModal: React.FC<{ order: Order | null, onClose: () => void, onU
                             </select>
                         </div>
                     </div>
+                    
+                    {order.customer.address && order.customer.address.latitude && (
+                        <div className="p-4 bg-emerald-900/10 border border-emerald-500/20 rounded-xl">
+                            <h3 className="text-xs font-bold text-emerald-600 uppercase mb-2">Ubicación GPS Detectada</h3>
+                            <a 
+                                href={`https://www.google.com/maps?q=${order.customer.address.latitude},${order.customer.address.longitude}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 font-bold"
+                            >
+                                <IconLocationMarker className="h-5 w-5" />
+                                Abrir en Google Maps
+                            </a>
+                        </div>
+                    )}
+
+                    <div>
+                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Dirección de entrega</h3>
+                        <p className="text-sm">{order.customer.address.calle} #{order.customer.address.numero}, {order.customer.address.colonia}</p>
+                        {order.customer.address.referencias && <p className="text-xs text-gray-500 mt-1 italic">Ref: {order.customer.address.referencias}</p>}
+                    </div>
+
                     <div>
                         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Detalle de productos</h3>
                         <div className="space-y-2">
