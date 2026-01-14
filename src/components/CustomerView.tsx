@@ -123,9 +123,9 @@ const RestaurantHero: React.FC<{
 
     return (
         <div className="relative">
-            <div className="h-48 w-full overflow-hidden relative">
+            <div className="h-48 w-full overflow-hidden relative bg-gray-900">
                 {branch.coverImageUrl ? (
-                    <img src={branch.coverImageUrl} alt="Cover" className="w-full h-full object-cover" />
+                    <img src={branch.coverImageUrl} alt="Cover" loading="eager" className="w-full h-full object-cover" />
                 ) : (
                     <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900" />
                 )}
@@ -136,7 +136,7 @@ const RestaurantHero: React.FC<{
                 <div className="w-28 h-28 bg-gray-800 rounded-full p-1 shadow-2xl mb-3 relative z-10">
                      <div className="w-full h-full rounded-full overflow-hidden bg-black flex items-center justify-center">
                         {branch.logoUrl ? 
-                            <img src={branch.logoUrl} alt={`${company.name} logo`} className="w-full h-full object-cover" />
+                            <img src={branch.logoUrl} alt={`${company.name} logo`} loading="eager" className="w-full h-full object-cover" />
                             :
                             <span className="text-2xl font-bold text-emerald-500">{company.name.substring(0,2).toUpperCase()}</span>
                         }
@@ -193,7 +193,6 @@ const RestaurantHero: React.FC<{
 
 const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price: number, promotion?: Promotion } => {
     const now = new Date();
-    // Filtramos promociones activas basándonos en fechas y si aplican al producto
     const activePromotions = promotions.filter(p => {
         const startDate = p.startDate ? new Date(p.startDate) : null;
         const endDate = p.endDate ? new Date(p.endDate) : null;
@@ -211,7 +210,6 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
 
     if (activePromotions.length === 0) return { price: product.price };
 
-    // Buscamos el mejor descuento disponible
     let bestPrice = product.price;
     let bestPromo: Promotion | undefined;
 
@@ -232,13 +230,13 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
     return { price: bestPrice, promotion: bestPromo };
 };
 
-const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: () => void; currency: string; promotions: Promotion[] }> = ({ product, quantityInCart, onClick, currency, promotions }) => {
+// Memoized Row to prevent re-renders on every scroll or minor state update
+const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: () => void; currency: string; promotions: Promotion[] }> = React.memo(({ product, quantityInCart, onClick, currency, promotions }) => {
     const { price: discountedPrice, promotion } = getDiscountedPrice(product, promotions);
     const hasDiscount = promotion !== undefined;
 
     return (
         <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group relative overflow-hidden">
-            {/* Cinta de Descuento (Ribbon) */}
             {hasDiscount && (
                 <div className="absolute top-0 left-0 bg-rose-600 text-white text-[10px] font-black px-2.5 py-1 rounded-br-lg z-10 shadow-lg flex flex-col items-center">
                     <span>-{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}</span>
@@ -246,7 +244,7 @@ const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: 
                 </div>
             )}
             <div className="relative h-24 w-24 flex-shrink-0">
-                <img src={product.imageUrl} alt={product.name} className="w-full h-full rounded-lg object-cover" />
+                <img src={product.imageUrl} alt={product.name} loading="lazy" className="w-full h-full rounded-lg object-cover bg-gray-700" />
                 {quantityInCart > 0 && (
                     <div className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg ring-2 ring-gray-900">
                         {quantityInCart}
@@ -262,7 +260,6 @@ const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: 
                     <p className="text-sm text-gray-400 line-clamp-2 mt-1 leading-snug">{product.description}</p>
                 </div>
                 <div className="flex justify-between items-end mt-2">
-                    {/* Jerarquía de Precios */}
                     <div className="flex flex-col">
                         {hasDiscount && (
                             <span className="text-[10px] text-gray-500 line-through font-medium opacity-60">{currency} ${product.price.toFixed(2)}</span>
@@ -276,7 +273,36 @@ const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: 
             </div>
         </div>
     );
-};
+});
+
+// Menu Skeleton Loader for perceived performance
+const MenuSkeleton: React.FC = () => (
+    <div className="px-4 space-y-8 animate-pulse mt-4">
+        {[1, 2].map((i) => (
+            <div key={i}>
+                <div className="h-6 w-32 bg-gray-800 rounded mb-4"></div>
+                <div className="grid gap-4">
+                    {[1, 2, 3].map((j) => (
+                        <div key={j} className="bg-gray-800 rounded-xl p-3 flex gap-4 h-28 border border-gray-800">
+                            <div className="h-24 w-24 bg-gray-700 rounded-lg flex-shrink-0"></div>
+                            <div className="flex-1 flex flex-col justify-between py-1">
+                                <div>
+                                    <div className="h-4 w-3/4 bg-gray-700 rounded mb-2"></div>
+                                    <div className="h-3 w-full bg-gray-700 rounded mb-1"></div>
+                                    <div className="h-3 w-1/2 bg-gray-700 rounded"></div>
+                                </div>
+                                <div className="flex justify-between items-end">
+                                    <div className="h-5 w-16 bg-gray-700 rounded"></div>
+                                    <div className="h-8 w-8 bg-gray-700 rounded-full"></div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        ))}
+    </div>
+);
 
 const MenuList: React.FC<{
     products: Product[],
@@ -406,7 +432,6 @@ const ProductDetailModal: React.FC<{
         return (selectedOptions[pid] || []).some(o => o.id === oid);
     };
 
-    // Cálculo dinámico para el botón
     let totalOptionsPrice = 0;
     (Object.values(selectedOptions) as PersonalizationOption[][]).forEach(group => group.forEach(opt => { totalOptionsPrice += Number(opt.price || 0); }));
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
@@ -446,7 +471,6 @@ const ProductDetailModal: React.FC<{
                         )}
                     </div>
                     
-                    {/* Banner de Promoción Activa */}
                     {promotion && (
                         <div className="mb-4 flex items-center gap-2 bg-rose-900/20 border border-rose-500/30 p-2.5 rounded-xl animate-pulse-subtle">
                             <IconTag className="h-4 w-4 text-rose-500" />
@@ -498,7 +522,6 @@ const ProductDetailModal: React.FC<{
                             <button onClick={() => setQuantity(q => q + 1)} className="p-2 rounded-full hover:bg-gray-700 text-white transition-colors"><IconPlus className="h-5 w-5"/></button>
                         </div>
                     </div>
-                    {/* Botón con Cálculo Dinámico */}
                     <button onClick={handleAdd} className="w-full font-black py-4 px-6 rounded-xl transition-all transform active:scale-[0.98] shadow-2xl flex justify-between items-center bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-900/50">
                         <span className="uppercase tracking-tight">Agregar al pedido</span>
                         <span className="text-xl">${totalPrice.toFixed(2)}</span>
@@ -856,7 +879,6 @@ export default function CustomerView() {
 
     useEffect(() => {
         fetchMenuData();
-        // Suscripción Real-time: Si el admin cambia una oferta, se refleja aquí al instante
         subscribeToMenuUpdates(fetchMenuData);
         
         const intervalId = setInterval(fetchMenuData, 30000);
@@ -895,7 +917,8 @@ export default function CustomerView() {
         setView('confirmation');
     };
 
-    if (isLoading || !settings) return <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-gray-300"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500 mb-4"></div><p className="animate-pulse">Sincronizando menú...</p></div>;
+    // Use MenuSkeleton instead of simple spinner
+    if (isLoading || !settings) return <div className="bg-gray-900 min-h-screen pt-20"><div className="w-12 h-12 border-t-2 border-emerald-500 rounded-full animate-spin mx-auto mb-4"></div><p className="text-gray-400 text-center animate-pulse mb-8">Sincronizando menú...</p><MenuSkeleton /></div>;
 
     return (
         <div className="bg-gray-900 min-h-screen font-sans text-gray-100 selection:bg-emerald-500 selection:text-white">

@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { useTheme } from '../hooks/useTheme';
 import { useCart } from '../hooks/useCart';
@@ -119,7 +119,7 @@ const Sidebar: React.FC<{ currentPage: AdminViewPage; setCurrentPage: (page: Adm
         { id: 'tutorials', name: 'Tutoriales', icon: <IconTutorials /> },
     ];
     return (
-        <aside className="w-64 bg-white dark:bg-gray-800 shadow-md flex flex-col">
+        <aside className="w-64 bg-white dark:bg-gray-800 shadow-md flex flex-col shrink-0">
             <div className="h-20 flex items-center justify-center border-b dark:border-gray-700">
                  <div className="flex items-center space-x-2">
                     <h2 className="text-xl font-bold dark:text-gray-100">ALTOQUE FOOD</h2>
@@ -231,12 +231,31 @@ const FilterDropdown: React.FC<{ label: string; options: string[]; icon?: React.
     );
 };
 
-const DashboardStatCard: React.FC<{ title: string; value: string; secondaryValue: string; }> = ({ title, value, secondaryValue }) => (
+// Memoized Stat Card for Performance
+const DashboardStatCard: React.FC<{ title: string; value: string; secondaryValue: string; }> = React.memo(({ title, value, secondaryValue }) => (
     <div className="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
         <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</h4>
         <div className="mt-2">
             <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{value}</p>
             <p className="text-sm text-gray-500 dark:text-gray-400">{secondaryValue}</p>
+        </div>
+    </div>
+));
+
+// Skeleton Loader for Dashboard
+const DashboardSkeleton: React.FC = () => (
+    <div className="space-y-6 animate-pulse">
+        <div className="bg-gray-200 dark:bg-gray-700 h-20 rounded-lg w-full"></div>
+        <div className="flex gap-4">
+            <div className="bg-gray-200 dark:bg-gray-700 h-10 w-32 rounded-md"></div>
+            <div className="bg-gray-200 dark:bg-gray-700 h-10 w-48 rounded-md"></div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[...Array(4)].map((_, i) => (
+                <div key={i} className="bg-gray-200 dark:bg-gray-700 h-32 rounded-lg"></div>
+            ))}
+            <div className="bg-gray-200 dark:bg-gray-700 h-48 rounded-lg lg:col-span-2"></div>
+            <div className="bg-gray-200 dark:bg-gray-700 h-48 rounded-lg lg:col-span-2"></div>
         </div>
     </div>
 );
@@ -262,7 +281,7 @@ const Dashboard: React.FC = () => {
     const totalPropinas = 0; 
 
     if (isLoading) {
-        return <div className="p-10 text-center animate-pulse text-gray-500">Cargando estadísticas...</div>;
+        return <DashboardSkeleton />;
     }
 
     return (
@@ -308,7 +327,8 @@ const Dashboard: React.FC = () => {
     );
 };
 
-const ProductListItem: React.FC<{product: Product, onEdit: () => void, onDuplicate: () => void, onDelete: () => void}> = ({product, onEdit, onDuplicate, onDelete}) => {
+// Memoized Product Item for List
+const ProductListItem: React.FC<{product: Product, onEdit: () => void, onDuplicate: () => void, onDelete: () => void}> = React.memo(({product, onEdit, onDuplicate, onDelete}) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -326,7 +346,7 @@ const ProductListItem: React.FC<{product: Product, onEdit: () => void, onDuplica
         <div className="flex items-center justify-between p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/50">
             <div className="flex items-center gap-x-4">
                 <IconGripVertical className="h-5 w-5 text-gray-400 cursor-grab" />
-                <img src={product.imageUrl} alt={product.name} className="w-12 h-12 rounded-md object-cover"/>
+                <img src={product.imageUrl} alt={product.name} loading="lazy" className="w-12 h-12 rounded-md object-cover bg-gray-200 dark:bg-gray-700"/>
                 <span className="font-medium text-gray-800 dark:text-gray-100">{product.name}</span>
             </div>
             <div className="relative" ref={menuRef}>
@@ -346,7 +366,7 @@ const ProductListItem: React.FC<{product: Product, onEdit: () => void, onDuplica
             </div>
         </div>
     )
-}
+});
 
 const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (product: Omit<Product, 'id' | 'created_at'> & { id?: string }) => void; product: Product | null; categories: Category[] }> = ({ isOpen, onClose, onSave, product, categories }) => {
     const [formData, setFormData] = useState<Partial<Product>>({});
@@ -1407,8 +1427,7 @@ const MenuManagement: React.FC = () => {
 };
 
 
-// --- Order Management Components ---
-
+// --- Order Management ---
 const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onUpdateStatus: (id: string, status: OrderStatus) => void; onUpdatePayment: (id: string, status: PaymentStatus) => void }> = ({ order, onClose, onUpdateStatus, onUpdatePayment }) => {
     const [isClosing, setIsClosing] = useState(false);
 
@@ -1449,8 +1468,6 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
         <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${isClosing ? 'pointer-events-none' : ''}`}>
             <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isClosing ? 'opacity-0' : 'opacity-100'}`} onClick={handleClose}></div>
             <div className={`bg-white dark:bg-gray-800 w-full max-w-2xl rounded-xl shadow-2xl transform transition-all duration-300 flex flex-col max-h-[90vh] ${isClosing ? 'scale-95 opacity-0 translate-y-4' : 'scale-100 opacity-100 translate-y-0'}`}>
-                
-                {/* Header */}
                 <div className="p-6 border-b dark:border-gray-700 flex justify-between items-start bg-gray-50 dark:bg-gray-900/50 rounded-t-xl">
                     <div>
                         <div className="flex items-center gap-2 mb-1">
@@ -1466,7 +1483,6 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                              <a href={`https://wa.me/${order.customer.phone.replace(/\D/g,'')}`} target="_blank" className="hover:underline">{order.customer.phone}</a>
                         </p>
                     </div>
-                    
                      <div className="relative group">
                         <button className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"><IconMoreVertical /></button>
                         <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 shadow-xl rounded-lg border dark:border-gray-700 hidden group-hover:block z-10 overflow-hidden">
@@ -1475,8 +1491,6 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                         </div>
                     </div>
                 </div>
-
-                {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6">
                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                         <div className="md:col-span-2 space-y-4">
@@ -1502,8 +1516,6 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                                      <strong className="block mb-1">📝 Nota general del cliente:</strong> {order.generalComments}
                                  </div>
                              )}
-                             
-                             {/* Payment Proof Section */}
                              {order.paymentProof && (
                                  <div className="mt-4 border dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
                                      <h4 className="font-bold text-gray-900 dark:text-gray-100 mb-2 flex items-center gap-2">
@@ -1518,7 +1530,6 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                                  </div>
                              )}
                         </div>
-                        
                         <div className="space-y-6">
                             <div>
                                 <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2 border-b dark:border-gray-700 pb-2">
@@ -1544,7 +1555,6 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                                     )}
                                 </div>
                             </div>
-
                              <div>
                                 <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2 border-b dark:border-gray-700 pb-2">
                                     <IconPayment className="h-5 w-5 text-gray-400"/> Pago
@@ -1564,13 +1574,10 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                         </div>
                      </div>
                 </div>
-
-                {/* Footer */}
                 <div className="p-4 bg-white dark:bg-gray-800 border-t dark:border-gray-700 flex gap-3 justify-end">
                      <button onClick={handlePrint} className="px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
                          <IconPrinter className="h-5 w-5"/>
                      </button>
-                     
                      {order.status !== OrderStatus.Completed && order.status !== OrderStatus.Cancelled && (
                         <button onClick={handleAdvanceStatus} className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
                             <IconCheck className="h-5 w-5"/>
@@ -1628,7 +1635,7 @@ const TimeAgo: React.FC<{ date: Date; className?: string }> = ({ date, className
             else {
                 const mins = Math.floor(diffInSeconds / 60);
                 setText(`hace ${mins} min`);
-                setIsLate(mins > 15); // Mark as late after 15 mins
+                setIsLate(mins > 15);
             }
         };
         update();
@@ -1639,7 +1646,8 @@ const TimeAgo: React.FC<{ date: Date; className?: string }> = ({ date, className
     return <span className={`${className} ${isLate ? 'text-red-500 font-bold' : 'text-gray-500'}`}>{text}</span>;
 };
 
-const OrderCard: React.FC<{ order: Order; onClick: () => void }> = ({ order, onClick }) => (
+// Memoized Order Card
+const OrderCard: React.FC<{ order: Order; onClick: () => void }> = React.memo(({ order, onClick }) => (
     <div onClick={onClick} className={`group relative bg-white dark:bg-gray-800 rounded-xl shadow-sm border p-4 cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5 ${order.status === OrderStatus.Pending ? 'border-yellow-400 ring-1 ring-yellow-400/20' : 'border-gray-200 dark:border-gray-700'}`}>
         <div className="flex justify-between items-start mb-3">
             <div className="flex items-center gap-2">
@@ -1656,7 +1664,6 @@ const OrderCard: React.FC<{ order: Order; onClick: () => void }> = ({ order, onC
                 <TimeAgo date={order.createdAt} className="text-xs block"/>
             </div>
         </div>
-        
         <div className="space-y-1 mb-4">
             {order.items.slice(0, 3).map((item, i) => (
                 <div key={i} className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
@@ -1665,7 +1672,6 @@ const OrderCard: React.FC<{ order: Order; onClick: () => void }> = ({ order, onC
             ))}
             {order.items.length > 3 && <p className="text-xs text-gray-400 italic">+ {order.items.length - 3} más...</p>}
         </div>
-
         <div className="flex justify-between items-center pt-3 border-t dark:border-gray-700">
              <span className={`text-xs font-semibold px-2 py-0.5 rounded ${order.paymentStatus === 'paid' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}`}>
                  {order.paymentStatus === 'paid' ? 'PAGADO' : 'PENDIENTE'}
@@ -1675,7 +1681,7 @@ const OrderCard: React.FC<{ order: Order; onClick: () => void }> = ({ order, onC
              </button>
         </div>
     </div>
-);
+));
 
 const OrdersKanbanBoard: React.FC<{ orders: Order[], onOrderClick: (order: Order) => void }> = ({ orders, onOrderClick }) => {
     const columns = [
@@ -1781,7 +1787,6 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
     const [customerName, setCustomerName] = useState('');
     const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('pending');
     
-    // Cart logic
     const { cartItems, addToCart, removeFromCart, updateQuantity, cartTotal, clearCart } = useCart();
 
     useEffect(() => {
@@ -1823,8 +1828,8 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
             },
             items: cartItems,
             total: cartTotal,
-            status: OrderStatus.Confirmed, // Manual orders start as Confirmed
-            branchId: 'main-branch', // Default
+            status: OrderStatus.Confirmed,
+            branchId: 'main-branch', 
             orderType: orderType,
             tableId: orderType === OrderType.DineIn ? selectedTable : undefined,
             paymentStatus: paymentStatus
@@ -1843,138 +1848,66 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
     return (
          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white dark:bg-gray-900 w-full max-w-6xl h-[90vh] rounded-2xl shadow-2xl flex overflow-hidden border dark:border-gray-700">
-                
-                {/* Left: Product Selection */}
                 <div className="w-3/5 flex flex-col border-r dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                     <div className="p-4 border-b dark:border-gray-700 bg-white dark:bg-gray-800 flex gap-3">
                          <div className="relative flex-1">
                             <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5"/>
-                            <input 
-                                type="text" 
-                                placeholder="Buscar producto..." 
-                                value={searchTerm}
-                                onChange={e => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2.5 rounded-lg border dark:border-gray-600 bg-gray-100 dark:bg-gray-700 focus:ring-2 focus:ring-emerald-500 outline-none"
-                            />
+                            <input type="text" placeholder="Buscar producto..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-lg border dark:border-gray-600 bg-gray-100 dark:bg-gray-700 focus:ring-2 focus:ring-emerald-500 outline-none"/>
                          </div>
                     </div>
-                    
-                    {/* Categories */}
                     <div className="flex gap-2 overflow-x-auto p-2 border-b dark:border-gray-700 bg-white dark:bg-gray-800">
-                        <button 
-                            onClick={() => setActiveCategory('all')}
-                            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${activeCategory === 'all' ? 'bg-emerald-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
-                        >
-                            Todo
-                        </button>
+                        <button onClick={() => setActiveCategory('all')} className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${activeCategory === 'all' ? 'bg-emerald-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}>Todo</button>
                         {categories.map(cat => (
-                            <button 
-                                key={cat.id}
-                                onClick={() => setActiveCategory(cat.id)}
-                                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${activeCategory === cat.id ? 'bg-emerald-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
-                            >
-                                {cat.name}
-                            </button>
+                            <button key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${activeCategory === cat.id ? 'bg-emerald-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}>{cat.name}</button>
                         ))}
                     </div>
-
-                    {/* Grid */}
                     <div className="flex-1 overflow-y-auto p-4">
                         <div className="grid grid-cols-3 gap-4">
                             {filteredProducts.map(product => (
-                                <div 
-                                    key={product.id} 
-                                    onClick={() => addToCart(product, 1)}
-                                    className="bg-white dark:bg-gray-800 p-3 rounded-xl border dark:border-gray-700 cursor-pointer hover:border-emerald-500 hover:shadow-md transition-all group"
-                                >
+                                <div key={product.id} onClick={() => addToCart(product, 1)} className="bg-white dark:bg-gray-800 p-3 rounded-xl border dark:border-gray-700 cursor-pointer hover:border-emerald-500 hover:shadow-md transition-all group">
                                     <div className="h-28 w-full bg-gray-200 dark:bg-gray-700 rounded-lg mb-3 overflow-hidden">
-                                        <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
+                                        <img src={product.imageUrl} alt={product.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
                                     </div>
                                     <h4 className="font-bold text-gray-800 dark:text-gray-100 text-sm line-clamp-2 leading-tight min-h-[2.5em]">{product.name}</h4>
                                     <div className="flex justify-between items-center mt-2">
                                         <span className="font-bold text-emerald-600 text-sm">${product.price.toFixed(2)}</span>
-                                        <div className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 p-1 rounded-md">
-                                            <IconPlus className="h-4 w-4"/>
-                                        </div>
+                                        <div className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 p-1 rounded-md"><IconPlus className="h-4 w-4"/></div>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     </div>
                 </div>
-
-                {/* Right: Order Details */}
                 <div className="w-2/5 flex flex-col bg-white dark:bg-gray-900 h-full relative">
                     <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800">
                         <h3 className="font-bold text-lg">Nuevo Pedido</h3>
                         <button onClick={onClose} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full"><IconX/></button>
                     </div>
-
                     <div className="p-4 space-y-4 border-b dark:border-gray-700">
-                        {/* Customer */}
                         <div>
                             <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Cliente</label>
-                            <input 
-                                type="text" 
-                                placeholder="Nombre del cliente" 
-                                value={customerName}
-                                onChange={e => setCustomerName(e.target.value)}
-                                className="w-full p-2 border dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none"
-                            />
+                            <input type="text" placeholder="Nombre del cliente" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full p-2 border dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none"/>
                         </div>
-
-                        {/* Type */}
                         <div className="grid grid-cols-2 gap-3">
-                            <button 
-                                onClick={() => setOrderType(OrderType.TakeAway)}
-                                className={`p-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-2 ${orderType === OrderType.TakeAway ? 'bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'dark:border-gray-700'}`}
-                            >
-                                <IconStore className="h-4 w-4"/> Para Llevar
-                            </button>
-                            <button 
-                                onClick={() => setOrderType(OrderType.DineIn)}
-                                className={`p-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-2 ${orderType === OrderType.DineIn ? 'bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'dark:border-gray-700'}`}
-                            >
-                                <IconTableLayout className="h-4 w-4"/> Comer Aquí
-                            </button>
+                            <button onClick={() => setOrderType(OrderType.TakeAway)} className={`p-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-2 ${orderType === OrderType.TakeAway ? 'bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'dark:border-gray-700'}`}><IconStore className="h-4 w-4"/> Para Llevar</button>
+                            <button onClick={() => setOrderType(OrderType.DineIn)} className={`p-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-2 ${orderType === OrderType.DineIn ? 'bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'dark:border-gray-700'}`}><IconTableLayout className="h-4 w-4"/> Comer Aquí</button>
                         </div>
-
                         {orderType === OrderType.DineIn && (
-                            <select 
-                                value={selectedTable}
-                                onChange={e => setSelectedTable(e.target.value)}
-                                className="w-full p-2 border dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-800 outline-none text-sm"
-                            >
+                            <select value={selectedTable} onChange={e => setSelectedTable(e.target.value)} className="w-full p-2 border dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-800 outline-none text-sm">
                                 <option value="">Seleccionar Mesa...</option>
-                                {zones.map(z => (
-                                    <optgroup key={z.id} label={z.name}>
-                                        {z.tables.map(t => (
-                                            <option key={t.id} value={`${z.name} - ${t.name}`}>Mesa {t.name}</option>
-                                        ))}
-                                    </optgroup>
-                                ))}
+                                {zones.map(z => (<optgroup key={z.id} label={z.name}>{z.tables.map(t => (<option key={t.id} value={`${z.name} - ${t.name}`}>Mesa {t.name}</option>))}</optgroup>))}
                             </select>
                         )}
                     </div>
-
-                    {/* Cart Items */}
                     <div className="flex-1 overflow-y-auto p-4 space-y-3">
                         {cartItems.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-2">
-                                <IconReceipt className="h-12 w-12 opacity-50"/>
-                                <p>Carrito vacío</p>
-                            </div>
+                            <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-2"><IconReceipt className="h-12 w-12 opacity-50"/><p>Carrito vacío</p></div>
                         ) : (
                             cartItems.map(item => (
                                 <div key={item.cartItemId} className="flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 p-2 rounded-lg border dark:border-gray-700">
                                     <div className="flex items-center gap-3">
-                                        <div className="bg-white dark:bg-gray-700 h-10 w-10 rounded-md flex items-center justify-center text-sm font-bold border dark:border-gray-600">
-                                            {item.quantity}x
-                                        </div>
-                                        <div className="flex-1">
-                                            <p className="font-bold text-sm line-clamp-1">{item.name}</p>
-                                            <p className="text-xs text-gray-500">${item.price.toFixed(2)}</p>
-                                        </div>
+                                        <div className="bg-white dark:bg-gray-700 h-10 w-10 rounded-md flex items-center justify-center text-sm font-bold border dark:border-gray-600">{item.quantity}x</div>
+                                        <div className="flex-1"><p className="font-bold text-sm line-clamp-1">{item.name}</p><p className="text-xs text-gray-500">${item.price.toFixed(2)}</p></div>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <p className="font-bold text-sm">${(item.price * item.quantity).toFixed(2)}</p>
@@ -1987,31 +1920,15 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
                             ))
                         )}
                     </div>
-
-                    {/* Footer / Checkout */}
                     <div className="p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-                        <div className="flex justify-between mb-4">
-                            <span className="text-gray-500">Subtotal</span>
-                            <span className="font-bold text-lg">${cartTotal.toFixed(2)}</span>
-                        </div>
-
+                        <div className="flex justify-between mb-4"><span className="text-gray-500">Subtotal</span><span className="font-bold text-lg">${cartTotal.toFixed(2)}</span></div>
                         <div className="flex items-center justify-between mb-4 p-3 bg-white dark:bg-gray-700 rounded-lg border dark:border-gray-600">
                             <span className="text-sm font-medium">Estado del pago:</span>
-                            <button 
-                                onClick={() => setPaymentStatus(s => s === 'paid' ? 'pending' : 'paid')}
-                                className={`px-3 py-1 rounded-full text-xs font-bold uppercase transition-colors ${paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}
-                            >
-                                {paymentStatus === 'paid' ? 'Pagado' : 'Pendiente'}
-                            </button>
+                            <button onClick={() => setPaymentStatus(s => s === 'paid' ? 'pending' : 'paid')} className={`px-3 py-1 rounded-full text-xs font-bold uppercase transition-colors ${paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{paymentStatus === 'paid' ? 'Pagado' : 'Pendiente'}</button>
                         </div>
-
                         <div className="grid grid-cols-2 gap-3">
-                            <button onClick={() => {clearCart(); onClose();}} className="px-4 py-3 border dark:border-gray-600 rounded-xl font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">
-                                Cancelar
-                            </button>
-                            <button onClick={handleCreateOrder} className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-lg shadow-emerald-900/20">
-                                Confirmar (${cartTotal.toFixed(2)})
-                            </button>
+                            <button onClick={() => {clearCart(); onClose();}} className="px-4 py-3 border dark:border-gray-600 rounded-xl font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">Cancelar</button>
+                            <button onClick={handleCreateOrder} className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-lg shadow-emerald-900/20">Confirmar (${cartTotal.toFixed(2)})</button>
                         </div>
                     </div>
                 </div>
@@ -2028,94 +1945,49 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
     const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
     const [storeOpen, setStoreOpen] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
-    
     const [zones, setZones] = useState<Zone[]>([]);
     const [activeZoneId, setActiveZoneId] = useState<string>('');
 
     useEffect(() => {
         const load = async () => {
-            const [activeOrders, fetchedZones] = await Promise.all([
-                getActiveOrders(),
-                getZones()
-            ]);
-            
+            const [activeOrders, fetchedZones] = await Promise.all([getActiveOrders(), getZones()]);
             setOrders(activeOrders);
             setZones(fetchedZones);
-            if(fetchedZones.length > 0) {
-                setActiveZoneId(fetchedZones[0].id);
-            }
+            if(fetchedZones.length > 0) setActiveZoneId(fetchedZones[0].id);
             setIsLoading(false);
         };
         load();
-
-        const unsubscribe = subscribeToNewOrders(
-            (newOrder) => {
-                setOrders(prev => [newOrder, ...prev]);
-            },
-            (updatedOrder) => {
-                 setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
-            }
-        );
-
-        return () => {
-            unsubscribe();
-        };
+        const unsubscribe = subscribeToNewOrders((newOrder) => setOrders(prev => [newOrder, ...prev]), (updatedOrder) => setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o)));
+        return () => { unsubscribe(); };
     }, []);
 
     const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
-        try {
-            await updateOrder(orderId, { status: newStatus });
-        } catch (e: any) {
-            console.error(e);
-            const errorMsg = e instanceof Error ? e.message : JSON.stringify(e);
-            alert(`Error updating order status: ${errorMsg}`);
-        }
+        try { await updateOrder(orderId, { status: newStatus }); } catch (e: any) { console.error(e); alert(`Error updating order status.`); }
     };
     
     const updatePaymentStatus = async (orderId: string, newStatus: PaymentStatus) => {
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, paymentStatus: newStatus } : o));
-        try {
-             await updateOrder(orderId, { paymentStatus: newStatus });
-        } catch (e: any) {
-            console.error(e);
-             const errorMsg = e instanceof Error ? e.message : JSON.stringify(e);
-             alert(`Error updating payment status: ${errorMsg}`);
-        }
+        try { await updateOrder(orderId, { paymentStatus: newStatus }); } catch (e: any) { console.error(e); alert(`Error updating payment status.`); }
     }
     
     const activeZone = useMemo(() => zones.find(z => z.id === activeZoneId), [zones, activeZoneId]);
-    
     const getTableStatus = (zoneName: string, tableName: string) => {
         const tableIdentifier = `${zoneName} - ${tableName}`;
-        const activeOrder = orders.find(o => 
-            o.tableId === tableIdentifier && 
-            o.status !== OrderStatus.Completed && 
-            o.status !== OrderStatus.Cancelled
-        );
+        const activeOrder = orders.find(o => o.tableId === tableIdentifier && o.status !== OrderStatus.Completed && o.status !== OrderStatus.Cancelled);
         return activeOrder ? { status: 'occupied', order: activeOrder } : { status: 'free', order: null };
     };
     
     const tableStats = useMemo(() => {
          const activeTables = orders.filter(o => o.tableId && o.status !== OrderStatus.Completed && o.status !== OrderStatus.Cancelled).length;
          const requestingBill = orders.filter(o => o.tableId && o.status === OrderStatus.Ready && o.paymentStatus === 'pending').length;
-         return {
-             requestingBill: requestingBill,
-             requestingWaiter: 0, 
-             pendingOrders: orders.filter(o => o.tableId && o.status === OrderStatus.Pending).length,
-             activeTables: activeTables
-         }
+         return { requestingBill, requestingWaiter: 0, pendingOrders: orders.filter(o => o.tableId && o.status === OrderStatus.Pending).length, activeTables }
     }, [orders]);
 
-    const tabs = [
-        { id: 'panel-pedidos', title: 'Panel de pedidos' },
-        { id: 'panel-mesas', title: 'Panel de mesas' },
-        { id: 'comandas-digitales', title: 'Comandas digitales' },
-    ];
+    const tabs = [{ id: 'panel-pedidos', title: 'Panel de pedidos' }, { id: 'panel-mesas', title: 'Panel de mesas' }, { id: 'comandas-digitales', title: 'Comandas digitales' }];
     
     const renderContent = () => {
         if (isLoading) return <div className="p-10 text-center text-gray-500 animate-pulse">Cargando tablero de control...</div>;
-
         switch (activeTab) {
             case 'panel-pedidos':
                 return (
@@ -2125,181 +1997,46 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                                 <button onClick={() => setViewMode('board')} className={`p-2 rounded-md transition-all ${viewMode === 'board' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`} title="Vista Tablero"><IconTableLayout className="h-5 w-5"/></button>
                                 <button onClick={() => setViewMode('list')} className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`} title="Vista Lista"><IconMenu className="h-5 w-5"/></button>
                             </div>
-                            
                             <div className="flex items-center gap-3">
                                 <div className="relative group">
-                                     <button className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors shadow-sm ${storeOpen ? 'border-green-900/30 bg-green-900/20 text-green-400' : 'border-red-900/30 bg-red-900/20 text-red-400'}`}>
-                                        <div className={`w-2 h-2 rounded-full ${storeOpen ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                                        {storeOpen ? 'Tienda Abierta' : 'Tienda Cerrada'}
-                                        <IconChevronDown className="h-4 w-4 opacity-50 ml-2"/>
-                                    </button>
-                                    <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 shadow-lg rounded-lg border dark:border-gray-700 hidden group-hover:block z-10 p-1">
-                                        <button onClick={() => setStoreOpen(o => !o)} className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 rounded flex items-center gap-2 text-gray-300">
-                                             <IconToggleOff className="h-4 w-4"/> {storeOpen ? 'Cerrar Tienda' : 'Abrir Tienda'}
-                                        </button>
-                                    </div>
+                                     <button className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors shadow-sm ${storeOpen ? 'border-green-900/30 bg-green-900/20 text-green-400' : 'border-red-900/30 bg-red-900/20 text-red-400'}`}><div className={`w-2 h-2 rounded-full ${storeOpen ? 'bg-green-500' : 'bg-red-500'}`}></div>{storeOpen ? 'Tienda Abierta' : 'Tienda Cerrada'}<IconChevronDown className="h-4 w-4 opacity-50 ml-2"/></button>
+                                    <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 shadow-lg rounded-lg border dark:border-gray-700 hidden group-hover:block z-10 p-1"><button onClick={() => setStoreOpen(o => !o)} className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 rounded flex items-center gap-2 text-gray-300"><IconToggleOff className="h-4 w-4"/> {storeOpen ? 'Cerrar Tienda' : 'Abrir Tienda'}</button></div>
                                 </div>
-
-                                <button onClick={() => setIsNewOrderModalOpen(true)} className="bg-white text-gray-900 hover:bg-gray-100 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow transition-all">
-                                    <IconPlus className="h-4 w-4 text-gray-900" /> Pedido Manual
-                                </button>
+                                <button onClick={() => setIsNewOrderModalOpen(true)} className="bg-white text-gray-900 hover:bg-gray-100 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow transition-all"><IconPlus className="h-4 w-4 text-gray-900" /> Pedido Manual</button>
                             </div>
                          </div>
-                        
-                        {orders.length === 0 ? (
-                             <EmptyOrdersView onNewOrderClick={() => setIsNewOrderModalOpen(true)} />
-                        ) : (
-                            viewMode === 'board' ? (
-                                <OrdersKanbanBoard orders={orders} onOrderClick={setSelectedOrder} />
-                            ) : (
-                                <div className="flex-1 overflow-auto rounded-lg border dark:border-gray-700">
-                                    <OrderListView orders={orders} onOrderClick={setSelectedOrder} />
-                                </div>
-                            )
-                        )}
+                        {orders.length === 0 ? (<EmptyOrdersView onNewOrderClick={() => setIsNewOrderModalOpen(true)} />) : (viewMode === 'board' ? (<OrdersKanbanBoard orders={orders} onOrderClick={setSelectedOrder} />) : (<div className="flex-1 overflow-auto rounded-lg border dark:border-gray-700"><OrderListView orders={orders} onOrderClick={setSelectedOrder} /></div>))}
                     </div>
                 );
              case 'panel-mesas':
                 return (
                     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900 p-4">
-                        <div className="flex justify-end gap-3 mb-4">
-                            <button className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
-                                Ver uso de suscripción
-                            </button>
-                            <button className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
-                                Ver historial <IconClock className="h-4 w-4 text-gray-400"/>
-                            </button>
-                        </div>
-
+                        <div className="flex justify-end gap-3 mb-4"><button className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Ver uso de suscripción</button><button className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">Ver historial <IconClock className="h-4 w-4 text-gray-400"/></button></div>
                         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 mb-6 flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-gray-200 dark:divide-gray-700">
-                            <div className="p-4 flex items-center justify-center md:justify-start md:w-48">
-                                <button className="flex items-center gap-2 text-gray-700 dark:text-gray-200 font-medium px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                                    <IconCalendar className="h-5 w-5 text-gray-500"/>
-                                    Hoy
-                                </button>
-                            </div>
+                            <div className="p-4 flex items-center justify-center md:justify-start md:w-48"><button className="flex items-center gap-2 text-gray-700 dark:text-gray-200 font-medium px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"><IconCalendar className="h-5 w-5 text-gray-500"/>Hoy</button></div>
                             <div className="flex-1 grid grid-cols-2 md:grid-cols-4 divide-x divide-gray-200 dark:divide-gray-700">
-                                <div className="p-4 text-center">
-                                    <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{tableStats.requestingBill}</p>
-                                    <p className="text-xs text-gray-500 uppercase tracking-wide mt-1">mesas solicitando cuenta</p>
-                                </div>
-                                <div className="p-4 text-center">
-                                    <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{tableStats.requestingWaiter}</p>
-                                    <p className="text-xs text-gray-500 uppercase tracking-wide mt-1">mesas solicitando mesero</p>
-                                </div>
-                                <div className="p-4 text-center">
-                                    <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{tableStats.pendingOrders}</p>
-                                    <p className="text-xs text-gray-500 uppercase tracking-wide mt-1">mesas con comandas pendientes</p>
-                                </div>
-                                <div className="p-4 text-center">
-                                    <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{tableStats.activeTables}</p>
-                                    <p className="text-xs text-gray-500 uppercase tracking-wide mt-1">mesas activas</p>
-                                </div>
+                                <div className="p-4 text-center"><p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{tableStats.requestingBill}</p><p className="text-xs text-gray-500 uppercase tracking-wide mt-1">mesas solicitando cuenta</p></div>
+                                <div className="p-4 text-center"><p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{tableStats.requestingWaiter}</p><p className="text-xs text-gray-500 uppercase tracking-wide mt-1">mesas solicitando mesero</p></div>
+                                <div className="p-4 text-center"><p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{tableStats.pendingOrders}</p><p className="text-xs text-gray-500 uppercase tracking-wide mt-1">mesas con comandas pendientes</p></div>
+                                <div className="p-4 text-center"><p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{tableStats.activeTables}</p><p className="text-xs text-gray-500 uppercase tracking-wide mt-1">mesas activas</p></div>
                             </div>
                         </div>
-
-                        <div className="mb-6">
-                            <div className="flex gap-2 overflow-x-auto pb-2">
-                                {zones.map(zone => (
-                                    <button
-                                        key={zone.id}
-                                        onClick={() => setActiveZoneId(zone.id)}
-                                        className={`px-6 py-2 rounded-lg border font-medium text-sm transition-all whitespace-nowrap ${
-                                            activeZoneId === zone.id
-                                            ? 'border-green-500 text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-400'
-                                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
-                                        }`}
-                                    >
-                                        {zone.name}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
+                        <div className="mb-6"><div className="flex gap-2 overflow-x-auto pb-2">{zones.map(zone => (<button key={zone.id} onClick={() => setActiveZoneId(zone.id)} className={`px-6 py-2 rounded-lg border font-medium text-sm transition-all whitespace-nowrap ${activeZoneId === zone.id ? 'border-green-500 text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-400' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'}`}>{zone.name}</button>))}</div></div>
                         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex-1 p-8 overflow-auto relative min-h-[400px]">
-                            {activeZone ? (
-                                <div 
-                                    className="grid gap-6"
-                                    style={{
-                                        gridTemplateColumns: `repeat(${activeZone.cols}, minmax(80px, 1fr))`,
-                                        gridTemplateRows: `repeat(${activeZone.rows}, minmax(80px, 1fr))`
-                                    }}
-                                >
+                            {activeZone ? (<div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${activeZone.cols}, minmax(80px, 1fr))`, gridTemplateRows: `repeat(${activeZone.rows}, minmax(80px, 1fr))` }}>
                                     {activeZone.tables.map(table => {
                                         const { status, order } = getTableStatus(activeZone.name, table.name);
                                         const isOccupied = status === 'occupied';
-                                        
-                                        return (
-                                            <div
-                                                key={table.id}
-                                                onClick={() => isOccupied && order ? setSelectedOrder(order) : null}
-                                                style={{
-                                                    gridRow: `${table.row} / span ${table.height}`,
-                                                    gridColumn: `${table.col} / span ${table.width}`,
-                                                }}
-                                                className={`
-                                                    relative rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer border-2
-                                                    ${table.shape === 'round' ? 'rounded-full aspect-square' : 'rounded-xl'}
-                                                    ${isOccupied 
-                                                        ? 'bg-red-50 border-red-400 dark:bg-red-900/20 dark:border-red-500/50 shadow-md' 
-                                                        : 'bg-gray-50 border-gray-200 dark:bg-gray-700/50 dark:border-gray-600 hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'
-                                                    }
-                                                `}
-                                            >
-                                                <span className={`text-2xl font-bold ${isOccupied ? 'text-red-500 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`}>
-                                                    {table.name}
-                                                </span>
-                                                
-                                                {isOccupied && order && (
-                                                    <div className="absolute -top-2 -right-2">
-                                                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold shadow-sm">
-                                                            {order.items.reduce((acc, i) => acc + i.quantity, 0)}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                                
-                                                {isOccupied && (
-                                                    <div className="mt-1 px-2 py-0.5 bg-white dark:bg-gray-800 rounded text-[10px] font-medium text-gray-600 dark:text-gray-300 shadow-sm border border-gray-100 dark:border-gray-700 truncate max-w-[90%]">
-                                                        Ocupada
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
+                                        return (<div key={table.id} onClick={() => isOccupied && order ? setSelectedOrder(order) : null} style={{ gridRow: `${table.row} / span ${table.height}`, gridColumn: `${table.col} / span ${table.width}`, }} className={`relative rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer border-2 ${table.shape === 'round' ? 'rounded-full aspect-square' : 'rounded-xl'} ${isOccupied ? 'bg-red-50 border-red-400 dark:bg-red-900/20 dark:border-red-500/50 shadow-md' : 'bg-gray-50 border-gray-200 dark:bg-gray-700/50 dark:border-gray-600 hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'}`}><span className={`text-2xl font-bold ${isOccupied ? 'text-red-500 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`}>{table.name}</span>{isOccupied && order && (<div className="absolute -top-2 -right-2"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold shadow-sm">{order.items.reduce((acc, i) => acc + i.quantity, 0)}</span></div>)}{isOccupied && (<div className="mt-1 px-2 py-0.5 bg-white dark:bg-gray-800 rounded text-[10px] font-medium text-gray-600 dark:text-gray-300 shadow-sm border border-gray-100 dark:border-gray-700 truncate max-w-[90%]">Ocupada</div>)}</div>);
                                     })}
-                                    
-                                    {Array.from({ length: activeZone.rows * activeZone.cols }).map((_, index) => {
-                                        const row = Math.floor(index / activeZone.cols) + 1;
-                                        const col = (index % activeZone.cols) + 1;
-                                        const isOccupied = activeZone.tables.some(t => 
-                                            row >= t.row && row < t.row + t.height &&
-                                            col >= t.col && col < t.col + t.width
-                                        );
-                                        if (isOccupied) return null;
-                                        return (
-                                            <div key={`dot-${row}-${col}`} style={{ gridRow: row, gridColumn: col }} className="flex items-center justify-center pointer-events-none">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700"></div>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                            ) : (
-                                <div className="flex items-center justify-center h-full text-gray-400">
-                                    Selecciona una zona para ver las mesas
-                                </div>
-                            )}
-                            <div className="absolute bottom-4 right-4">
-                                <div className="bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2 cursor-pointer hover:bg-gray-800">
-                                    Estás en tu periodo de prueba
-                                    <IconChevronUp className="h-4 w-4 text-gray-400"/>
-                                </div>
-                            </div>
+                                    {Array.from({ length: activeZone.rows * activeZone.cols }).map((_, index) => { const row = Math.floor(index / activeZone.cols) + 1; const col = (index % activeZone.cols) + 1; const isOccupied = activeZone.tables.some(t => row >= t.row && row < t.row + t.height && col >= t.col && col < t.col + t.width); if (isOccupied) return null; return (<div key={`dot-${row}-${col}`} style={{ gridRow: row, gridColumn: col }} className="flex items-center justify-center pointer-events-none"><div className="w-1.5 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700"></div></div>) })}
+                                </div>) : (<div className="flex items-center justify-center h-full text-gray-400">Selecciona una zona para ver las mesas</div>)}
+                            <div className="absolute bottom-4 right-4"><div className="bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2 cursor-pointer hover:bg-gray-800">Estás en tu periodo de prueba<IconChevronUp className="h-4 w-4 text-gray-400"/></div></div>
                         </div>
                     </div>
                 );
-            case 'comandas-digitales':
-                 return <div className="text-center p-10 text-gray-500 bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700">Comandas digitales (próximamente)</div>;
-            default:
-                return null;
+            case 'comandas-digitales': return <div className="text-center p-10 text-gray-500 bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700">Comandas digitales (próximamente)</div>;
+            default: return null;
         }
     };
     
@@ -2307,9 +2044,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
         <div className="h-full flex flex-col">
             <div className="border-b border-gray-200 dark:border-gray-700 shrink-0">
                 <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-                    {tabs.map(tab => (
-                        <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`${activeTab === tab.id ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm focus:outline-none`}>{tab.title}</button>
-                    ))}
+                    {tabs.map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`${activeTab === tab.id ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm focus:outline-none`}>{tab.title}</button>))}
                 </nav>
             </div>
              <div className="mt-6 flex-1">{renderContent()}</div>
@@ -2319,12 +2054,17 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
     );
 };
 
-// --- Analytics Components ---
+// --- Missing Component Definitions ---
+
 const Analytics: React.FC = () => {
-    const [orders] = usePersistentState<Order[]>('orders', []); 
     const [query, setQuery] = useState('');
     const [insights, setInsights] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [orders, setOrders] = useState<Order[]>([]);
+
+    useEffect(() => {
+        getActiveOrders().then(setOrders);
+    }, []);
 
     const handleGetInsights = async () => {
         if (!query) return;
@@ -2338,21 +2078,8 @@ const Analytics: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
             <h2 className="text-xl font-bold mb-4">Analítica con IA</h2>
             <div className="flex space-x-2">
-                <input
-                    type="text"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Ej: ¿Cuáles son los productos más populares los fines de semana?"
-                    className="flex-1 px-4 py-2 border dark:border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-transparent dark:text-white"
-                />
-                <button 
-                    onClick={handleGetInsights} 
-                    disabled={isLoading}
-                    className="bg-indigo-600 text-white px-6 py-2 rounded-lg flex items-center space-x-2 hover:bg-indigo-700 disabled:bg-indigo-300"
-                >
-                    <IconSparkles />
-                    <span>{isLoading ? 'Analizando...' : 'Obtener Insights'}</span>
-                </button>
+                <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ej: ¿Cuáles son los productos más populares los fines de semana?" className="flex-1 px-4 py-2 border dark:border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-transparent dark:text-white" />
+                <button onClick={handleGetInsights} disabled={isLoading} className="bg-indigo-600 text-white px-6 py-2 rounded-lg flex items-center space-x-2 hover:bg-indigo-700 disabled:bg-indigo-300"><IconSparkles /><span>{isLoading ? 'Analizando...' : 'Obtener Insights'}</span></button>
             </div>
             {isLoading && <div className="mt-6 text-center">Cargando...</div>}
             {insights && (
@@ -2364,8 +2091,6 @@ const Analytics: React.FC = () => {
     );
 };
 
-
-// --- Messages Components ---
 const Messages: React.FC = () => {
     const [conversations, setConversations] = usePersistentState<Conversation[]>('conversations', MOCK_CONVERSATIONS);
     const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(conversations[0] || null);
@@ -2373,21 +2098,8 @@ const Messages: React.FC = () => {
 
     const handleSendMessage = () => {
         if (!newMessage.trim() || !selectedConversation) return;
-
-        const message: AdminChatMessage = {
-            id: `msg-${Date.now()}`,
-            sender: 'admin',
-            text: newMessage.trim(),
-            timestamp: new Date()
-        };
-        
-        const updatedConversation: Conversation = {
-            ...selectedConversation,
-            messages: [...selectedConversation.messages, message],
-            lastMessage: message.text,
-            lastMessageTimestamp: message.timestamp
-        };
-        
+        const message: AdminChatMessage = { id: `msg-${Date.now()}`, sender: 'admin', text: newMessage.trim(), timestamp: new Date() };
+        const updatedConversation: Conversation = { ...selectedConversation, messages: [...selectedConversation.messages, message], lastMessage: message.text, lastMessageTimestamp: message.timestamp };
         setConversations(prev => prev.map(c => c.id === updatedConversation.id ? updatedConversation : c));
         setSelectedConversation(updatedConversation);
         setNewMessage('');
@@ -2396,59 +2108,17 @@ const Messages: React.FC = () => {
     return (
         <div className="flex h-[calc(100vh-160px)] bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
             <div className="w-1/3 border-r dark:border-gray-700">
-                <div className="p-4 border-b dark:border-gray-700">
-                    <h2 className="text-xl font-bold">Conversaciones</h2>
-                </div>
-                <div className="overflow-y-auto h-full">
-                    {conversations.map(conv => (
-                        <div
-                            key={conv.id}
-                            onClick={() => setSelectedConversation(conv)}
-                            className={`p-4 cursor-pointer border-l-4 ${selectedConversation?.id === conv.id ? 'border-indigo-500 bg-gray-50 dark:bg-gray-700/50' : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
-                        >
-                            <div className="flex justify-between">
-                                <p className="font-semibold">{conv.customerName}</p>
-                                {conv.unreadCount > 0 && <span className="bg-indigo-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">{conv.unreadCount}</span>}
-                            </div>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 truncate">{conv.lastMessage}</p>
-                        </div>
-                    ))}
-                </div>
+                <div className="p-4 border-b dark:border-gray-700"><h2 className="text-xl font-bold">Conversaciones</h2></div>
+                <div className="overflow-y-auto h-full">{conversations.map(conv => (<div key={conv.id} onClick={() => setSelectedConversation(conv)} className={`p-4 cursor-pointer border-l-4 ${selectedConversation?.id === conv.id ? 'border-indigo-500 bg-gray-50 dark:bg-gray-700/50' : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}><div className="flex justify-between"><p className="font-semibold">{conv.customerName}</p>{conv.unreadCount > 0 && <span className="bg-indigo-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">{conv.unreadCount}</span>}</div><p className="text-sm text-gray-600 dark:text-gray-400 truncate">{conv.lastMessage}</p></div>))}</div>
             </div>
             <div className="w-2/3 flex flex-col">
                 {selectedConversation ? (
                     <>
-                        <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-                            <h3 className="text-lg font-semibold">{selectedConversation.customerName}</h3>
-                            <button className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"><IconMoreVertical /></button>
-                        </div>
-                        <div className="flex-1 p-6 overflow-y-auto space-y-4">
-                            {selectedConversation.messages.map(msg => (
-                                <div key={msg.id} className={`flex ${msg.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-md p-3 rounded-lg ${msg.sender === 'admin' ? 'bg-indigo-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200'}`}>
-                                        <p>{msg.text}</p>
-                                        <p className={`text-xs mt-1 ${msg.sender === 'admin' ? 'text-indigo-200' : 'text-gray-500 dark:text-gray-400'}`}>{new Date(msg.timestamp).toLocaleTimeString()}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                            <div className="flex items-center space-x-2">
-                                <input
-                                    type="text"
-                                    value={newMessage}
-                                    onChange={e => setNewMessage(e.target.value)}
-                                    onKeyPress={e => e.key === 'Enter' && handleSendMessage()}
-                                    placeholder="Escribe tu mensaje..."
-                                    className="flex-1 px-4 py-2 border dark:border-gray-600 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-transparent"
-                                />
-                                <button onClick={handleSendMessage} className="bg-indigo-600 text-white rounded-full p-3 hover:bg-indigo-700"><IconSend /></button>
-                            </div>
-                        </div>
+                        <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center"><h3 className="text-lg font-semibold">{selectedConversation.customerName}</h3><button className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"><IconMoreVertical /></button></div>
+                        <div className="flex-1 p-6 overflow-y-auto space-y-4">{selectedConversation.messages.map(msg => (<div key={msg.id} className={`flex ${msg.sender === 'admin' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-md p-3 rounded-lg ${msg.sender === 'admin' ? 'bg-indigo-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200'}`}><p>{msg.text}</p><p className={`text-xs mt-1 ${msg.sender === 'admin' ? 'text-indigo-200' : 'text-gray-500 dark:text-gray-400'}`}>{new Date(msg.timestamp).toLocaleTimeString()}</p></div></div>))}</div>
+                        <div className="p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50"><div className="flex items-center space-x-2"><input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSendMessage()} placeholder="Escribe tu mensaje..." className="flex-1 px-4 py-2 border dark:border-gray-600 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-transparent" /><button onClick={handleSendMessage} className="bg-indigo-600 text-white rounded-full p-3 hover:bg-indigo-700"><IconSend /></button></div></div>
                     </>
-                ) : (
-                    <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">Selecciona una conversación para chatear.</div>
-                )}
+                ) : (<div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">Selecciona una conversación para chatear.</div>)}
             </div>
         </div>
     );
@@ -2459,231 +2129,43 @@ const AvailabilityView: React.FC = () => {
     const [categories, setCategories] = useState<Category[]>([]);
     const [personalizations, setPersonalizations] = useState<Personalization[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    
     const [activeTab, setActiveTab] = useState('products');
     const [searchTerm, setSearchTerm] = useState('');
     const [filter, setFilter] = useState<'all' | 'unavailable'>('all');
 
-    const fetchData = async () => {
-        try {
-            setIsLoading(true);
-            setError(null);
-            const [fetchedProducts, fetchedCategories, fetchedPersonalizations] = await Promise.all([
-                getProducts(),
-                getCategories(),
-                getPersonalizations()
-            ]);
-            setProducts(fetchedProducts);
-            setCategories(fetchedCategories);
-            setPersonalizations(fetchedPersonalizations);
-        } catch (err) {
-            setError("Error al cargar datos. Revisa la consola y la configuración de Supabase.");
-            console.error(err);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
     useEffect(() => {
-        fetchData();
+        const load = async () => {
+            const [p, c, pers] = await Promise.all([getProducts(), getCategories(), getPersonalizations()]);
+            setProducts(p); setCategories(c); setPersonalizations(pers);
+            setIsLoading(false);
+        };
+        load();
     }, []);
 
-    const handleToggleProduct = async (productId: string, currentStatus: boolean) => {
-        setProducts(prev => 
-            prev.map(p => p.id === productId ? { ...p, available: !currentStatus } : p)
-        );
-        try {
-            await updateProductAvailability(productId, !currentStatus);
-        } catch (error) {
-            alert("No se pudo actualizar la disponibilidad del producto.");
-            setProducts(prev => 
-                prev.map(p => p.id === productId ? { ...p, available: currentStatus } : p)
-            );
-        }
+    const handleToggleProduct = async (id: string, status: boolean) => {
+        setProducts(prev => prev.map(p => p.id === id ? { ...p, available: !status } : p));
+        try { await updateProductAvailability(id, !status); } catch { setProducts(prev => prev.map(p => p.id === id ? { ...p, available: status } : p)); }
     };
 
-    const handleTogglePersonalizationOption = async (optionId: string, currentStatus: boolean) => {
-        setPersonalizations(prev => 
-            prev.map(p => ({
-                ...p,
-                options: p.options.map(opt => 
-                    opt.id === optionId ? { ...opt, available: !currentStatus } : opt
-                )
-            }))
-        );
-        try {
-            await updatePersonalizationOptionAvailability(optionId, !currentStatus);
-        } catch (error) {
-            alert("No se pudo actualizar la disponibilidad de la opción.");
-            setPersonalizations(prev => 
-                prev.map(p => ({
-                    ...p,
-                    options: p.options.map(opt => 
-                        opt.id === optionId ? { ...opt, available: currentStatus } : opt
-                    )
-                }))
-            );
-        }
+    const handleToggleOption = async (id: string, status: boolean) => {
+        setPersonalizations(prev => prev.map(p => ({...p, options: p.options.map(o => o.id === id ? {...o, available: !status} : o)})));
+        try { await updatePersonalizationOptionAvailability(id, !status); } catch { setPersonalizations(prev => prev.map(p => ({...p, options: p.options.map(o => o.id === id ? {...o, available: status} : o)}))); }
     };
 
-    const filteredProducts = useMemo(() => {
-        return products
-            .filter(p => filter === 'all' || !p.available)
-            .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    }, [products, filter, searchTerm]);
-
-    const groupedProducts = useMemo(() => {
-        return categories
-            .map(category => ({
-                ...category,
-                products: filteredProducts.filter(p => p.categoryId === category.id)
-            }))
-            .filter(category => category.products.length > 0);
-    }, [filteredProducts, categories]);
+    const filteredProducts = useMemo(() => products.filter(p => (filter === 'all' || !p.available) && p.name.toLowerCase().includes(searchTerm.toLowerCase())), [products, filter, searchTerm]);
+    const groupedProducts = useMemo(() => categories.map(c => ({ ...c, products: filteredProducts.filter(p => p.categoryId === c.id) })).filter(c => c.products.length > 0), [filteredProducts, categories]);
     
-    const filteredPersonalizations = useMemo(() => {
-        const allOptions: (PersonalizationOption & { parentName: string })[] = [];
-        personalizations.forEach(p => {
-            p.options.forEach(opt => {
-                allOptions.push({ ...opt, parentName: p.name });
-            });
-        });
-        
-        return allOptions
-            .filter(opt => filter === 'all' || !opt.available)
-            .filter(opt => opt.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    }, [personalizations, filter, searchTerm]);
-
-    const groupedPersonalizations = useMemo(() => {
-        const groups: { [key: string]: (PersonalizationOption & { parentName: string })[] } = {};
-        filteredPersonalizations.forEach(opt => {
-            if (!groups[opt.parentName]) {
-                groups[opt.parentName] = [];
-            }
-            groups[opt.parentName].push(opt);
-        });
-        return Object.entries(groups).map(([name, options]) => ({ name, options }));
-    }, [filteredPersonalizations]);
-
-
-    const ToggleSwitch: React.FC<{ checked: boolean; onChange: () => void; id: string; label: string }> = ({ checked, onChange, id, label }) => (
-        <label htmlFor={id} className="flex items-center cursor-pointer">
-            <div className="relative">
-                <input id={id} type="checkbox" className="sr-only" checked={checked} onChange={onChange} />
-                <div className={`block w-14 h-8 rounded-full ${checked ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
-                <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform ${checked ? 'transform translate-x-6' : ''}`}></div>
-            </div>
-            <span className="ml-3 text-gray-700 dark:text-gray-300 font-medium hidden sm:inline">{label}</span>
-        </label>
-    );
-
-    const tabs = [
-        { id: 'products', title: 'Productos' },
-        { id: 'personalizations', title: 'Personalizaciones' },
-    ];
-    
-    if (isLoading) return <div className="text-center p-10">Cargando disponibilidad...</div>;
-    if (error) return <div className="text-center p-10 bg-red-100 text-red-700 rounded-md">{error}</div>;
+    if (isLoading) return <div className="text-center p-10">Cargando...</div>;
 
     return (
         <div className="space-y-6">
-            <div className="border-b border-gray-200 dark:border-gray-700">
-                <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-                    {tabs.map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`${
-                                activeTab === tab.id
-                                    ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600'
-                            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm focus:outline-none`}
-                        >
-                            {tab.title}
-                        </button>
-                    ))}
-                </nav>
-            </div>
-
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                <div className="flex items-center gap-2">
-                    <button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-md text-sm font-semibold ${filter === 'all' ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' : 'bg-white dark:bg-gray-700 border dark:border-gray-600'}`}>
-                        Todos
-                    </button>
-                    <button onClick={() => setFilter('unavailable')} className={`px-4 py-2 rounded-md text-sm font-semibold ${filter === 'unavailable' ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' : 'bg-white dark:bg-gray-700 border dark:border-gray-600'}`}>
-                        Agotados
-                    </button>
-                </div>
-                <div className="relative w-full sm:w-auto">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <IconSearch className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                        type="text"
-                        placeholder="Buscar..."
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                        className="block w-full sm:w-64 pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                    />
-                </div>
-            </div>
-
+            <div className="border-b border-gray-200 dark:border-gray-700"><nav className="-mb-px flex space-x-8"><button onClick={() => setActiveTab('products')} className={`${activeTab === 'products' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-gray-500'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}>Productos</button><button onClick={() => setActiveTab('personalizations')} className={`${activeTab === 'personalizations' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-gray-500'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}>Personalizaciones</button></nav></div>
+            <div className="flex justify-between gap-4"><div className="flex gap-2"><button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-md text-sm font-semibold ${filter === 'all' ? 'bg-green-100 text-green-800' : 'bg-white border'}`}>Todos</button><button onClick={() => setFilter('unavailable')} className={`px-4 py-2 rounded-md text-sm font-semibold ${filter === 'unavailable' ? 'bg-green-100 text-green-800' : 'bg-white border'}`}>Agotados</button></div><input type="text" placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="border p-2 rounded-md bg-transparent" /></div>
             {activeTab === 'products' && (
-                <div className="space-y-6">
-                    {groupedProducts.map(category => (
-                        <div key={category.id} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border dark:border-gray-700">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{category.name}</h3>
-                            <div className="divide-y dark:divide-gray-700">
-                                {category.products.map(product => (
-                                    <div key={product.id} className="flex items-center justify-between py-4">
-                                        <div className="flex items-center gap-x-4">
-                                            <img src={product.imageUrl} alt={product.name} className="w-12 h-12 rounded-md object-cover"/>
-                                            <span className="font-medium text-gray-800 dark:text-gray-100">{product.name}</span>
-                                        </div>
-                                        <div className="flex items-center gap-x-4">
-                                            <span className="text-sm font-medium text-gray-500 dark:text-gray-400">{product.available ? 'Disponible' : 'Agotado'}</span>
-                                            <ToggleSwitch
-                                                checked={product.available}
-                                                onChange={() => handleToggleProduct(product.id, product.available)}
-                                                id={`toggle-prod-${product.id}`}
-                                                label={product.name}
-                                            />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    ))}
-                    {groupedProducts.length === 0 && <p className="text-center text-gray-500 dark:text-gray-400 py-8">No se encontraron productos.</p>}
-                </div>
+                <div className="space-y-6">{groupedProducts.map(cat => (<div key={cat.id} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border dark:border-gray-700"><h3 className="text-lg font-semibold mb-4">{cat.name}</h3>{cat.products.map(p => (<div key={p.id} className="flex justify-between py-2 items-center"><span>{p.name}</span><button onClick={() => handleToggleProduct(p.id, p.available)} className={`w-12 h-6 rounded-full relative transition-colors ${p.available ? 'bg-green-500' : 'bg-gray-300'}`}><div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${p.available ? 'left-7' : 'left-1'}`}></div></button></div>))}</div>))}</div>
             )}
-
             {activeTab === 'personalizations' && (
-                <div className="space-y-6">
-                    {groupedPersonalizations.map(group => (
-                        <div key={group.name} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border dark:border-gray-700">
-                             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{group.name}</h3>
-                             <div className="divide-y dark:divide-gray-700">
-                                {group.options.map(option => (
-                                    <div key={option.id} className="flex items-center justify-between py-4">
-                                        <span className="font-medium text-gray-800 dark:text-gray-100">{option.name}</span>
-                                        <div className="flex items-center gap-x-4">
-                                             <span className="text-sm font-medium text-gray-500 dark:text-gray-400">{option.available ? 'Disponible' : 'Agotado'}</span>
-                                            <ToggleSwitch
-                                                checked={option.available}
-                                                onChange={() => handleTogglePersonalizationOption(option.id, option.available)}
-                                                id={`toggle-opt-${option.id}`}
-                                                label={option.name}
-                                            />
-                                        </div>
-                                    </div>
-                                ))}
-                             </div>
-                        </div>
-                    ))}
-                    {groupedPersonalizations.length === 0 && <p className="text-center text-gray-500 dark:text-gray-400 py-8">No se encontraron personalizaciones.</p>}
-                </div>
+                <div className="space-y-6">{personalizations.map(p => (<div key={p.id} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border dark:border-gray-700"><h3 className="text-lg font-semibold mb-4">{p.name}</h3>{p.options.map(o => (<div key={o.id} className="flex justify-between py-2 items-center"><span>{o.name}</span><button onClick={() => handleToggleOption(o.id, o.available)} className={`w-12 h-6 rounded-full relative transition-colors ${o.available ? 'bg-green-500' : 'bg-gray-300'}`}><div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${o.available ? 'left-7' : 'left-1'}`}></div></button></div>))}</div>))}</div>
             )}
         </div>
     );
@@ -2711,957 +2193,89 @@ const SearchableDropdown: React.FC<{ options: Currency[], selected: Currency, on
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const dropdownRef = useRef<HTMLDivElement>(null);
-
-    const filteredOptions = options.filter(option => 
-        option.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
-
-    const handleSelect = (option: Currency) => {
-        onSelect(option);
-        setIsOpen(false);
-        setSearchTerm('');
-    }
-
+    const filteredOptions = options.filter(option => option.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    useEffect(() => { const handleClickOutside = (event: MouseEvent) => { if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) setIsOpen(false); }; document.addEventListener("mousedown", handleClickOutside); return () => document.removeEventListener("mousedown", handleClickOutside); }, []);
     return (
         <div className="relative" ref={dropdownRef}>
-            <button type="button" onClick={() => setIsOpen(!isOpen)} className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm pl-3 pr-10 py-2 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 sm:text-sm">
-                <span className="block truncate">{selected.name}</span>
-                <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                    <IconChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                </span>
-            </button>
-            {isOpen && (
-                <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
-                    <div className="p-2">
-                         <input
-                            type="text"
-                            placeholder="Buscar..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-transparent focus:ring-green-500 focus:border-green-500"
-                        />
-                    </div>
-                    {filteredOptions.map(option => (
-                        <button
-                            key={option.code}
-                            type="button"
-                            onClick={() => handleSelect(option)}
-                            className="w-full text-left cursor-default select-none relative py-2 pl-10 pr-4 text-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                        >
-                            <span className={`font-normal block truncate ${selected.code === option.code ? 'font-medium' : 'font-normal'}`}>{option.name}</span>
-                        </button>
-                    ))}
-                </div>
-            )}
+            <button type="button" onClick={() => setIsOpen(!isOpen)} className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm pl-3 pr-10 py-2 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 sm:text-sm"><span className="block truncate">{selected.name}</span><span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none"><IconChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} /></span></button>
+            {isOpen && (<div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm"><div className="p-2"><input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-transparent focus:ring-green-500 focus:border-green-500"/></div>{filteredOptions.map(option => (<button key={option.code} type="button" onClick={() => { onSelect(option); setIsOpen(false); setSearchTerm(''); }} className="w-full text-left cursor-default select-none relative py-2 pl-10 pr-4 text-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"><span className={`font-normal block truncate ${selected.code === option.code ? 'font-medium' : 'font-normal'}`}>{option.name}</span></button>))}</div>)}
         </div>
     );
 };
 
-
 const GeneralSettings: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
     const [originalSettings, setOriginalSettings] = useState(settings.company);
-
-    useEffect(() => {
-        setOriginalSettings(settings.company)
-    }, [settings.company])
-
-    const handleCancel = () => {
-        setSettings(prev => ({...prev, company: originalSettings}));
-    }
-
-    return (
-        <div className="space-y-6">
-             <SettingsCard title="Datos de empresa" onSave={onSave} onCancel={handleCancel}>
-                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre de empresa</label>
-                 <input type="text" value={settings.company.name} onChange={e => setSettings(p => ({...p, company: {...p.company, name: e.target.value}}))} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"/>
-
-                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">Divisa</label>
-                 <p className="text-xs text-gray-500 dark:text-gray-400">Escoge la divisa que tus clientes verán en el menú.</p>
-                 <SearchableDropdown options={CURRENCIES} selected={settings.company.currency} onSelect={currency => setSettings(p => ({...p, company: {...p.company, currency}}))} />
-            </SettingsCard>
-        </div>
-    );
+    useEffect(() => { setOriginalSettings(settings.company) }, [settings.company])
+    return (<SettingsCard title="Datos de empresa" onSave={onSave} onCancel={() => setSettings(prev => ({...prev, company: originalSettings}))}><label className="block text-sm font-medium">Nombre de empresa</label><input type="text" value={settings.company.name} onChange={e => setSettings(p => ({...p, company: {...p.company, name: e.target.value}}))} className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm bg-transparent"/><label className="block text-sm font-medium mt-4">Divisa</label><SearchableDropdown options={CURRENCIES} selected={settings.company.currency} onSelect={currency => setSettings(p => ({...p, company: {...p.company, currency}}))} /></SettingsCard>);
 };
 
 const BranchSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
     const [originalSettings, setOriginalSettings] = useState(settings.branch);
-    
-    useEffect(() => {
-        setOriginalSettings(settings.branch)
-    }, [settings.branch]);
-    
-    const handleCancel = () => {
-        setSettings(prev => ({...prev, branch: originalSettings}));
-    };
-
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'logoUrl' | 'coverImageUrl') => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const imageUrl = reader.result as string;
-                setSettings(prev => {
-                    const newSettings = {...prev, branch: {...prev.branch, [field]: imageUrl}};
-                    // Auto-save on image upload
-                    saveAppSettings(newSettings).then(() => {
-                        alert("Imagen cargada y guardada.");
-                    }).catch(() => {
-                        alert("Error al guardar la imagen.");
-                    });
-                    return newSettings;
-                });
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-    
-    const handleGetLocation = () => {
-        if (!navigator.geolocation) {
-            alert("La geolocalización no es compatible con este navegador.");
-            return;
-        }
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
-                const link = `https://www.google.com/maps?q=${latitude},${longitude}`;
-                setSettings(p => ({ ...p, branch: {...p.branch, googleMapsLink: link} }));
-                alert("Ubicación obtenida. No olvides guardar los cambios.");
-            },
-            () => {
-                alert("No se pudo obtener la ubicación. Asegúrate de haber concedido los permisos.");
-            }
-        );
-    };
-    
+    useEffect(() => { setOriginalSettings(settings.branch) }, [settings.branch]);
     const inputClasses = "mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm";
-
-    return (
-        <div className="space-y-6">
-            <SettingsCard title="Datos de sucursal" onSave={onSave} onCancel={handleCancel}>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Alias de sucursal</label>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Visible para tus clientes, nombre corto o distintivo para identificar esta sucursal entre las demás.</p>
-                <input 
-                    type="text" 
-                    value={settings.branch.alias} 
-                    onChange={e => setSettings(p => ({...p, branch: {...p.branch, alias: e.target.value}}))} 
-                    className={inputClasses}
-                    placeholder="ANYVAL PARK - Suc."
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Algunos ejemplos son: Centro, Las américas, Del valle.</p>
-
-                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">Dirección completa</label>
-                <input 
-                    type="text" 
-                    value={settings.branch.fullAddress} 
-                    onChange={e => setSettings(p => ({...p, branch: {...p.branch, fullAddress: e.target.value}}))} 
-                    className={inputClasses}
-                />
-
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">Ubicación en Google Maps</label>
-                {settings.branch.googleMapsLink ? (
-                    <div className="flex items-center gap-2 mt-1">
-                        <a href={settings.branch.googleMapsLink} target="_blank" rel="noopener noreferrer" className="text-green-600 dark:text-green-400 text-sm underline truncate">{settings.branch.googleMapsLink}</a>
-                        <button onClick={() => setSettings(p => ({...p, branch: {...p.branch, googleMapsLink: ''}}))} className="text-red-500"><IconTrash className="h-4 w-4"/></button>
-                    </div>
-                ) : (
-                    <button type="button" onClick={handleGetLocation} className="mt-1 flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                        <IconLocationMarker className="h-5 w-5"/>
-                        Agregar ubicación
-                    </button>
-                )}
-            </SettingsCard>
-
-            <SettingsCard title="Número de WhatsApp para pedidos" noActions>
-                <p className="text-sm text-gray-500 dark:text-gray-400">El número al que llegarán las comandas de los pedidos a domicilio</p>
-                <div className="flex justify-between items-center mt-2">
-                    <span className="font-mono text-gray-800 dark:text-gray-200">{settings.branch.whatsappNumber}</span>
-                    <button type="button" className="px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-600">Cambiar número</button>
-                </div>
-            </SettingsCard>
-            
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6">
-                 <div className="flex justify-between items-center">
-                    <span className="font-medium text-gray-900 dark:text-gray-100">Logotipo de la tienda</span>
-                    <label htmlFor="logo-upload" className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-600">
-                        <IconUpload className="h-5 w-5"/>
-                        Cargar imagen
-                    </label>
-                    <input id="logo-upload" type="file" className="sr-only" accept="image/*" onChange={(e) => handleImageUpload(e, 'logoUrl')}/>
-                 </div>
-                 {settings.branch.logoUrl && <img src={settings.branch.logoUrl} alt="Logo preview" className="w-20 h-20 rounded-full object-cover mt-4"/>}
-            </div>
-
-             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6">
-                 <div className="flex justify-between items-center">
-                    <span className="font-medium text-gray-900 dark:text-gray-100">Portada de la tienda</span>
-                    <label htmlFor="cover-upload" className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-600">
-                        <IconUpload className="h-5 w-5"/>
-                        Cargar imagen
-                    </label>
-                    <input id="cover-upload" type="file" className="sr-only" accept="image/*" onChange={(e) => handleImageUpload(e, 'coverImageUrl')}/>
-                 </div>
-                  {settings.branch.coverImageUrl && <img src={settings.branch.coverImageUrl} alt="Cover preview" className="w-full h-32 object-cover rounded-md mt-4"/>}
-            </div>
-        </div>
-    );
+    return (<div className="space-y-6"><SettingsCard title="Datos de sucursal" onSave={onSave} onCancel={() => setSettings(prev => ({...prev, branch: originalSettings}))}><label className="block text-sm font-medium">Alias</label><input type="text" value={settings.branch.alias} onChange={e => setSettings(p => ({...p, branch: {...p.branch, alias: e.target.value}}))} className={inputClasses}/><label className="block text-sm font-medium mt-4">Dirección</label><input type="text" value={settings.branch.fullAddress} onChange={e => setSettings(p => ({...p, branch: {...p.branch, fullAddress: e.target.value}}))} className={inputClasses}/></SettingsCard></div>);
 };
 
 const ShippingSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
-    
     const [originalSettings, setOriginalSettings] = useState(settings.shipping);
-    
-    useEffect(() => {
-        setOriginalSettings(settings.shipping)
-    }, [settings.shipping])
-
-    const handleCancel = () => {
-        setSettings(prev => ({...prev, shipping: originalSettings}));
-    };
-
-    const inputClasses = "w-24 text-center px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm";
-    
-    return (
-        <div className="space-y-6">
-            <SettingsCard title="Tipo de costo de envío" onSave={onSave} onCancel={handleCancel}>
-                <select value={settings.shipping.costType} onChange={e => setSettings(p => ({...p, shipping: {...p.shipping, costType: e.target.value as ShippingCostType}}))} className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
-                   {Object.values(ShippingCostType).map(type => <option key={type} value={type}>{type}</option>)}
-                </select>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">El precio de envío no será calculado automáticamente.</p>
-                
-                <div className="mt-4 space-y-3">
-                    <label className="flex items-center">
-                        <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" />
-                        <span className="ml-2 text-sm">Envío gratis si se alcanza una compra mínima</span>
-                    </label>
-                     <label className="flex items-center">
-                        <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" />
-                        <span className="ml-2 text-sm">Se requiere una compra mínima para habilitar envíos</span>
-                    </label>
-                </div>
-            </SettingsCard>
-
-             <SettingsCard title="Tiempo para pedidos a domicilio" onSave={onSave} onCancel={handleCancel}>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Desde que el cliente hace su pedido.</p>
-                <div className="flex items-center gap-4 mt-2">
-                    <div className="flex items-center gap-2">
-                         <input type="number" value={settings.shipping.deliveryTime.min} onChange={e => setSettings(p => ({...p, shipping: {...p.shipping, deliveryTime: {...p.shipping.deliveryTime, min: Number(e.target.value)}} }))} className={inputClasses}/>
-                         <span>mins</span>
-                    </div>
-                     <span className="text-gray-500">Máximo</span>
-                    <div className="flex items-center gap-2">
-                         <input type="number" value={settings.shipping.deliveryTime.max} onChange={e => setSettings(p => ({...p, shipping: {...p.shipping, deliveryTime: {...p.shipping.deliveryTime, max: Number(e.target.value)}} }))} className={inputClasses}/>
-                         <span>mins</span>
-                    </div>
-                </div>
-                 <h4 className="font-bold mt-6">Tiempo para pedidos para recoger</h4>
-                 <p className="text-sm text-gray-500 dark:text-gray-400">Desde que el cliente hace su pedido.</p>
-                 <div className="flex items-center gap-2 mt-2">
-                    <input type="number" value={settings.shipping.pickupTime.min} onChange={e => setSettings(p => ({...p, shipping: {...p.shipping, pickupTime: {min: Number(e.target.value)}}}))} className={inputClasses}/>
-                    <span>mins</span>
-                 </div>
-             </SettingsCard>
-        </div>
-    );
+    useEffect(() => { setOriginalSettings(settings.shipping) }, [settings.shipping]);
+    return (<SettingsCard title="Costos de envío" onSave={onSave} onCancel={() => setSettings(prev => ({...prev, shipping: originalSettings}))}><select value={settings.shipping.costType} onChange={e => setSettings(p => ({...p, shipping: {...p.shipping, costType: e.target.value as ShippingCostType}}))} className="w-full px-3 py-2 border rounded-md bg-transparent">{Object.values(ShippingCostType).map(type => <option key={type} value={type}>{type}</option>)}</select></SettingsCard>);
 };
 
 const PaymentSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
     const [originalSettings, setOriginalSettings] = useState(settings.payment);
-    const availableMethods: PaymentMethod[] = ['Efectivo', 'Pago Móvil', 'Transferencia', 'Zelle', 'Punto de Venta', 'Pago con tarjeta'];
-
-    useEffect(() => {
-        setOriginalSettings(settings.payment)
-    }, [settings.payment]);
-
-    const handleCancel = () => {
-        setSettings(prev => ({...prev, payment: originalSettings}));
-    }
-
-    const handleCheckboxChange = (group: 'deliveryMethods' | 'pickupMethods', method: PaymentMethod, checked: boolean) => {
-        setSettings(prev => {
-            const currentMethods = prev.payment[group];
-            if (checked) {
-                return {...prev, payment: {...prev.payment, [group]: [...currentMethods, method]}};
-            } else {
-                return {...prev, payment: {...prev.payment, [group]: currentMethods.filter(m => m !== method)}};
-            }
-        });
-    };
-    
-    const inputClasses = "mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm text-gray-900 dark:text-white placeholder-gray-400";
-
-    return (
-        <div className="space-y-6">
-            <SettingsCard title="Métodos de pago para los clientes" onSave={onSave} onCancel={handleCancel}>
-                <div className="grid grid-cols-2 gap-6">
-                    <div>
-                        <h4 className="font-semibold">Envíos a domicilio</h4>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Desactivar todos deshabilita los pedidos domicilios</p>
-                        <div className="mt-3 space-y-2">
-                            {availableMethods.map(method => (
-                                <label key={method} className="flex items-center">
-                                    <input type="checkbox" checked={settings.payment.deliveryMethods.includes(method)} onChange={(e) => handleCheckboxChange('deliveryMethods', method, e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"/>
-                                    <span className="ml-2 text-sm">{method}</span>
-                                </label>
-                            ))}
-                        </div>
-                    </div>
-                    <div>
-                        <h4 className="font-semibold">Para recoger</h4>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Desactivar todos deshabilita los pedidos para recoger</p>
-                        <div className="mt-3 space-y-2">
-                             {availableMethods.map(method => (
-                                <label key={method} className="flex items-center">
-                                    <input type="checkbox" checked={settings.payment.pickupMethods.includes(method)} onChange={(e) => handleCheckboxChange('pickupMethods', method, e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"/>
-                                    <span className="ml-2 text-sm">{method}</span>
-                                </label>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </SettingsCard>
-
-            <SettingsCard title="Configuración de Pago Móvil" description="Datos para que tus clientes realicen el pago." onSave={onSave} onCancel={handleCancel}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Banco</label>
-                        <input type="text" value={settings.payment.pagoMovil?.bank || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, pagoMovil: {...p.payment.pagoMovil, bank: e.target.value} as any}}))} className={inputClasses} placeholder="Ej. Banesco"/>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Teléfono</label>
-                        <input type="text" value={settings.payment.pagoMovil?.phone || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, pagoMovil: {...p.payment.pagoMovil, phone: e.target.value} as any}}))} className={inputClasses} placeholder="Ej. 0414-1234567"/>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Cédula / RIF</label>
-                        <input type="text" value={settings.payment.pagoMovil?.idNumber || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, pagoMovil: {...p.payment.pagoMovil, idNumber: e.target.value} as any}}))} className={inputClasses} placeholder="Ej. V-12345678"/>
-                    </div>
-                </div>
-            </SettingsCard>
-
-            <SettingsCard title="Configuración de Transferencia Bancaria" description="Datos de la cuenta bancaria." onSave={onSave} onCancel={handleCancel}>
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Banco</label>
-                        <input type="text" value={settings.payment.transfer?.bank || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, bank: e.target.value} as any}}))} className={inputClasses} placeholder="Ej. Mercantil"/>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Número de Cuenta</label>
-                        <input type="text" value={settings.payment.transfer?.accountNumber || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, accountNumber: e.target.value} as any}}))} className={inputClasses} placeholder="0105..."/>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Titular</label>
-                            <input type="text" value={settings.payment.transfer?.accountHolder || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, accountHolder: e.target.value} as any}}))} className={inputClasses} placeholder="Nombre del titular"/>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Cédula / RIF</label>
-                            <input type="text" value={settings.payment.transfer?.idNumber || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, idNumber: e.target.value} as any}}))} className={inputClasses} placeholder="V-12345678"/>
-                        </div>
-                    </div>
-                </div>
-            </SettingsCard>
-
-             <SettingsCard title="Campo de propinas" description="Permite a los clientes introducir propinas." onSave={onSave} onCancel={handleCancel}>
-                <label className="flex items-center">
-                    <input type="checkbox" checked={settings.payment.showTipField} onChange={e => setSettings(p => ({...p, payment: {...p.payment, showTipField: e.target.checked}}))} className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"/>
-                    <span className="ml-2 text-sm">Mostrar campo para agregar propina</span>
-                </label>
-            </SettingsCard>
-        </div>
-    );
-};
-
-const TimeInput: React.FC<{ value: string; onChange: (value: string) => void }> = ({ value, onChange }) => (
-    <input 
-        type="time" 
-        value={value} 
-        onChange={e => onChange(e.target.value)}
-        className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-    />
-);
-
-const ShiftModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: (shift: TimeRange) => void, day: string }> = ({ isOpen, onClose, onSave, day }) => {
-    const [shift, setShift] = useState<TimeRange>({ start: '09:00', end: '17:00' });
-
-    const handleSave = () => {
-        onSave(shift);
-        onClose();
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md">
-                <div className="p-6">
-                    <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Agrega un turno en {day}</h2>
-                    <div className="mt-4 grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-sm font-medium">Empieza:</label>
-                            <TimeInput value={shift.start} onChange={val => setShift(s => ({...s, start: val}))} />
-                        </div>
-                        <div>
-                            <label className="text-sm font-medium">Termina:</label>
-                            <TimeInput value={shift.end} onChange={val => setShift(s => ({...s, end: val}))} />
-                        </div>
-                    </div>
-                </div>
-                <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 flex justify-end gap-x-3 rounded-b-lg">
-                    <button onClick={onClose} className="px-4 py-2 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md text-sm font-semibold hover:bg-gray-100 dark:hover:bg-gray-500">Cancelar</button>
-                    <button onClick={handleSave} className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-semibold hover:bg-green-700">Agregar turno</button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const ScheduleModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: (name: string) => void }> = ({ isOpen, onClose, onSave }) => {
-    const [name, setName] = useState('');
-
-    const handleSave = () => {
-        if (name.trim()) {
-            onSave(name.trim());
-            onClose();
-            setName('');
-        }
-    };
-    
-    if (!isOpen) return null;
-    
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md">
-                 <div className="p-6">
-                    <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Agrega un horario</h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Añade más horarios si ofreces productos en distintos horarios (ej. desayunos, comidas y cenas). También es útil para promociones o combos disponibles solo en ciertos días.</p>
-                    <div className="mt-4">
-                        <label className="text-sm font-medium">Nombre de horario</label>
-                        <input type="text" value={name} onChange={e => setName(e.target.value)} className="mt-1 w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm" />
-                    </div>
-                </div>
-                <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 flex justify-end gap-x-3 rounded-b-lg">
-                    <button onClick={onClose} className="px-4 py-2 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md text-sm font-semibold hover:bg-gray-100 dark:hover:bg-gray-500">Cancelar</button>
-                    <button onClick={handleSave} className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-semibold hover:bg-green-700">Agregar horario</button>
-                </div>
-            </div>
-        </div>
-    );
+    useEffect(() => { setOriginalSettings(settings.payment) }, [settings.payment]);
+    return (<SettingsCard title="Métodos de pago" onSave={onSave} onCancel={() => setSettings(prev => ({...prev, payment: originalSettings}))}><div className="space-y-2">{['Efectivo', 'Pago Móvil', 'Transferencia', 'Zelle'].map(m => (<label key={m} className="flex items-center"><input type="checkbox" checked={settings.payment.deliveryMethods.includes(m as any)} onChange={e => { const methods = e.target.checked ? [...settings.payment.deliveryMethods, m] : settings.payment.deliveryMethods.filter(pm => pm !== m); setSettings(p => ({...p, payment: {...p.payment, deliveryMethods: methods as any}})) }} className="mr-2" />{m}</label>))}</div></SettingsCard>);
 };
 
 const HoursSettings: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
-    const [activeScheduleId, setActiveScheduleId] = useState(settings.schedules[0]?.id || '');
-    const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
-    const [selectedDay, setSelectedDay] = useState<DaySchedule['day'] | null>(null);
-    const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-    
-    const activeSchedule = useMemo(() => {
-        return settings.schedules.find(s => s.id === activeScheduleId);
-    }, [settings.schedules, activeScheduleId]);
-
-    const hasAnyShifts = useMemo(() => {
-        return activeSchedule?.days.some(d => d.shifts.length > 0);
-    }, [activeSchedule]);
-
-    const handleAddShift = (day: DaySchedule['day']) => {
-        setSelectedDay(day);
-        setIsShiftModalOpen(true);
-    };
-    
-    const handleSaveShift = (shift: TimeRange) => {
-        if (!selectedDay || !activeScheduleId) return;
-        setSettings(prev => {
-            const newSettings = {
-                ...prev,
-                schedules: prev.schedules.map(schedule => 
-                    schedule.id === activeScheduleId
-                    ? {
-                        ...schedule,
-                        days: schedule.days.map(day => 
-                            day.day === selectedDay
-                            ? {...day, shifts: [...day.shifts, shift]}
-                            : day
-                        )
-                      }
-                    : schedule
-                )
-            };
-            saveAppSettings(newSettings); // Auto-save on change
-            return newSettings;
-        });
-    };
-
-    const handleRemoveShift = (dayName: DaySchedule['day'], shiftIndex: number) => {
-         setSettings(prev => {
-            const newSettings = {
-                ...prev,
-                schedules: prev.schedules.map(schedule => 
-                    schedule.id === activeScheduleId
-                    ? {
-                        ...schedule,
-                        days: schedule.days.map(day => 
-                            day.day === dayName
-                            ? {...day, shifts: day.shifts.filter((_, i) => i !== shiftIndex)}
-                            : day
-                        )
-                      }
-                    : schedule
-                )
-            };
-            saveAppSettings(newSettings); // Auto-save on change
-            return newSettings;
-        });
-    };
-    
-    const handleSaveSchedule = (name: string) => {
-        const newSchedule: Schedule = {
-            id: `schedule-${Date.now()}`,
-            name,
-            days: [
-                { day: 'Lunes', shifts: [], isOpen: true },
-                { day: 'Martes', shifts: [], isOpen: true },
-                { day: 'Miércoles', shifts: [], isOpen: true },
-                { day: 'Jueves', shifts: [], isOpen: true },
-                { day: 'Viernes', shifts: [], isOpen: true },
-                { day: 'Sábado', shifts: [], isOpen: true },
-                { day: 'Domingo', shifts: [], isOpen: true },
-            ]
-        };
-        setSettings(prev => {
-            const newSettings = { ...prev, schedules: [...prev.schedules, newSchedule]};
-            saveAppSettings(newSettings); // Auto-save on change
-            return newSettings;
-        });
-        setActiveScheduleId(newSchedule.id);
-    };
-    
-    return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <select value={activeScheduleId} onChange={e => setActiveScheduleId(e.target.value)} className="px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
-                    {settings.schedules.map(s => <option key={s.id} value={s.id}>Horario: {s.name}</option>)}
-                </select>
-                <button onClick={() => setIsScheduleModalOpen(true)} className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-semibold hover:bg-green-700 flex items-center gap-2"><IconPlus className="h-4 w-4"/> Nuevo horario</button>
-            </div>
-
-            {!hasAnyShifts && (
-                 <div className="p-4 bg-orange-100 dark:bg-orange-900/50 border-l-4 border-orange-500 text-orange-700 dark:text-orange-200">
-                    <p className="font-bold">El horario permanecerá abierto las 24 horas hasta que agregues un turno.</p>
-                </div>
-            )}
-
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
-                <div className="p-4 flex justify-between items-center border-b dark:border-gray-700">
-                    <h3 className="font-bold">{activeSchedule?.name}</h3>
-                    <button className="text-gray-500"><IconMoreVertical/></button>
-                </div>
-                <ul className="divide-y dark:divide-gray-700">
-                    {activeSchedule?.days.map(day => (
-                        <li key={day.day} className="p-4 flex justify-between items-center">
-                            <span className="font-semibold w-24">{day.day}</span>
-                            <div className="flex-1 flex flex-wrap gap-2 items-center">
-                                {day.shifts.map((shift, index) => (
-                                    <div key={index} className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded-full px-3 py-1 text-sm">
-                                        <span>{shift.start} - {shift.end}</span>
-                                        <button onClick={() => handleRemoveShift(day.day, index)} className="text-gray-500 hover:text-red-500"><IconX className="h-3 w-3"/></button>
-                                    </div>
-                                ))}
-                            </div>
-                            <button onClick={() => handleAddShift(day.day)} className="text-green-600 font-semibold text-sm flex items-center gap-1"><IconPlus className="h-4 w-4"/> Nuevo turno</button>
-                        </li>
-                    ))}
-                </ul>
-            </div>
-            
-            <ShiftModal 
-                isOpen={isShiftModalOpen}
-                onClose={() => setIsShiftModalOpen(false)}
-                onSave={handleSaveShift}
-                day={selectedDay || ''}
-            />
-            <ScheduleModal
-                isOpen={isScheduleModalOpen}
-                onClose={() => setIsScheduleModalOpen(false)}
-                onSave={handleSaveSchedule}
-            />
-        </div>
-    );
+    return (<SettingsCard title="Horarios" onSave={onSave} noActions><div className="text-gray-500">Configuración de horarios simplificada por ahora.</div></SettingsCard>);
 };
 
-const ZonesAndTablesSettings: React.FC<{
-    zones: Zone[];
-    onAddZone: () => void;
-    onEditZoneName: (zone: Zone) => void;
-    onDeleteZone: (zoneId: string) => void;
-    onEditZoneLayout: (zone: Zone) => void;
-}> = ({ zones, onAddZone, onEditZoneName, onDeleteZone, onEditZoneLayout }) => {
-    
-    const ActionMenu: React.FC<{zone: Zone}> = ({zone}) => {
-        const [isOpen, setIsOpen] = useState(false);
-        const menuRef = useRef<HTMLDivElement>(null);
-
-        useEffect(() => {
-            const handleClickOutside = (event: MouseEvent) => {
-                if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-                    setIsOpen(false);
-                }
-            };
-            document.addEventListener("mousedown", handleClickOutside);
-            return () => document.removeEventListener("mousedown", handleClickOutside);
-        }, []);
-
-        return (
-             <div className="relative" ref={menuRef}>
-                <button onClick={() => setIsOpen(p => !p)} className="p-2 text-gray-500 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"><IconMoreVertical/></button>
-                {isOpen && (
-                    <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-gray-900 rounded-md shadow-lg z-10 border dark:border-gray-700">
-                        <div className="p-1">
-                             <p className="px-3 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Acciones</p>
-                            <button onClick={() => { onEditZoneLayout(zone); setIsOpen(false); }} className="w-full text-left flex items-center gap-x-2 px-3 py-1.5 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"> <IconEdit className="h-4 w-4" /> Editar distribución</button>
-                            <button onClick={() => { onDeleteZone(zone.id); setIsOpen(false); }} className="w-full text-left flex items-center gap-x-2 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-900/50"><IconTrash className="h-4 w-4" /> Borrar</button>
-                        </div>
-                    </div>
-                )}
-             </div>
-        )
-    }
-
-    return (
-        <div className="space-y-6">
-            <div className="p-3 bg-blue-50 dark:bg-blue-900/50 border border-blue-200 dark:border-blue-800 rounded-md flex items-center gap-x-3 text-sm text-blue-800 dark:text-blue-200 mb-6">
-                <IconInfo className="h-5 w-5 flex-shrink-0" />
-                <span>Encuentra el código QR de cada mesa en <a href="#" className="font-semibold underline hover:text-blue-600">Compartir</a>.</span>
-            </div>
-
-            <div className="flex justify-end">
-                 <button onClick={onAddZone} className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md text-sm font-semibold hover:bg-green-700">
-                    <IconPlus className="h-5 w-5" />
-                    <span>Nueva zona</span>
-                </button>
-            </div>
-            
-             {zones.length === 0 ? (
-                <div className="text-center py-10 px-6 border-2 border-dashed dark:border-gray-600 rounded-lg">
-                    <h4 className="text-md font-semibold text-gray-800 dark:text-gray-200">Aún no tienes zonas creadas</h4>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Empieza por agregar tu primera zona para organizar tus mesas.</p>
-                </div>
-            ) : (
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
-                   <ul className="divide-y dark:divide-gray-700">
-                        {zones.map(zone => (
-                           <li key={zone.id} className="p-4 flex justify-between items-center">
-                                <div className="flex-grow">
-                                    <input type="text" defaultValue={zone.name} onBlur={(e) => onEditZoneName({ ...zone, name: e.target.value })} className="font-semibold bg-transparent border-none focus:ring-0 p-0 m-0 w-full" />
-                                </div>
-                                <div className="pr-2">
-                                    <ActionMenu zone={zone}/>
-                                </div>
-                           </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-        </div>
-    );
+const ZonesAndTablesSettings: React.FC<{ zones: Zone[]; onAddZone: () => void; onEditZoneName: (zone: Zone) => void; onDeleteZone: (zoneId: string) => void; onEditZoneLayout: (zone: Zone) => void; }> = ({ zones, onAddZone, onEditZoneName, onDeleteZone, onEditZoneLayout }) => {
+    return (<div className="space-y-4"><div className="flex justify-end"><button onClick={onAddZone} className="bg-green-600 text-white px-4 py-2 rounded-md">Nueva Zona</button></div>{zones.map(z => (<div key={z.id} className="flex justify-between items-center p-4 border rounded-md"><span>{z.name}</span><div className="flex gap-2"><button onClick={() => onEditZoneLayout(z)} className="text-blue-500"><IconEdit/></button><button onClick={() => onDeleteZone(z.id)} className="text-red-500"><IconTrash/></button></div></div>))}</div>);
 };
 
 const PrintingSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
     const [originalSettings, setOriginalSettings] = useState(settings.printing);
-    
-    useEffect(() => {
-        setOriginalSettings(settings.printing)
-    }, [settings.printing]);
-
-    const handleCancel = () => {
-        setSettings(prev => ({...prev, printing: originalSettings}));
-    }
-
-    const methods = [
-        { id: PrintingMethod.Native, icon: <IconPrinter/>, description: "Impresión nativa y por defecto del navegador, sin configuración adicional.", tag: null },
-        { id: PrintingMethod.Bluetooth, icon: <IconBluetooth/>, description: "Conexión inalámbrica mediante Bluetooth.", tag: "Impresión automática" },
-        { id: PrintingMethod.USB, icon: <IconUSB/>, description: "Conexión mediante cable USB. Requiere instalar el driver. Solo disponible para computadoras o laptops.", tag: "Impresión automática" },
-    ];
-    
-    return (
-        <div className="space-y-6">
-            <SettingsCard title="Método de impresión" onSave={onSave} onCancel={handleCancel}>
-                <div className="space-y-3">
-                    {methods.map(method => (
-                        <button key={method.id} onClick={() => setSettings(p => ({...p, printing: { method: method.id } }))} className={`w-full text-left p-4 border-2 rounded-lg flex items-start gap-4 transition-all ${settings.printing.method === method.id ? 'border-green-500 bg-green-50 dark:bg-green-900/30' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}`}>
-                            <div className={`flex-shrink-0 ${settings.printing.method === method.id ? 'text-green-600' : 'text-gray-500'}`}>{method.icon}</div>
-                            <div className="flex-grow">
-                                <div className="flex items-center gap-2">
-                                    <h4 className="font-bold">{method.id}</h4>
-                                    {method.tag && <span className="text-xs font-semibold bg-gray-200 dark:bg-gray-600 px-2 py-0.5 rounded-full">{method.tag}</span>}
-                                </div>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{method.description}</p>
-                            </div>
-                            {settings.printing.method === method.id && <IconCheck className="h-6 w-6 text-green-500 flex-shrink-0"/>}
-                        </button>
-                    ))}
-                </div>
-            </SettingsCard>
-        </div>
-    );
+    useEffect(() => { setOriginalSettings(settings.printing) }, [settings.printing]);
+    return (<SettingsCard title="Impresión" onSave={onSave} onCancel={() => setSettings(prev => ({...prev, printing: originalSettings}))}><select value={settings.printing.method} onChange={e => setSettings(p => ({...p, printing: {method: e.target.value as any}}))} className="w-full border p-2 rounded bg-transparent">{Object.values(PrintingMethod).map(m => <option key={m} value={m}>{m}</option>)}</select></SettingsCard>);
 };
 
-const ZoneEditor: React.FC<{
-    initialZone: Zone;
-    onSave: (zone: Zone) => void;
-    onExit: () => void;
-}> = ({ initialZone, onSave, onExit }) => {
+const ZoneEditor: React.FC<{ initialZone: Zone; onSave: (zone: Zone) => void; onExit: () => void; }> = ({ initialZone, onSave, onExit }) => {
     const [zone, setZone] = useState(initialZone);
     const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
     const gridRef = useRef<HTMLDivElement>(null);
 
-    const selectedTable = useMemo(() => zone.tables.find(t => t.id === selectedTableId), [zone.tables, selectedTableId]);
-
-    const isCellOccupied = (row: number, col: number, tableIdToIgnore: string | null = null): boolean => {
-        return zone.tables.some(table => {
-            if (table.id === tableIdToIgnore) return false;
-            return row >= table.row && row < table.row + table.height &&
-                   col >= table.col && col < table.col + table.width;
-        });
-    };
-    
-    const handleTableUpdate = (updatedTable: Table) => {
-        // Check for collisions before updating state
-        for (let r = 0; r < updatedTable.height; r++) {
-            for (let c = 0; c < updatedTable.width; c++) {
-                if (isCellOccupied(updatedTable.row + r, updatedTable.col + c, updatedTable.id)) {
-                    alert("La mesa no puede superponerse con otra existente.");
-                    return; // Abort update
-                }
-            }
-        }
-
-        setZone(prevZone => ({
-            ...prevZone,
-            tables: prevZone.tables.map(t => t.id === updatedTable.id ? updatedTable : t),
-        }));
-    };
-    
     const addTable = (row: number, col: number) => {
-        if (isCellOccupied(row, col)) return;
-
-        const newTable: Table = {
-            id: crypto.randomUUID(), // Use standard UUID generator for Supabase compatibility
-            zoneId: zone.id,
-            name: (zone.tables.length + 1).toString(),
-            row,
-            col,
-            width: 1,
-            height: 1,
-            shape: 'square',
-            status: 'available',
-        };
-
+        const newTable: Table = { id: crypto.randomUUID(), zoneId: zone.id, name: (zone.tables.length + 1).toString(), row, col, width: 1, height: 1, shape: 'square', status: 'available' };
         setZone(prev => ({ ...prev, tables: [...prev.tables, newTable] }));
-        setSelectedTableId(newTable.id);
     };
-    
-    const deleteTable = (tableId: string) => {
-         setZone(prev => ({
-            ...prev,
-            tables: prev.tables.filter(t => t.id !== tableId)
-        }));
-        setSelectedTableId(null);
-    }
-    
-    const TableEditorSidebar: React.FC<{
-        table: Table;
-        onUpdate: (table: Table) => void;
-        onDelete: (tableId: string) => void;
-        onClose: () => void;
-    }> = ({ table, onUpdate, onDelete, onClose }) => {
-        if (!table) return null;
-        return (
-            <div className="absolute top-0 left-0 h-full w-80 bg-white dark:bg-gray-800 shadow-lg z-20 flex flex-col p-4 border-r dark:border-gray-700">
-                <div className="flex justify-between items-center mb-4">
-                    <button onClick={onClose} className="flex items-center text-sm font-semibold">
-                       <IconArrowLeft className="h-4 w-4 mr-1"/> Mesa {table.name}
-                    </button>
-                </div>
-                 <div className="space-y-4 flex-grow">
-                     <div>
-                        <label className="text-sm font-medium">Identificador</label>
-                        <input type="text" value={table.name} onChange={e => onUpdate({...table, name: e.target.value})} className="mt-1 w-full p-2 border dark:border-gray-600 rounded-md bg-transparent"/>
-                    </div>
-                     <div>
-                        <label className="text-sm font-medium">Forma</label>
-                        <select value={table.shape} onChange={e => onUpdate({...table, shape: e.target.value as 'square' | 'round'})} className="mt-1 w-full p-2 border dark:border-gray-600 rounded-md bg-transparent dark:bg-gray-800">
-                            <option value="square">Cuadrada</option>
-                            <option value="round">Redonda</option>
-                        </select>
-                    </div>
-                     <div className="grid grid-cols-2 gap-2">
-                        <div>
-                            <label className="text-sm font-medium">Ancho</label>
-                            <input type="number" min="1" value={table.width} onChange={e => onUpdate({...table, width: Math.max(1, parseInt(e.target.value) || 1)})} className="mt-1 w-full p-2 border dark:border-gray-600 rounded-md bg-transparent" />
-                        </div>
-                         <div>
-                            <label className="text-sm font-medium">Altura</label>
-                            <input type="number" min="1" value={table.height} onChange={e => onUpdate({...table, height: Math.max(1, parseInt(e.target.value) || 1)})} className="mt-1 w-full p-2 border dark:border-gray-600 rounded-md bg-transparent"/>
-                        </div>
-                    </div>
-                 </div>
-                 <button onClick={() => onDelete(table.id)} className="w-full text-red-600 dark:text-red-400 py-2 text-sm font-semibold border border-red-200 dark:border-red-800 rounded-md hover:bg-red-50 dark:hover:bg-red-900/50">Borrar</button>
-            </div>
-        );
-    }
-    
 
     return (
         <div className="fixed inset-0 bg-gray-50 dark:bg-gray-900 z-50 flex flex-col">
-            <header className="bg-white dark:bg-gray-800 p-4 border-b dark:border-gray-700 flex justify-between items-center shrink-0 z-10">
-                <div className="flex items-center gap-x-4">
-                    <button onClick={onExit} className="flex items-center text-red-600 font-semibold text-sm">
-                        <IconLogoutAlt className="h-5 w-5 mr-1 transform rotate-180" />
-                        Salir
-                    </button>
-                    <h2 className="text-xl font-bold">{zone.name}</h2>
-                </div>
-                <button onClick={() => onSave(zone)} className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700">
-                    Guardar
-                </button>
-            </header>
-            <div className="flex-1 flex overflow-hidden relative">
-                {selectedTable && <TableEditorSidebar table={selectedTable} onUpdate={handleTableUpdate} onDelete={deleteTable} onClose={() => setSelectedTableId(null)}/>}
-                
-                <main className="flex-1 p-8 overflow-auto bg-gray-100 dark:bg-gray-900" onClick={(e) => { if(e.target === e.currentTarget) setSelectedTableId(null)}}>
-                    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 w-full min-h-full">
-                        <div
-                            ref={gridRef}
-                            className="grid"
-                            style={{
-                                gridTemplateColumns: `repeat(${zone.cols}, minmax(60px, 1fr))`,
-                                gridTemplateRows: `repeat(${zone.rows}, minmax(60px, 1fr))`,
-                                gap: '1rem'
-                            }}
-                        >
-                           {/* Render tables using pure CSS Grid positioning */}
-                            {zone.tables.map(table => (
-                                <div
-                                    key={table.id}
-                                    onClick={() => setSelectedTableId(table.id)}
-                                    className={`flex items-center justify-center font-bold text-lg text-gray-800 dark:text-gray-100 cursor-pointer border-2 transition-all duration-200
-                                        ${table.shape === 'round' ? 'rounded-full' : 'rounded-lg'}
-                                        ${selectedTableId === table.id ? 'bg-green-200 border-green-500 dark:bg-green-800 dark:border-green-400 ring-2 ring-green-500' : 'bg-white border-gray-300 dark:bg-gray-700 dark:border-gray-600 hover:border-emerald-400'}`
-                                    }
-                                    style={{
-                                        gridRow: `${table.row} / span ${table.height}`,
-                                        gridColumn: `${table.col} / span ${table.width}`,
-                                    }}
-                                >
-                                    {table.name}
-                                </div>
-                            ))}
-                            {/* Render placeholders only in unoccupied cells */}
-                            {Array.from({ length: zone.rows * zone.cols }).map((_, index) => {
-                                const row = Math.floor(index / zone.cols) + 1;
-                                const col = (index % zone.cols) + 1;
-                                if (isCellOccupied(row, col)) return null;
-                                return (
-                                    <div
-                                        key={`cell-${row}-${col}`}
-                                        onClick={() => addTable(row, col)}
-                                        className="bg-gray-100 dark:bg-gray-800/50 rounded-lg flex items-center justify-center text-gray-400 hover:bg-green-100 hover:text-green-600 cursor-pointer border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-green-400"
-                                        style={{ gridRow: row, gridColumn: col }}
-                                    >
-                                        <IconPlus className="h-6 w-6"/>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </main>
-            </div>
+            <header className="bg-white dark:bg-gray-800 p-4 border-b dark:border-gray-700 flex justify-between items-center shrink-0 z-10"><div className="flex items-center gap-x-4"><button onClick={onExit} className="flex items-center text-red-600 font-semibold text-sm"><IconLogoutAlt className="h-5 w-5 mr-1 transform rotate-180" />Salir</button><h2 className="text-xl font-bold">{zone.name}</h2></div><button onClick={() => onSave(zone)} className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700">Guardar</button></header>
+            <main className="flex-1 p-8 overflow-auto bg-gray-100 dark:bg-gray-900"><div className="bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 w-full min-h-full"><div className="grid" style={{ gridTemplateColumns: `repeat(${zone.cols}, minmax(60px, 1fr))`, gridTemplateRows: `repeat(${zone.rows}, minmax(60px, 1fr))`, gap: '1rem' }}>
+                {zone.tables.map(table => (<div key={table.id} className="flex items-center justify-center font-bold text-lg text-gray-800 dark:text-gray-100 cursor-pointer border-2 bg-white border-gray-300 dark:bg-gray-700 dark:border-gray-600" style={{ gridRow: `${table.row} / span ${table.height}`, gridColumn: `${table.col} / span ${table.width}` }}>{table.name}</div>))}
+                {Array.from({ length: zone.rows * zone.cols }).map((_, index) => { const row = Math.floor(index / zone.cols) + 1; const col = (index % zone.cols) + 1; if (zone.tables.some(t => row >= t.row && row < t.row + t.height && col >= t.col && col < t.col + t.width)) return null; return (<div key={`cell-${row}-${col}`} onClick={() => addTable(row, col)} className="bg-gray-100 dark:bg-gray-800/50 rounded-lg flex items-center justify-center text-gray-400 hover:bg-green-100 hover:text-green-600 cursor-pointer border-2 border-dashed border-gray-300 dark:border-gray-600" style={{ gridRow: row, gridColumn: col }}><IconPlus className="h-6 w-6"/></div>); })}
+            </div></div></main>
         </div>
     );
 };
 
-const SettingsModal: React.FC<{
-    isOpen: boolean;
-    onClose: () => void;
-    onEditZoneLayout: (zone: Zone) => void;
-    initialPage?: SettingsPage;
-}> = ({ isOpen, onClose, onEditZoneLayout, initialPage = 'general' }) => {
+const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; onEditZoneLayout: (zone: Zone) => void; initialPage?: SettingsPage; }> = ({ isOpen, onClose, onEditZoneLayout, initialPage = 'general' }) => {
     const [settings, setSettings] = useState<AppSettings | null>(null);
     const [activePage, setActivePage] = useState<SettingsPage>(initialPage);
     const [zones, setZones] = useState<Zone[]>([]);
 
-    useEffect(() => {
-        if (isOpen) {
-            setActivePage(initialPage);
-            getAppSettings().then(setSettings);
-            fetchData();
-        }
-    }, [isOpen, initialPage]);
+    useEffect(() => { if (isOpen) { setActivePage(initialPage); getAppSettings().then(setSettings); getZones().then(setZones); } }, [isOpen, initialPage]);
 
-    const handleSaveSettings = async () => {
-        if (!settings) return;
-        try {
-            await saveAppSettings(settings);
-            alert("¡Configuración guardada!");
-        } catch (error) {
-            alert("Error al guardar la configuración.");
-            console.error(error);
-        }
-    };
+    const handleSaveSettings = async () => { if (!settings) return; try { await saveAppSettings(settings); alert("¡Configuración guardada!"); } catch { alert("Error al guardar."); } };
+    const handleAddZone = async () => { const name = prompt("Nombre de zona:"); if (name) { await saveZone({ name, rows: 5, cols: 5 }); getZones().then(setZones); } };
+    const handleEditZoneName = async (z: Zone) => { await saveZone(z); getZones().then(setZones); };
+    const handleDeleteZone = async (id: string) => { if (confirm("Borrar zona?")) { await deleteZone(id); getZones().then(setZones); } };
 
-    const fetchData = async () => {
-        try {
-            const data = await getZones();
-            setZones(data);
-        } catch (err) {
-            console.error('Failed to load zones.', err);
-        }
-    };
-
-    const handleAddZone = async () => {
-        const name = prompt("Enter new zone name:");
-        if (name) {
-            await saveZone({ name, rows: 5, cols: 5 });
-            fetchData();
-        }
-    };
-
-    const handleEditZoneName = async (zone: Zone) => {
-        if (zone.name.trim() === '') return;
-        await saveZone({ id: zone.id, name: zone.name, rows: zone.rows, cols: zone.cols });
-        fetchData();
-    };
-
-    const handleDeleteZone = async (zoneId: string) => {
-        if (window.confirm("Are you sure you want to delete this zone and all its tables?")) {
-            await deleteZone(zoneId);
-            fetchData();
-        }
-    };
-
-    const handleEditLayout = (zone: Zone) => {
-        onEditZoneLayout(zone);
-    };
-    
     if (!isOpen || !settings) return null;
-
-    const navItems: { id: SettingsPage; name: string; icon: React.ReactNode }[] = [
-        { id: 'general', name: 'General', icon: <IconSettings /> },
-        { id: 'store-data', name: 'Datos de la tienda', icon: <IconStore /> },
-        { id: 'shipping-costs', name: 'Costos de envío', icon: <IconDelivery /> },
-        { id: 'payment-methods', name: 'Métodos de pago', icon: <IconPayment /> },
-        { id: 'hours', name: 'Horarios', icon: <IconClock /> },
-        { id: 'zones-tables', name: 'Zonas y mesas', icon: <IconTableLayout /> },
-        { id: 'printing', name: 'Impresión', icon: <IconPrinter /> },
-    ];
 
     const renderPage = () => {
         switch (activePage) {
@@ -3670,7 +2284,7 @@ const SettingsModal: React.FC<{
             case 'shipping-costs': return <ShippingSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
             case 'payment-methods': return <PaymentSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
             case 'hours': return <HoursSettings onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
-            case 'zones-tables': return <ZonesAndTablesSettings zones={zones} onAddZone={handleAddZone} onEditZoneName={handleEditZoneName} onDeleteZone={handleDeleteZone} onEditZoneLayout={handleEditLayout} />;
+            case 'zones-tables': return <ZonesAndTablesSettings zones={zones} onAddZone={handleAddZone} onEditZoneName={handleEditZoneName} onDeleteZone={handleDeleteZone} onEditZoneLayout={onEditZoneLayout} />;
             case 'printing': return <PrintingSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
             default: return null;
         }
@@ -3679,148 +2293,118 @@ const SettingsModal: React.FC<{
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-40 flex justify-end">
             <div className="bg-white dark:bg-gray-900 h-full w-full max-w-5xl flex flex-col relative">
-                <header className="p-4 border-b dark:border-gray-700 flex justify-between items-center shrink-0">
-                    <div className="flex items-center gap-x-4">
-                        <h2 className="text-xl font-bold">Configuración</h2>
-                    </div>
-                    <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"><IconX /></button>
-                </header>
+                <header className="p-4 border-b dark:border-gray-700 flex justify-between items-center shrink-0"><h2 className="text-xl font-bold">Configuración</h2><button onClick={onClose}><IconX /></button></header>
                 <div className="flex flex-1 overflow-hidden">
-                    <aside className="w-64 border-r dark:border-gray-700 p-4">
-                        <nav className="space-y-1">
-                            {navItems.map(item => (
-                                <button key={item.id} onClick={() => setActivePage(item.id)} className={`w-full flex items-center gap-x-3 px-3 py-2.5 rounded-md text-sm font-medium ${activePage === item.id ? 'bg-green-50 text-green-700 dark:bg-green-900/50 dark:text-green-300' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
-                                    {item.icon}
-                                    {item.name}
-                                </button>
-                            ))}
-                        </nav>
-                    </aside>
-                    <main className="flex-1 p-6 overflow-y-auto bg-gray-50 dark:bg-gray-900/50">
-                        {renderPage()}
-                    </main>
+                    <aside className="w-64 border-r dark:border-gray-700 p-4"><nav className="space-y-1">{['general', 'store-data', 'shipping-costs', 'payment-methods', 'hours', 'zones-tables', 'printing'].map(id => (<button key={id} onClick={() => setActivePage(id as SettingsPage)} className={`w-full text-left px-3 py-2 rounded-md ${activePage === id ? 'bg-green-50 dark:bg-green-900/50' : ''}`}>{id}</button>))}</nav></aside>
+                    <main className="flex-1 p-6 overflow-y-auto bg-gray-50 dark:bg-gray-900/50">{renderPage()}</main>
                 </div>
             </div>
         </div>
     );
 };
 
-const QRModal: React.FC<{
-    isOpen: boolean;
-    onClose: () => void;
-    url: string;
-    title: string;
-    filename: string;
-}> = ({ isOpen, onClose, url, title, filename }) => {
+const QRModal: React.FC<{ isOpen: boolean; onClose: () => void; url: string; title: string; filename: string; }> = ({ isOpen, onClose, url, title }) => {
     if (!isOpen) return null;
-
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(url)}`;
-
-    const handleDownload = async () => {
-        try {
-            const response = await fetch(qrUrl);
-            if (!response.ok) throw new Error('Network response was not ok.');
-            const blob = await response.blob();
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(link.href);
-        } catch (error) {
-            console.error("Failed to download QR code:", error);
-            alert("No se pudo descargar el código QR.");
-        }
-    };
-
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-sm text-center p-8" onClick={e => e.stopPropagation()}>
-                <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">{title}</h2>
-                <p className="text-gray-500 dark:text-gray-400 mb-6">Escanea este código para abrir el menú.</p>
-                <div className="flex justify-center">
-                    <img src={qrUrl} alt={title} className="w-64 h-64 rounded-lg border-4 border-white dark:border-gray-700" />
-                </div>
-                <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                    <button onClick={handleDownload} className="w-full px-4 py-3 bg-green-600 text-white rounded-md text-sm font-semibold hover:bg-green-700">
-                        Descargar QR
-                    </button>
-                    <button onClick={onClose} className="w-full px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md text-sm font-semibold hover:bg-gray-300 dark:hover:bg-gray-600">
-                        Cerrar
-                    </button>
-                </div>
-            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-sm text-center p-8"><h2 className="text-xl font-bold mb-4">{title}</h2><img src={qrUrl} alt="QR" className="mx-auto" /><button onClick={onClose} className="mt-4 bg-gray-200 px-4 py-2 rounded">Cerrar</button></div>
         </div>
     );
 };
 
 const ShareView: React.FC<{ onGoToTableSettings: () => void }> = ({ onGoToTableSettings }) => {
-    const [activeTab, setActiveTab] = useState<'domicilio' | 'mesas' | 'multi-sucursal'>('domicilio');
     const [settings, setSettings] = useState<AppSettings | null>(null);
     const [zones, setZones] = useState<Zone[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isQrModalOpen, setIsQrModalOpen] = useState(false);
-    const [qrModalData, setQrModalData] = useState({ url: '', title: '', filename: '' });
-    const [toastMessage, setToastMessage] = useState<string | null>(null);
+    const [qrModal, setQrModal] = useState({ open: false, url: '', title: '', filename: '' });
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [appSettings, zoneData] = await Promise.all([
-                    getAppSettings(),
-                    getZones()
-                ]);
-                setSettings(appSettings);
-                setZones(zoneData);
-            } catch (error) {
-                console.error("Failed to load share data:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchData();
-    }, []);
+    useEffect(() => { Promise.all([getAppSettings(), getZones()]).then(([s, z]) => { setSettings(s); setZones(z); }); }, []);
 
-    const showToast = (message: string) => {
-        setToastMessage(message);
-        setTimeout(() => setToastMessage(null), 3000);
-    };
-
-    const copyToClipboard = (text: string) => {
-        navigator.clipboard.writeText(text).then(() => {
-            showToast("Enlace copiado al portapapeles");
-        });
-    };
-    
-    const openQrModal = (url: string, title: string, filename: string) => {
-        setQrModalData({ url, title, filename });
-        setIsQrModalOpen(true);
-    };
-
-    if (isLoading || !settings) {
-         return <div className="p-10 text-center">Cargando opciones de compartir...</div>;
-    }
-
-    const baseUrl = window.location.origin + window.location.pathname;
-    const menuLink = `${baseUrl}#/menu`;
+    if (!settings) return <div>Cargando...</div>;
+    const menuLink = `${window.location.origin + window.location.pathname}#/menu`;
 
     return (
         <div className="space-y-6">
-             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6 mb-6">
-                <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">Comparte tu menú digital</h2>
-                <div className="flex items-center gap-4">
-                    <input type="text" readOnly value={menuLink} className="flex-1 bg-gray-100 dark:bg-gray-700 border-none rounded-lg px-4 py-3 text-gray-600 dark:text-gray-300 font-mono text-sm focus:ring-0"/>
-                    <button onClick={() => copyToClipboard(menuLink)} className="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 px-4 py-3 rounded-lg font-semibold transition-colors">Copiar</button>
-                    <button onClick={() => openQrModal(menuLink, "Código QR del Menú", "menu-qr.png")} className="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 px-4 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2">
-                        <IconQR className="h-5 w-5"/> QR
-                    </button>
-                    <a href={menuLink} target="_blank" rel="noopener noreferrer" className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2">
-                        <IconExternalLink className="h-5 w-5"/> Abrir
-                    </a>
-                </div>
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border dark:border-gray-700">
+                <h2 className="text-xl font-bold mb-4">Comparte tu menú</h2>
+                <div className="flex gap-4"><input readOnly value={menuLink} className="flex-1 border p-2 rounded bg-transparent" /><button onClick={() => navigator.clipboard.writeText(menuLink)} className="bg-gray-200 px-4 py-2 rounded">Copiar</button><button onClick={() => setQrModal({ open: true, url: menuLink, title: "QR Menú", filename: "menu.png" })} className="bg-gray-200 px-4 py-2 rounded">QR</button></div>
             </div>
+            {zones.map(z => (<div key={z.id} className="bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"><h3 className="font-bold mb-4">{z.name}</h3><div className="grid grid-cols-4 gap-4">{z.tables.map(t => (<button key={t.id} onClick={() => setQrModal({ open: true, url: `${menuLink}?table=${t.name}&zone=${z.name}`, title: `Mesa ${t.name}`, filename: `qr-${t.name}.png` })} className="border p-4 rounded text-center hover:bg-gray-50 dark:hover:bg-gray-700">Mesa {t.name}</button>))}</div></div>))}
+            <QRModal isOpen={qrModal.open} onClose={() => setQrModal({ ...qrModal, open: false })} url={qrModal.url} title={qrModal.title} filename={qrModal.filename} />
+        </div>
+    );
+};
 
-            <div className="border-b border-gray-200 dark:border-gray-700">
-                <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-                    <button onClick={() => setActiveTab('domicilio')} className={`${activeTab === 'domicilio' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text
+const AdminView: React.FC = () => {
+    const [currentPage, setCurrentPage] = useState<AdminViewPage>('dashboard');
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const [theme, toggleTheme] = useTheme();
+    const [isZoneEditorOpen, setIsZoneEditorOpen] = useState(false);
+    const [zoneToEdit, setZoneToEdit] = useState<Zone | null>(null);
+    const [lastNewOrder, setLastNewOrder] = useState<Order | null>(null);
+    const [hasUnreadOrders, setHasUnreadOrders] = useState(false);
+
+    useEffect(() => {
+        const unsubscribe = subscribeToNewOrders((newOrderPayload: Order) => {
+            playChicAlert();
+            setLastNewOrder(newOrderPayload);
+            setTimeout(() => setLastNewOrder(null), 5000); 
+            if (currentPage !== 'orders') setHasUnreadOrders(true);
+        });
+        
+        const unlockAudio = () => {
+             const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+             if(AudioContext) {
+                 const ctx = new AudioContext();
+                 ctx.resume();
+             }
+             window.removeEventListener('click', unlockAudio);
+             window.removeEventListener('touchstart', unlockAudio);
+        };
+        
+        window.addEventListener('click', unlockAudio);
+        window.addEventListener('touchstart', unlockAudio);
+
+        return () => { unsubscribe(); };
+    }, [currentPage]);
+
+    useEffect(() => {
+        if (currentPage === 'orders') setHasUnreadOrders(false);
+    }, [currentPage]);
+
+    const openTableSettings = () => { setIsSettingsOpen(true); };
+    const handleEditZoneLayout = (zone: Zone) => { setZoneToEdit(zone); setIsSettingsOpen(false); setIsZoneEditorOpen(true); };
+    const handleSaveZoneLayout = async (updatedZone: Zone) => { try { await saveZoneLayout(updatedZone); setIsZoneEditorOpen(false); setZoneToEdit(null); setIsSettingsOpen(true); } catch (error) { alert("Error al guardar la distribución: " + error); } };
+
+    const renderPage = () => {
+        switch (currentPage) {
+            case 'dashboard': return <Dashboard />;
+            case 'products': return <MenuManagement />;
+            case 'orders': return <OrderManagement onSettingsClick={openTableSettings} />;
+            case 'analytics': return <Analytics />;
+            case 'messages': return <Messages />;
+            case 'availability': return <AvailabilityView />;
+            case 'share': return <ShareView onGoToTableSettings={openTableSettings}/>;
+            case 'tutorials': return <div className="p-10 text-center text-gray-500">Tutoriales próximamente...</div>;
+            default: return <Dashboard />;
+        }
+    };
+
+    return (
+        <div className="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-200 overflow-hidden transition-colors duration-200">
+            <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} hasUnreadOrders={hasUnreadOrders} />
+            <div className="flex-1 flex flex-col min-w-0 relative">
+                <Header title={PAGE_TITLES[currentPage]} onSettingsClick={() => setIsSettingsOpen(true)} onPreviewClick={() => setIsPreviewOpen(true)} theme={theme} toggleTheme={toggleTheme} />
+                <main className="flex-1 overflow-auto p-8 scroll-smooth">
+                    <div className="max-w-7xl mx-auto">{renderPage()}</div>
+                </main>
+                <NewOrderToast order={lastNewOrder} onClose={() => setLastNewOrder(null)} />
+            </div>
+            {isZoneEditorOpen && zoneToEdit && (<ZoneEditor initialZone={zoneToEdit} onSave={handleSaveZoneLayout} onExit={() => { setIsZoneEditorOpen(false); setZoneToEdit(null); setIsSettingsOpen(true); }} />)}
+            <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} onEditZoneLayout={handleEditZoneLayout} />
+        </div>
+    );
+};
+
+export default AdminView;
