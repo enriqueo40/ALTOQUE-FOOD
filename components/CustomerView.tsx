@@ -190,30 +190,35 @@ const RestaurantHero: React.FC<{
     );
 };
 
+// --- Lógica de Promociones ---
+
+/**
+ * Helper para calcular el precio final basándose en promociones activas
+ */
 const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price: number, promotion?: Promotion } => {
     const now = new Date();
-    // Filter active promotions based on dates and product applicability
-    const activePromotions = promotions.filter(p => {
-        const startDate = p.startDate ? new Date(p.startDate + 'T00:00:00') : null;
-        const endDate = p.endDate ? new Date(p.endDate + 'T23:59:59') : null;
-        
-        if (startDate && now < startDate) return false;
-        if (endDate && now > endDate) return false;
-        
+    const todayStr = now.toISOString().split('T')[0];
+
+    // Filtrar promociones activas para la fecha de hoy
+    const activePromos = promotions.filter(p => {
+        const isDateActive = (!p.startDate || todayStr >= p.startDate) && (!p.endDate || todayStr <= p.endDate);
+        if (!isDateActive) return false;
+
+        // Si aplica a todos o si el producto está en la lista específica
         if (p.appliesTo === PromotionAppliesTo.AllProducts) return true;
         return p.productIds?.includes(product.id);
     });
 
-    if (activePromotions.length === 0) return { price: product.price };
+    if (activePromos.length === 0) return { price: product.price };
 
-    // Find best discount
+    // Buscar la promoción que otorgue el mejor descuento (precio más bajo)
     let bestPrice = product.price;
     let bestPromo: Promotion | undefined;
 
-    activePromotions.forEach(promo => {
+    activePromos.forEach(promo => {
         let currentPrice = product.price;
         if (promo.discountType === DiscountType.Percentage) {
-            currentPrice = product.price * (1 - promo.discountValue / 100);
+            currentPrice = product.price * (1 - (promo.discountValue / 100));
         } else {
             currentPrice = Math.max(0, product.price - promo.discountValue);
         }
@@ -228,16 +233,16 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
 };
 
 const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: () => void; currency: string; promotions: Promotion[] }> = ({ product, quantityInCart, onClick, currency, promotions }) => {
-    const { price: discountedPrice, promotion } = getDiscountedPrice(product, promotions);
+    const { price: finalPrice, promotion } = getDiscountedPrice(product, promotions);
     const hasDiscount = promotion !== undefined;
 
     return (
         <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group relative overflow-hidden">
-            {/* Promotion Ribbon */}
+            {/* Listón de Oferta */}
             {hasDiscount && (
                 <div className="absolute top-0 left-0 bg-rose-600 text-white text-[10px] font-black px-2.5 py-1 rounded-br-lg z-10 shadow-lg flex flex-col items-center">
                     <span>-{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}</span>
-                    <span className="text-[6px] opacity-80 uppercase -mt-0.5 font-bold">OFERTA</span>
+                    <span className="text-[7px] uppercase opacity-80 -mt-0.5">Oferta</span>
                 </div>
             )}
             <div className="relative h-24 w-24 flex-shrink-0">
@@ -257,12 +262,15 @@ const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: 
                     <p className="text-sm text-gray-400 line-clamp-2 mt-1 leading-snug">{product.description}</p>
                 </div>
                 <div className="flex justify-between items-end mt-2">
-                    {/* Price Hierarchy */}
                     <div className="flex flex-col">
                         {hasDiscount && (
-                            <span className="text-[10px] text-gray-500 line-through font-medium opacity-60">{currency} ${product.price.toFixed(2)}</span>
+                            <span className="text-[10px] text-gray-500 line-through mb-0.5 opacity-60 font-medium">
+                                {currency} ${product.price.toFixed(2)}
+                            </span>
                         )}
-                        <p className={`font-black text-lg ${hasDiscount ? 'text-rose-500' : 'text-white'}`}>{currency} ${discountedPrice.toFixed(2)}</p>
+                        <p className={`font-black text-lg ${hasDiscount ? 'text-rose-500' : 'text-white'}`}>
+                            {currency} ${finalPrice.toFixed(2)}
+                        </p>
                     </div>
                     <div className="bg-gray-700 p-1.5 rounded-full text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors shadow-sm">
                         <IconPlus className="h-4 w-4" />
@@ -278,7 +286,7 @@ const MenuList: React.FC<{
     categories: Category[],
     onProductClick: (product: Product) => void, 
     cartItems: CartItem[], 
-    currency: string, 
+    currency: string,
     promotions: Promotion[]
 }> = ({ products, categories, onProductClick, cartItems, currency, promotions }) => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -384,7 +392,7 @@ const ProductDetailModal: React.FC<{
         setTimeout(onClose, 300);
     };
 
-    const { price: basePrice, promotion } = getDiscountedPrice(product, promotions);
+    const { price: discountedPrice, promotion } = getDiscountedPrice(product, promotions);
 
     const handleOptionToggle = (personalization: Personalization, option: PersonalizationOption) => {
         setSelectedOptions(prev => {
@@ -403,12 +411,7 @@ const ProductDetailModal: React.FC<{
 
     let totalOptionsPrice = 0;
     (Object.values(selectedOptions) as PersonalizationOption[][]).forEach(group => group.forEach(opt => { totalOptionsPrice += Number(opt.price || 0); }));
-    const totalPrice = (basePrice + totalOptionsPrice) * quantity;
-
-    const handleAdd = () => {
-        const flatOptions = (Object.values(selectedOptions) as PersonalizationOption[][]).reduce((acc: PersonalizationOption[], curr: PersonalizationOption[]) => acc.concat(curr), []);
-        onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptions);
-    }
+    const totalPrice = (discountedPrice + totalOptionsPrice) * quantity;
 
     return (
         <div className={`fixed inset-0 z-50 flex items-end justify-center sm:items-center transition-opacity duration-300 ${isClosing ? 'opacity-0' : 'opacity-100'}`}>
@@ -423,7 +426,8 @@ const ProductDetailModal: React.FC<{
                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover rounded-t-3xl sm:rounded-t-2xl" />
                      <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent h-full w-full pointer-events-none"></div>
                      {promotion && (
-                        <div className="absolute top-6 left-6 bg-rose-600 text-white px-3 py-1.5 rounded-full text-xs font-black shadow-xl z-10 animate-bounce-short uppercase tracking-wider">
+                        <div className="absolute top-6 left-6 bg-rose-600 text-white px-3 py-1.5 rounded-full text-xs font-black shadow-xl z-10 flex items-center gap-1.5 animate-pulse uppercase tracking-wider">
+                            <IconTag className="h-3 w-3" />
                             ¡Super Oferta!
                         </div>
                      )}
@@ -432,22 +436,12 @@ const ProductDetailModal: React.FC<{
                 <div className="p-6 flex-grow overflow-y-auto -mt-12 relative z-10">
                     <div className="flex justify-between items-start mb-2">
                         <h2 className="text-3xl font-black text-white">{product.name}</h2>
-                        {promotion && (
-                            <div className="text-right">
-                                <span className="text-gray-500 line-through text-sm font-medium">{currency} ${product.price.toFixed(2)}</span>
-                                <p className="text-rose-500 text-xl font-black">-{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}</p>
-                            </div>
-                        )}
                     </div>
-                    
-                    {/* Active Promotion Banner */}
                     {promotion && (
-                        <div className="mb-4 flex items-center gap-2 bg-rose-900/20 border border-rose-500/30 p-2.5 rounded-xl animate-pulse-subtle">
-                            <IconTag className="h-4 w-4 text-rose-500" />
+                        <div className="mb-4 flex items-center gap-2 bg-rose-900/20 border border-rose-500/30 p-2.5 rounded-xl">
                             <p className="text-xs font-bold text-rose-400">Promoción activa: {promotion.name}</p>
                         </div>
                     )}
-
                     <p className="text-gray-300 leading-relaxed mb-8">{product.description}</p>
                     
                     <div className="space-y-6">
@@ -485,20 +479,30 @@ const ProductDetailModal: React.FC<{
 
                 <div className="p-4 border-t border-gray-800 bg-gray-900 rounded-b-3xl sm:rounded-b-2xl safe-bottom">
                     <div className="flex items-center justify-between gap-4 mb-4">
-                         <span className="text-gray-400 font-bold uppercase text-xs tracking-widest">Cantidad</span>
+                         <div className="flex flex-col">
+                            {promotion && (
+                                <span className="text-xs text-gray-500 line-through font-medium opacity-60">
+                                    {currency} ${product.price.toFixed(2)}
+                                </span>
+                            )}
+                            <span className="text-gray-400 font-bold uppercase text-xs tracking-widest">Total Unitario: <span className={promotion ? 'text-rose-400' : 'text-emerald-400'}>${(totalPrice / quantity).toFixed(2)}</span></span>
+                         </div>
                          <div className="flex items-center gap-6 bg-gray-800 rounded-full px-2 py-1 border border-gray-700">
                             <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="p-2 rounded-full hover:bg-gray-700 text-white transition-colors"><IconMinus className="h-5 w-5"/></button>
                             <span className="font-bold text-xl text-white w-6 text-center">{quantity}</span>
                             <button onClick={() => setQuantity(q => q + 1)} className="p-2 rounded-full hover:bg-gray-700 text-white transition-colors"><IconPlus className="h-5 w-5"/></button>
                         </div>
                     </div>
-                    <button onClick={handleAdd} className="w-full font-black py-4 px-6 rounded-xl transition-all transform active:scale-[0.98] shadow-2xl flex justify-between items-center bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-900/50">
+                    <button onClick={() => {
+                        const flatOptions = (Object.values(selectedOptions) as PersonalizationOption[][]).reduce((acc: PersonalizationOption[], curr: PersonalizationOption[]) => acc.concat(curr), []);
+                        // Pasar el producto con el precio descontado al carrito para el cálculo total
+                        onAddToCart({ ...product, price: discountedPrice }, quantity, comments, flatOptions);
+                    }} className="w-full font-black py-4 px-6 rounded-xl transition-all transform active:scale-[0.98] shadow-2xl flex justify-between items-center bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-900/50">
                         <span className="uppercase tracking-tight">Agregar al pedido</span>
                         <span className="text-xl">${totalPrice.toFixed(2)}</span>
                     </button>
                 </div>
             </div>
-            <style>{`@keyframes bounce-short { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } } .animate-bounce-short { animation: bounce-short 2s infinite ease-in-out; } @keyframes pulse-subtle { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } } .animate-pulse-subtle { animation: pulse-subtle 3s infinite ease-in-out; }`}</style>
         </div>
     );
 }
