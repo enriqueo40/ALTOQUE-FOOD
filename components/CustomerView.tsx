@@ -502,16 +502,16 @@ const ProductDetailModal: React.FC<{
     };
 
     const isOptionSelected = (pid: string, oid: string) => {
-        return (selectedOptions[pid] || []).some(o => o.id === oid);
+        return selectedOptions[pid]?.some(o => o.id === oid);
     };
 
-    // Fix: Using a loop to avoid '+' operator type inference issues with 'unknown' in reduce
+    // FIX: Operator '+' cannot be applied to types 'number' and 'unknown'.
+    // Replaced reduce with a more robust typing and explicit loop to avoid type inference issues.
     let totalOptionsPrice = 0;
-    const optionGroups = Object.values(selectedOptions);
-    for (const group of optionGroups) {
-        const options = group as PersonalizationOption[];
-        for (const opt of options) {
-            totalOptionsPrice += (Number(opt.price) || 0);
+    const selectedOptionGroups = Object.values(selectedOptions) as PersonalizationOption[][];
+    for (const group of selectedOptionGroups) {
+        for (const opt of group) {
+            totalOptionsPrice += Number(opt.price || 0);
         }
     }
     
@@ -519,7 +519,7 @@ const ProductDetailModal: React.FC<{
 
     const handleAdd = () => {
         // Correctly typed concat and reduce
-        const flatOptions = (Object.values(selectedOptions) as PersonalizationOption[][]).reduce((acc, curr) => acc.concat(curr), []);
+        const flatOptions = Object.values(selectedOptions).reduce((acc: PersonalizationOption[], curr: PersonalizationOption[]) => acc.concat(curr), []);
         onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptions);
     }
 
@@ -567,7 +567,7 @@ const ProductDetailModal: React.FC<{
                                             <div 
                                                 key={opt.id} 
                                                 onClick={() => handleOptionToggle(p, opt)}
-                                                className={`flex justify-between items-center p-3 rounded-lg cursor-pointer border transition-all ${isSelected ? 'bg-emerald-500/20 border-emerald-500 ring-1 ring-emerald-500 shadow-lg shadow-emerald-900/20' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}
+                                                className={`flex justify-between items-center p-3 rounded-lg cursor-pointer border transition-all ${isSelected ? 'bg-emerald-500/20 border-emerald-500 ring-1 border-emerald-500 shadow-lg shadow-emerald-900/20' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}
                                             >
                                                 <div className="flex items-center gap-3">
                                                     <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${isSelected ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-gray-500'}`}>
@@ -851,7 +851,7 @@ const CheckoutView: React.FC<{
                  <div className="space-y-2 pt-2">
                     {availablePaymentMethods.map(method => (
                         <div key={method}>
-                            <label className={`flex justify-between items-center p-4 rounded-xl cursor-pointer transition-all border ${selectedPaymentMethod === method ? 'bg-emerald-900/20 border-emerald-500 ring-1 ring-emerald-500 shadow-lg shadow-emerald-900/10' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}>
+                            <label className={`flex justify-between items-center p-4 rounded-xl cursor-pointer transition-all border ${selectedPaymentMethod === method ? 'bg-emerald-900/20 border-emerald-500 ring-1 border-emerald-500 shadow-lg shadow-emerald-900/10' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}>
                                 <span className={`font-medium ${selectedPaymentMethod === method ? 'text-emerald-400' : 'text-white'}`}>{method}</span>
                                 <input type="radio" name="payment" value={method} checked={selectedPaymentMethod === method} onChange={() => {setSelectedPaymentMethod(method); setPaymentProof(null);}} className="h-5 w-5 accent-emerald-500" />
                             </label>

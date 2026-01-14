@@ -54,6 +54,7 @@ export interface Customer {
     phone: string;
     address: Address;
     paymentProof?: string;
+    paymentMethod?: string;
 }
 
 export interface Order {
