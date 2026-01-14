@@ -901,19 +901,125 @@ export default function CustomerView() {
 
     const handlePlaceOrder = async (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number = 0, paymentProof: string | null = null) => {
         if (!settings) return;
-        const shippingCost = (orderType === OrderType.Delivery && settings.shipping.costType === ShippingCostType.Fixed) ? (Number(settings.shipping.fixedCost) || 0) : 0;
+
+        const shippingCost = (orderType === OrderType.Delivery && settings.shipping.costType === ShippingCostType.Fixed) 
+            ? (Number(settings.shipping.fixedCost) || 0) 
+            : 0;
+
         const finalTotal = cartTotal + shippingCost + tipAmount;
-        const newOrder: Omit<Order, 'id' | 'createdAt'> = { customer, items: cartItems, total: finalTotal, status: OrderStatus.Pending, branchId: 'main-branch', generalComments: generalComments + (tipAmount > 0 ? ` | Propina: ${settings.company.currency.code} ${tipAmount.toFixed(2)}` : ''), orderType: orderType, tableId: orderType === OrderType.DineIn && tableInfo ? `${tableInfo.zone} - ${tableInfo.table}` : undefined, paymentProof: paymentProof || undefined };
-        try { await saveOrder(newOrder); } catch(e) { console.error(e); alert("Hubo un error al guardar tu pedido."); return; }
-        const itemDetails = cartItems.map(item => `▪️ ${item.quantity}x ${item.name}${item.selectedOptions?.length ? `\n   + ${item.selectedOptions.map(o => o.name).join('\n   + ')}` : ''}${item.comments ? `\n   _Nota: ${item.comments}_` : ''}`);
+
+        const newOrder: Omit<Order, 'id' | 'createdAt'> = {
+            customer,
+            items: cartItems,
+            total: finalTotal,
+            status: OrderStatus.Pending,
+            branchId: 'main-branch',
+            generalComments: generalComments + (tipAmount > 0 ? ` | Propina: ${settings.company.currency.code} ${tipAmount.toFixed(2)}` : ''),
+            orderType: orderType,
+            tableId: orderType === OrderType.DineIn && tableInfo ? `${tableInfo.zone} - ${tableInfo.table}` : undefined,
+            paymentProof: paymentProof || undefined,
+        };
+
+        try {
+            await saveOrder(newOrder);
+        } catch(e) {
+            console.error("Failed to save order", e);
+            alert("Hubo un error al guardar tu pedido. Por favor, intenta de nuevo.");
+            return;
+        }
+
         const currency = settings.company.currency.code;
-        const lineSeparator = "━━━━━━━━━━━━━━━━━━━━";
-        let messageParts = [`🧾 *TICKET DE PEDIDO*`, `📍 *${settings.company.name.toUpperCase()}*`, lineSeparator, `🗓️ Fecha: ${new Date().toLocaleDateString()}`, `⏰ Hora: ${new Date().toLocaleTimeString()}`, lineSeparator];
-        if (orderType === OrderType.DineIn) messageParts.push(`🪑 *UBICACIÓN*\nZona: ${tableInfo?.zone}\nMesa: ${tableInfo?.table}\n👤 Cliente: ${customer.name}`, lineSeparator);
-        else messageParts.push(`👤 *CLIENTE*\nNombre: ${customer.name}\nTel: ${customer.phone}\n🏷️ Tipo: ${orderType === OrderType.TakeAway ? 'Para llevar' : 'Domicilio'}`, lineSeparator);
-        if (orderType === OrderType.Delivery) messageParts.push(`📍 *DIRECCIÓN*\n🏠 ${customer.address.calle} #${customer.address.numero}\n🏙️ Col. ${customer.address.colonia}${customer.address.referencias ? `\nRef: ${customer.address.referencias}` : ''}`, lineSeparator);
-        messageParts.push(`🛒 *DETALLE*`, ...itemDetails, ``, generalComments ? `📝 *NOTAS:* ${generalComments}` : '', lineSeparator, `💰 *RESUMEN*\nSubtotal: ${currency} $${cartTotal.toFixed(2)}`, orderType === OrderType.Delivery ? `Envío: ${shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : 'Por cotizar'}` : '', tipAmount > 0 ? `Propina: ${currency} $${tipAmount.toFixed(2)}` : '', `*TOTAL A PAGAR: ${currency} $${finalTotal.toFixed(2)}*`, lineSeparator, `💳 Método: ${paymentMethod}`, paymentProof ? "\n📸 *Comprobante adjunto*" : "", `✅ Estado: PENDIENTE`);
-        window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(messageParts.filter(p => p !== '').join('\n'))}`, '_blank');
+        
+        // --- Improved Message Construction ---
+        const itemDetails = cartItems.map(item => {
+            // Calculate individual item total including options
+            const optionsPrice = item.selectedOptions ? item.selectedOptions.reduce((acc, opt) => acc + opt.price, 0) : 0;
+            const itemTotal = (item.price + optionsPrice) * item.quantity;
+
+            let detail = `▪️ *${item.quantity}x ${item.name}* ($${itemTotal.toFixed(2)})`;
+            
+            if (item.selectedOptions && item.selectedOptions.length > 0) {
+                detail += `\n   └ ${item.selectedOptions.map(o => o.name).join(', ')}`;
+            }
+            if (item.comments) {
+                detail += `\n   _Nota: ${item.comments}_`;
+            }
+            return detail;
+        }).join('\n');
+
+        const lineSeparator = "--------------------------------";
+        const proofMessage = paymentProof ? "\n📸 *Comprobante de pago adjunto*" : "";
+
+        let messageParts: string[] = [];
+
+        // Header
+        messageParts.push(`🧾 *NUEVO PEDIDO WEB*`);
+        messageParts.push(`📍 *${settings.company.name.toUpperCase()}*`);
+        messageParts.push(lineSeparator);
+
+        // Date Info
+        messageParts.push(`🗓️ ${new Date().toLocaleDateString()}  ⏰ ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`);
+        messageParts.push(lineSeparator);
+
+        // Customer & Type Info
+        if (orderType === OrderType.DineIn && tableInfo) {
+            messageParts.push(`🍽️ *MESA (DINE-IN)*`);
+            messageParts.push(`🪑 Zona: ${tableInfo.zone} | Mesa: ${tableInfo.table}`);
+            messageParts.push(`👤 Cliente: ${customer.name}`);
+        } else if (orderType === OrderType.TakeAway) {
+            messageParts.push(`🛍️ *PARA RECOGER (PICKUP)*`);
+            messageParts.push(`👤 Cliente: ${customer.name}`);
+            messageParts.push(`📞 Tel: ${customer.phone}`);
+        } else {
+            messageParts.push(`🛵 *A DOMICILIO (DELIVERY)*`);
+            messageParts.push(`👤 Cliente: ${customer.name}`);
+            messageParts.push(`📞 Tel: ${customer.phone}`);
+            messageParts.push(`📍 Dir: ${customer.address.calle} #${customer.address.numero}, ${customer.address.colonia}`);
+            if (customer.address.referencias) messageParts.push(`👀 Ref: ${customer.address.referencias}`);
+        }
+        
+        messageParts.push(lineSeparator);
+
+        // Items
+        messageParts.push(`🛒 *DETALLE DEL PEDIDO:*`);
+        messageParts.push(itemDetails);
+        messageParts.push(``); // Empty line
+
+        if (generalComments) {
+            messageParts.push(`📝 *NOTA GENERAL:* ${generalComments}`);
+            messageParts.push(lineSeparator);
+        } else {
+            messageParts.push(lineSeparator);
+        }
+
+        // Financials
+        messageParts.push(`💵 *RESUMEN:*`);
+        messageParts.push(`Subtotal: ${currency} $${cartTotal.toFixed(2)}`);
+        
+        if (orderType === OrderType.Delivery && settings.shipping.costType !== ShippingCostType.ToBeQuoted) {
+             messageParts.push(`Envío: ${shippingCost === 0 ? 'GRATIS' : `${currency} $${shippingCost.toFixed(2)}`}`);
+        } else if (orderType === OrderType.Delivery) {
+             messageParts.push(`Envío: Por cotizar`);
+        }
+
+        if (tipAmount > 0) {
+            messageParts.push(`Propina: ${currency} $${tipAmount.toFixed(2)}`);
+        }
+
+        messageParts.push(`*TOTAL A PAGAR: ${currency} $${finalTotal.toFixed(2)}*`);
+        messageParts.push(lineSeparator);
+
+        // Payment
+        messageParts.push(`💳 *MÉTODO PAGO:* ${paymentMethod}`);
+        if (proofMessage) messageParts.push(proofMessage);
+        
+        messageParts.push(`✅ *Estado:* PENDIENTE DE CONFIRMACIÓN`);
+
+        // Use 'api.whatsapp.com' for better reliability with pre-filled text
+        const finalMessage = messageParts.join('\n');
+        const whatsappUrl = `https://api.whatsapp.com/send?phone=${settings.branch.whatsappNumber.replace(/\D/g,'')}&text=${encodeURIComponent(finalMessage)}`;
+        
+        window.open(whatsappUrl, '_blank');
         setView('confirmation');
     };
 
