@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { useTheme } from '../hooks/useTheme';
 import { useCart } from '../hooks/useCart';
@@ -76,13 +76,13 @@ const NewOrderToast: React.FC<{ order: Order | null; onClose: () => void }> = ({
 
     return (
         <div className="fixed top-24 right-5 z-50 w-80 animate-fade-in-up">
-            <div className="relative bg-white/90 dark:bg-gray-800/90 backdrop-blur-md border-l-4 border-emerald-500 shadow-2xl rounded-r-lg p-4 overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-[shimmer_1s_infinite]"></div>
+            <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl border-l-4 border-emerald-500 shadow-2xl rounded-r-lg p-4 overflow-hidden border border-gray-100 dark:border-gray-700">
+                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-[shimmer_1.5s_infinite]"></div>
                 
                 <div className="flex justify-between items-start relative z-10">
                     <div className="flex items-start gap-3">
-                         <div className="bg-emerald-100 dark:bg-emerald-900/50 p-2 rounded-full text-emerald-600 dark:text-emerald-400">
-                             <IconBell className="h-6 w-6 animate-swing" />
+                         <div className="bg-emerald-100 dark:bg-emerald-900/50 p-2 rounded-full text-emerald-600 dark:text-emerald-400 shadow-sm">
+                             <IconBell className="h-6 w-6 animate-[swing_1s_ease-in-out_infinite]" />
                          </div>
                          <div>
                              <h4 className="font-bold text-gray-900 dark:text-gray-100 text-base">¡Nuevo Pedido!</h4>
@@ -103,7 +103,9 @@ const NewOrderToast: React.FC<{ order: Order | null; onClose: () => void }> = ({
                     60% { transform: rotate(5deg); }
                     80% { transform: rotate(-5deg); }
                 }
-                .animate-swing { animation: swing 1s ease-in-out; }
+                .animate-fade-in-up { animation: fadeInUp 0.5s ease-out forwards; }
+                @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+                @keyframes shimmer { 100% { transform: translateX(100%); } }
             `}</style>
         </div>
     );
@@ -231,8 +233,7 @@ const FilterDropdown: React.FC<{ label: string; options: string[]; icon?: React.
     );
 };
 
-// Memoized Stat Card for Performance
-const DashboardStatCard: React.FC<{ title: string; value: string; secondaryValue: string; }> = React.memo(({ title, value, secondaryValue }) => (
+const DashboardStatCard: React.FC<{ title: string; value: string; secondaryValue: string; }> = ({ title, value, secondaryValue }) => (
     <div className="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
         <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</h4>
         <div className="mt-2">
@@ -240,27 +241,10 @@ const DashboardStatCard: React.FC<{ title: string; value: string; secondaryValue
             <p className="text-sm text-gray-500 dark:text-gray-400">{secondaryValue}</p>
         </div>
     </div>
-));
-
-// Skeleton Loader for Dashboard
-const DashboardSkeleton: React.FC = () => (
-    <div className="space-y-6 animate-pulse">
-        <div className="bg-gray-200 dark:bg-gray-700 h-20 rounded-lg w-full"></div>
-        <div className="flex gap-4">
-            <div className="bg-gray-200 dark:bg-gray-700 h-10 w-32 rounded-md"></div>
-            <div className="bg-gray-200 dark:bg-gray-700 h-10 w-48 rounded-md"></div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[...Array(4)].map((_, i) => (
-                <div key={i} className="bg-gray-200 dark:bg-gray-700 h-32 rounded-lg"></div>
-            ))}
-            <div className="bg-gray-200 dark:bg-gray-700 h-48 rounded-lg lg:col-span-2"></div>
-            <div className="bg-gray-200 dark:bg-gray-700 h-48 rounded-lg lg:col-span-2"></div>
-        </div>
-    </div>
 );
 
 const Dashboard: React.FC = () => {
+    // Connected to Real Data from Supabase
     const [orders, setOrders] = useState<Order[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     
@@ -274,14 +258,14 @@ const Dashboard: React.FC = () => {
     const totalSales = useMemo(() => orders.reduce((sum, order) => sum + order.total, 0), [orders]);
     const totalOrders = orders.length;
 
-    const previousDaySales = totalSales * 0.9; 
-    const previousDayOrders = Math.floor(totalOrders * 0.9); 
+    const previousDaySales = totalSales * 0.9; // Simulation for comparison
+    const previousDayOrders = Math.floor(totalOrders * 0.9); // Simulation for comparison
     
     const totalEnvios = orders.filter(o => o.orderType === OrderType.Delivery).length;
-    const totalPropinas = 0; 
+    const totalPropinas = 0; // This would need extraction from order details if stored separately
 
     if (isLoading) {
-        return <DashboardSkeleton />;
+        return <div className="p-10 text-center animate-pulse text-gray-500">Cargando estadísticas...</div>;
     }
 
     return (
@@ -304,6 +288,7 @@ const Dashboard: React.FC = () => {
                 <DashboardStatCard title="Envíos" value={totalEnvios.toString()} secondaryValue={"0"} />
                 <DashboardStatCard title="Propinas" value={`$${totalPropinas.toFixed(2)}`} secondaryValue={"$0.00"} />
 
+                {/* Placeholder Cards */}
                 <div className="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 lg:col-span-2">
                     <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-4">Ticket promedio</h4>
                     <div className="h-48 flex items-center justify-center">
@@ -327,8 +312,7 @@ const Dashboard: React.FC = () => {
     );
 };
 
-// Memoized Product Item for List
-const ProductListItem: React.FC<{product: Product, onEdit: () => void, onDuplicate: () => void, onDelete: () => void}> = React.memo(({product, onEdit, onDuplicate, onDelete}) => {
+const ProductListItem: React.FC<{product: Product, onEdit: () => void, onDuplicate: () => void, onDelete: () => void}> = ({product, onEdit, onDuplicate, onDelete}) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -346,7 +330,7 @@ const ProductListItem: React.FC<{product: Product, onEdit: () => void, onDuplica
         <div className="flex items-center justify-between p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/50">
             <div className="flex items-center gap-x-4">
                 <IconGripVertical className="h-5 w-5 text-gray-400 cursor-grab" />
-                <img src={product.imageUrl} alt={product.name} loading="lazy" className="w-12 h-12 rounded-md object-cover bg-gray-200 dark:bg-gray-700"/>
+                <img src={product.imageUrl} alt={product.name} className="w-12 h-12 rounded-md object-cover"/>
                 <span className="font-medium text-gray-800 dark:text-gray-100">{product.name}</span>
             </div>
             <div className="relative" ref={menuRef}>
@@ -366,7 +350,7 @@ const ProductListItem: React.FC<{product: Product, onEdit: () => void, onDuplica
             </div>
         </div>
     )
-});
+}
 
 const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (product: Omit<Product, 'id' | 'created_at'> & { id?: string }) => void; product: Product | null; categories: Category[] }> = ({ isOpen, onClose, onSave, product, categories }) => {
     const [formData, setFormData] = useState<Partial<Product>>({});
@@ -378,14 +362,7 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
             if (product) {
                 setFormData(product);
             } else {
-                setFormData({
-                    name: '',
-                    description: '',
-                    price: 0,
-                    imageUrl: '',
-                    categoryId: categories[0]?.id || '',
-                    available: true,
-                });
+                setFormData({ name: '', description: '', price: 0, imageUrl: '', categoryId: categories[0]?.id || '', available: true });
             }
         }
     }, [product, isOpen, categories]);
@@ -393,12 +370,8 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
         let processedValue: string | number | boolean = value;
-        if (type === 'number') {
-            processedValue = parseFloat(value) || 0;
-        }
-        if (name === 'available') {
-            processedValue = (e.target as HTMLInputElement).checked;
-        }
+        if (type === 'number') processedValue = parseFloat(value) || 0;
+        if (name === 'available') processedValue = (e.target as HTMLInputElement).checked;
         setFormData(prev => ({ ...prev, [name]: processedValue }));
     };
 
@@ -406,26 +379,17 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
             const reader = new FileReader();
-            reader.onloadend = () => {
-                setFormData(prev => ({ ...prev, imageUrl: reader.result as string }));
-            };
+            reader.onloadend = () => { setFormData(prev => ({ ...prev, imageUrl: reader.result as string })); };
             reader.readAsDataURL(file);
         }
     };
 
     const handleGenerateDescription = async () => {
-        if (!formData.name) {
-            alert("Por favor, introduce primero el nombre del producto.");
-            return;
-        }
+        if (!formData.name) { alert("Por favor, introduce primero el nombre del producto."); return; }
         setIsGenerating(true);
         try {
             const categoryName = categories.find(c => c.id === formData.categoryId)?.name || 'General';
-            const description = await generateProductDescription(
-                formData.name!,
-                categoryName,
-                formData.description || ''
-            );
+            const description = await generateProductDescription(formData.name!, categoryName, formData.description || '');
             setFormData(prev => ({ ...prev, description }));
         } catch (error) {
             console.error("Error generating description:", error);
@@ -437,10 +401,7 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.imageUrl) {
-            alert("Por favor, sube una imagen para el producto.");
-            return;
-        }
+        if (!formData.imageUrl) { alert("Por favor, sube una imagen para el producto."); return; }
         onSave({
             id: product?.id,
             name: formData.name!,
@@ -462,23 +423,15 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
                     <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-gray-100">{product ? 'Editar Producto' : 'Añadir Nuevo Producto'}</h2>
                     <div className="space-y-4">
                         <input type="text" name="name" placeholder="Nombre" value={formData.name || ''} onChange={handleChange} required className={inputClasses}/>
-                        
                         <div>
                             <div className="flex justify-between items-center mb-1">
                                 <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Descripción</label>
-                                <button
-                                    type="button"
-                                    onClick={handleGenerateDescription}
-                                    disabled={isGenerating || !formData.name}
-                                    className="flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400 font-semibold hover:text-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    <IconSparkles className="h-4 w-4" />
-                                    {isGenerating ? 'Generando...' : 'Generar con IA'}
+                                <button type="button" onClick={handleGenerateDescription} disabled={isGenerating || !formData.name} className="flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400 font-semibold hover:text-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <IconSparkles className="h-4 w-4" />{isGenerating ? 'Generando...' : 'Generar con IA'}
                                 </button>
                             </div>
                             <textarea id="description" name="description" placeholder="Descripción" rows={3} value={formData.description || ''} onChange={handleChange} required className={inputClasses.replace('mt-1', '')}></textarea>
                         </div>
-                        
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Imagen del producto</label>
                             <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-md">
@@ -486,29 +439,21 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
                                     {formData.imageUrl ? (
                                         <img src={formData.imageUrl} alt="Vista previa" className="mx-auto h-24 w-auto max-w-full object-contain rounded-md" />
                                     ) : (
-                                        <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-                                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                        </svg>
+                                        <div className="mx-auto h-12 w-12 text-gray-400 flex items-center justify-center"><IconUpload className="h-8 w-8"/></div>
                                     )}
                                     <div className="flex text-sm text-gray-600 dark:text-gray-400 justify-center">
-                                        <label htmlFor="file-upload" className="relative cursor-pointer bg-white dark:bg-gray-800 rounded-md font-medium text-emerald-600 hover:text-emerald-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-emerald-500 px-1">
+                                        <label htmlFor="file-upload" className="relative cursor-pointer bg-white dark:bg-gray-800 rounded-md font-medium text-emerald-600 hover:text-emerald-500 px-1">
                                             <span>{formData.imageUrl ? 'Cambiar imagen' : 'Subir un archivo'}</span>
                                             <input id="file-upload" name="imageUrl" type="file" className="sr-only" onChange={handleImageChange} accept="image/png, image/jpeg, image/gif"/>
                                         </label>
-                                        <p className="pl-1">o arrastra y suelta</p>
                                     </div>
-                                    <p className="text-xs text-gray-500 dark:text-gray-500">
-                                        PNG, JPG, GIF
-                                    </p>
                                 </div>
                             </div>
                         </div>
-
                         <input type="number" name="price" placeholder="Precio" step="0.01" value={formData.price || 0} onChange={handleChange} required className={inputClasses}/>
                         <select name="categoryId" value={formData.categoryId} onChange={handleChange} required className={inputClasses}>
                             {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                         </select>
-                        
                         <div className="flex items-center">
                             <input id="available" name="available" type="checkbox" checked={formData.available} onChange={handleChange} className="h-4 w-4 text-emerald-500 focus:ring-emerald-400 border-gray-300 rounded" />
                             <label htmlFor="available" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">Disponible para la venta</label>
@@ -533,18 +478,13 @@ const CategoryModal: React.FC<{
     const [name, setName] = useState('');
 
     useEffect(() => {
-        if (isOpen) {
-            setName(category ? category.name : '');
-        }
+        if (isOpen) setName(category ? category.name : '');
     }, [category, isOpen]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!name.trim()) return;
-        onSave({
-            id: category?.id,
-            name: name.trim(),
-        });
+        onSave({ id: category?.id, name: name.trim() });
     };
 
     if (!isOpen) return null;
@@ -553,60 +493,20 @@ const CategoryModal: React.FC<{
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md">
                 <form onSubmit={handleSubmit} className="p-8 space-y-6">
+                    <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">{category ? 'Editar Categoría' : 'Agrega una categoría'}</h2>
                     <div>
-                        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
-                            {category ? 'Editar Categoría' : 'Agrega una categoría'}
-                        </h2>
-                    </div>
-                    <div>
-                        <label htmlFor="categoryName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Nombre de categoría
-                        </label>
-                        <input
-                            id="categoryName"
-                            type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            required
-                            className="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 placeholder-gray-400 dark:placeholder-gray-400 dark:text-white"
-                        />
-                    </div>
-                    <div>
-                        <label htmlFor="schedules" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Horarios que incluyen esta categoría
-                        </label>
-                        <select
-                            id="schedules"
-                            disabled
-                            className="mt-1 block w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 dark:text-white disabled:opacity-70"
-                        >
-                            <option>Menú general</option>
-                        </select>
-                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                            Puedes usar una misma categoría en múltiples sucursales
-                        </p>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre de categoría</label>
+                        <input type="text" value={name} onChange={(e) => setName(e.target.value)} required className="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 dark:text-white"/>
                     </div>
                     <div className="flex justify-end space-x-4 pt-2">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-6 py-2 border border-gray-300 dark:border-gray-500 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 font-semibold"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            type="submit"
-                            className="px-6 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 font-semibold"
-                        >
-                            {category ? 'Guardar Cambios' : 'Agregar categoría'}
-                        </button>
+                        <button type="button" onClick={onClose} className="px-6 py-2 border border-gray-300 dark:border-gray-500 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 font-semibold">Cancelar</button>
+                        <button type="submit" className="px-6 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 font-semibold">{category ? 'Guardar Cambios' : 'Agregar categoría'}</button>
                     </div>
                 </form>
             </div>
         </div>
     );
 };
-
 
 const ProductsView: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
@@ -651,7 +551,7 @@ const ProductsView: React.FC = () => {
     const handleSaveProduct = async (productData: Omit<Product, 'id' | 'created_at'> & { id?: string }) => {
         try {
             await saveProduct(productData);
-            await fetchData(); 
+            await fetchData(); // Refetch data to show changes
         } catch (error) {
             alert("No se pudo guardar el producto.");
         } finally {
@@ -672,7 +572,7 @@ const ProductsView: React.FC = () => {
     const handleSaveCategory = async (categoryData: Omit<Category, 'id' | 'created_at'> & { id?: string }) => {
         try {
             await saveCategory(categoryData);
-            await fetchData(); 
+            await fetchData(); // Refetch data
         } catch (error) {
             alert("No se pudo guardar la categoría.");
         } finally {
@@ -840,19 +740,11 @@ const PersonalizationModal: React.FC<{isOpen: boolean, onClose: () => void, onSa
     useEffect(() => {
         if (isOpen) {
             if (personalization) {
-                setName(personalization.name);
-                setLabel(personalization.label);
-                setAllowRepetition(personalization.allowRepetition);
+                setName(personalization.name); setLabel(personalization.label); setAllowRepetition(personalization.allowRepetition);
                 setOptions(personalization.options.map(({id, available, ...rest}) => rest));
-                setMinSelection(personalization.minSelection || 0);
-                setMaxSelection(personalization.maxSelection === undefined ? null : personalization.maxSelection);
+                setMinSelection(personalization.minSelection || 0); setMaxSelection(personalization.maxSelection ?? null);
             } else {
-                setName('');
-                setLabel('');
-                setOptions([{ name: '', price: 0 }]);
-                setAllowRepetition(false);
-                setMinSelection(0);
-                setMaxSelection(null);
+                setName(''); setLabel(''); setOptions([{ name: '', price: 0 }]); setAllowRepetition(false); setMinSelection(0); setMaxSelection(null);
             }
         }
     }, [isOpen, personalization]);
@@ -889,94 +781,32 @@ const PersonalizationModal: React.FC<{isOpen: boolean, onClose: () => void, onSa
     
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-start justify-end">
-            <div className="bg-white dark:bg-gray-800 h-full w-full max-w-3xl flex flex-col relative">
-                <header className="p-6 border-b dark:border-gray-700 flex justify-between items-center sticky top-0 bg-white dark:bg-gray-800 z-10 shrink-0">
-                    <h2 className="text-xl font-semibold">{personalization ? 'Editar' : 'Agregar'} una personalización</h2>
-                    <div className="flex items-center gap-x-4">
-                        <button className="text-sm font-medium text-gray-700 dark:text-gray-200 px-3 py-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 border dark:border-gray-600">Vista previa</button>
-                        <button onClick={onClose} className="text-gray-500 hover:text-gray-800 p-1"><IconX /></button>
+            <div className="bg-white dark:bg-gray-800 h-full w-full max-w-3xl flex flex-col relative p-6">
+                <h2 className="text-xl font-semibold mb-4">{personalization ? 'Editar' : 'Agregar'} personalización</h2>
+                <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1">
+                    <input type="text" placeholder="Nombre" value={name} onChange={e => setName(e.target.value)} required className="w-full p-2 border rounded dark:bg-gray-700"/>
+                    <input type="text" placeholder="Etiqueta" value={label} onChange={e => setLabel(e.target.value)} className="w-full p-2 border rounded dark:bg-gray-700"/>
+                    <div>
+                        <label>Opciones</label>
+                        {options.map((opt, i) => (
+                            <div key={i} className="flex gap-2 mb-2">
+                                <input type="text" placeholder="Nombre Opción" value={opt.name} onChange={e => {const newOpts = [...options]; newOpts[i].name = e.target.value; setOptions(newOpts)}} className="flex-1 p-2 border rounded dark:bg-gray-700"/>
+                                <input type="number" placeholder="Precio" value={opt.price} onChange={e => {const newOpts = [...options]; newOpts[i].price = parseFloat(e.target.value)||0; setOptions(newOpts)}} className="w-24 p-2 border rounded dark:bg-gray-700"/>
+                                <button type="button" onClick={() => setOptions(options.filter((_, idx) => idx !== i))}><IconTrash/></button>
+                            </div>
+                        ))}
+                        <button type="button" onClick={() => setOptions([...options, {name: '', price: 0}])} className="text-emerald-600">+ Agregar opción</button>
                     </div>
-                </header>
-                <div className="flex flex-1 overflow-hidden">
-                    <form onSubmit={handleSubmit} className="flex-1 flex flex-col w-2/3">
-                        <div className="p-6 flex-1 overflow-y-auto space-y-6">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre de personalización</label>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Instrucciones para el cliente.</p>
-                                <input type="text" value={name} onChange={e => setName(e.target.value)} required className={lightInputClasses}/>
-                            </div>
-                            <div>
-                                <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Etiqueta distintiva
-                                    <IconInfo className="inline h-4 w-4 ml-1 text-gray-400" title="No es visible para tus clientes."/>
-                                </label>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">No es visible para tus clientes.</p>
-                                <input type="text" value={label} onChange={e => setLabel(e.target.value)} className={lightInputClasses}/>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Opciones</label>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Ingredientes, extras, aderezos, etc.</p>
-                                <div className="space-y-3">
-                                    {options.map((opt, index) => (
-                                        <div key={index} className="flex items-center gap-x-2">
-                                            <IconGripVertical className="h-5 w-5 text-gray-400 cursor-grab flex-shrink-0" />
-                                            <input type="text" placeholder="Nombre" value={opt.name} onChange={e => handleOptionChange(index, 'name', e.target.value)} required className={`${lightInputClasses} flex-1`}/>
-                                            <div className="relative flex-shrink-0">
-                                                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500 dark:text-gray-400 text-sm">$</span>
-                                                <input type="number" step="0.01" placeholder="0" value={opt.price} onChange={e => handleOptionChange(index, 'price', e.target.value)} required className={`${lightInputClasses} w-28 pl-7`}/>
-                                            </div>
-                                            <button type="button" onClick={() => removeOption(index)} disabled={options.length <= 1} className="text-gray-500 hover:text-red-600 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed"><IconTrash className="h-4 w-4"/> Borrar</button>
-                                        </div>
-                                    ))}
-                                </div>
-                                <button type="button" onClick={addOption} className="mt-4 text-emerald-600 font-semibold text-sm flex items-center gap-x-2 hover:text-emerald-800">
-                                    <IconPlus className="h-4 w-4" /> Agregar otro opción
-                                </button>
-                            </div>
-                            <div className="border-t dark:border-gray-700 pt-6 space-y-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Permitir repetición de opciones</label>
-                                    <div className="flex">
-                                        <button type="button" onClick={() => setAllowRepetition(false)} className={`px-6 py-2 text-sm border focus:outline-none focus:z-10 focus:ring-2 focus:ring-emerald-500 rounded-l-md ${!allowRepetition ? 'bg-white dark:bg-gray-600 border-emerald-500 text-emerald-600 dark:text-white z-10' : 'bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300'}`}>No</button>
-                                        <button type="button" onClick={() => setAllowRepetition(true)} className={`-ml-px px-6 py-2 text-sm border focus:outline-none focus:z-10 focus:ring-2 focus:ring-emerald-500 rounded-r-md ${allowRepetition ? 'bg-white dark:bg-gray-600 border-emerald-500 text-emerald-600 dark:text-white z-10' : 'bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300'}`}>Sí</button>
-                                    </div>
-                                </div>
-                                <div>
-                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cantidad que se podrá seleccionar</label>
-                                     <div className="grid grid-cols-2 gap-4">
-                                        <div className="relative">
-                                            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500 dark:text-gray-400 text-sm">Mínimo</span>
-                                            <input 
-                                                type="number" 
-                                                value={minSelection} 
-                                                onChange={e => setMinSelection(Math.max(0, Number(e.target.value)))} 
-                                                className={`${lightInputClasses} text-right pr-4 pl-16`}
-                                            />
-                                        </div>
-                                        <div className="relative">
-                                            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500 dark:text-gray-400 text-sm">Máximo</span>
-                                            <input 
-                                                type="number"
-                                                value={maxSelection ?? ''}
-                                                onChange={e => setMaxSelection(e.target.value === '' ? null : Math.max(minSelection, Number(e.target.value)))}
-                                                placeholder="Sin límite"
-                                                className={`${lightInputClasses} text-right pr-4 pl-16`}
-                                            />
-                                        </div>
-                                     </div>
-                                </div>
-                            </div>
-                        </div>
-                        <footer className="p-6 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex justify-end items-center space-x-3 sticky bottom-0 shrink-0">
-                            <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">Cancelar</button>
-                            <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700">Agregar personalización</button>
-                        </footer>
-                    </form>
-                    <div className="w-1/3 bg-gray-100 dark:bg-gray-900/50 p-6 border-l dark:border-gray-700">
-                         <h3 className="font-semibold text-gray-800 dark:text-gray-200">Vista previa</h3>
-                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">La vista previa aparecerá aquí a medida que completes el formulario.</p>
+                    <div className="flex gap-4">
+                        <label><input type="checkbox" checked={allowRepetition} onChange={e => setAllowRepetition(e.target.checked)}/> Permitir repetición</label>
+                        <input type="number" placeholder="Min" value={minSelection} onChange={e => setMinSelection(parseInt(e.target.value)||0)} className="w-20 p-2 border rounded dark:bg-gray-700"/>
+                        <input type="number" placeholder="Max" value={maxSelection??''} onChange={e => setMaxSelection(e.target.value ? parseInt(e.target.value) : null)} className="w-20 p-2 border rounded dark:bg-gray-700"/>
                     </div>
-                </div>
+                    <div className="flex justify-end gap-2 pt-4">
+                        <button type="button" onClick={onClose} className="px-4 py-2 border rounded">Cancelar</button>
+                        <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded">Guardar</button>
+                    </div>
+                </form>
             </div>
         </div>
     );
@@ -984,248 +814,77 @@ const PersonalizationModal: React.FC<{isOpen: boolean, onClose: () => void, onSa
 
 const PersonalizationsView: React.FC = () => {
     const [personalizations, setPersonalizations] = useState<Personalization[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingPersonalization, setEditingPersonalization] = useState<Personalization | null>(null);
+    const [editing, setEditing] = useState<Personalization | null>(null);
 
-    const fetchData = async () => {
-        try {
-            setIsLoading(true);
-            setError(null);
-            const data = await getPersonalizations();
-            setPersonalizations(data);
-        } catch (err) {
-            setError("No se pudieron cargar las personalizaciones.");
-            console.error(err);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    const fetchData = async () => { setPersonalizations(await getPersonalizations()); };
+    useEffect(() => { fetchData(); }, []);
 
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    const handleOpenModal = (p: Personalization | null) => {
-        setEditingPersonalization(p);
-        setIsModalOpen(true);
-    };
-
-    const handleSave = async (personalizationData: Omit<Personalization, 'id' | 'created_at'> & { id?: string }) => {
-        try {
-            await savePersonalization(personalizationData);
-            await fetchData();
-            setIsModalOpen(false);
-        } catch (error) {
-            alert("No se pudo guardar la personalización.");
-            console.error(error);
-        }
-    };
-
-    const handleDelete = async (id: string) => {
-        if (window.confirm('¿Estás seguro de que quieres eliminar esta personalización?')) {
-            try {
-                await deletePersonalization(id);
-                await fetchData();
-            } catch (error) {
-                alert("No se pudo eliminar la personalización.");
-                console.error(error);
-            }
-        }
-    };
-
-    if (isLoading) return <div className="text-center p-10">Cargando personalizaciones...</div>;
-    if (error) return <div className="text-center p-10 bg-red-100 text-red-700 rounded-md">{error}</div>;
+    const handleSave = async (p: any) => { await savePersonalization(p); fetchData(); setIsModalOpen(false); };
+    const handleDelete = async (id: string) => { if(confirm('¿Borrar?')) { await deletePersonalization(id); fetchData(); }};
 
     return (
         <div>
-            <div className="flex justify-end items-center mb-6">
-                <button onClick={() => handleOpenModal(null)} className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700">
-                    + Agregar personalización
-                </button>
+            <div className="flex justify-end mb-4"><button onClick={() => {setEditing(null); setIsModalOpen(true)}} className="bg-emerald-600 text-white px-4 py-2 rounded">Nueva Personalización</button></div>
+            <div className="bg-white dark:bg-gray-800 rounded shadow p-4 space-y-2">
+                {personalizations.map(p => (
+                    <div key={p.id} className="flex justify-between border-b p-2">
+                        <span>{p.name}</span>
+                        <div>
+                            <button onClick={() => {setEditing(p); setIsModalOpen(true)}} className="mr-2"><IconEdit/></button>
+                            <button onClick={() => handleDelete(p.id)} className="text-red-500"><IconTrash/></button>
+                        </div>
+                    </div>
+                ))}
             </div>
-            {personalizations.length === 0 ? (
-                 <div className="text-center py-16 px-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                    <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Crea personalizaciones para tus productos</h3>
-                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Permite que tus clientes agreguen extras, elijan ingredientes y más.</p>
-                </div>
-            ) : (
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border dark:border-gray-700">
-                    <ul className="divide-y dark:divide-gray-700">
-                        {personalizations.map(p => (
-                            <li key={p.id} className="py-3 flex justify-between items-center">
-                                <div>
-                                    <p className="font-semibold text-gray-800 dark:text-gray-100">{p.name}</p>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">{p.options.length} opciones</p>
-                                </div>
-                                <div className="flex items-center gap-x-2">
-                                    <button onClick={() => handleOpenModal(p)} className="p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"><IconPencil className="h-5 w-5"/></button>
-                                    <button onClick={() => handleDelete(p.id)} className="p-2 text-gray-500 hover:text-red-600 dark:hover:text-red-400"><IconTrash className="h-5 w-5"/></button>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-             <PersonalizationModal 
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onSave={handleSave}
-                personalization={editingPersonalization}
-            />
+            <PersonalizationModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSave} personalization={editing} />
         </div>
     );
 };
 
-const PromotionModal: React.FC<{
-    isOpen: boolean;
-    onClose: () => void;
-    onSave: (promo: Omit<Promotion, 'id' | 'created_at'> & { id?: string }) => void;
-    promotion: Promotion | null;
-    products: Product[];
-}> = ({ isOpen, onClose, onSave, promotion, products }) => {
-    
-    const getInitialFormData = (): Omit<Promotion, 'id' | 'created_at'> & { id?: string } => ({
-        id: '',
-        name: '',
-        discountType: DiscountType.Percentage,
-        discountValue: 0,
-        appliesTo: PromotionAppliesTo.SpecificProducts,
-        productIds: [''],
-        startDate: new Date().toISOString().split('T')[0],
-        endDate: '',
-    });
-    
-    const [formData, setFormData] = useState(getInitialFormData());
+const PromotionModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (promo: any) => void; promotion: Promotion | null; products: Product[]; }> = ({ isOpen, onClose, onSave, promotion, products }) => {
+    const [formData, setFormData] = useState<any>({ name: '', discountType: DiscountType.Percentage, discountValue: 0, appliesTo: PromotionAppliesTo.AllProducts, productIds: [], startDate: '', endDate: '' });
+    useEffect(() => { if (isOpen) setFormData(promotion || { name: '', discountType: DiscountType.Percentage, discountValue: 0, appliesTo: PromotionAppliesTo.AllProducts, productIds: [], startDate: '', endDate: '' }); }, [isOpen, promotion]);
 
-    useEffect(() => {
-        if (isOpen) {
-            if (promotion) {
-                const productIds = (promotion.productIds?.length || 0) > 0 ? promotion.productIds : [''];
-                setFormData({...promotion, productIds});
-            } else {
-                setFormData(getInitialFormData());
-            }
-        }
-    }, [promotion, isOpen]);
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: name === 'discountValue' ? parseFloat(value) || 0 : value }));
-    };
-    
-    const handleProductChange = (index: number, productId: string) => {
-        const newProductIds = [...formData.productIds];
-        newProductIds[index] = productId;
-        setFormData(prev => ({ ...prev, productIds: newProductIds }));
-    };
-
-    const addProductField = () => {
-        setFormData(prev => ({ ...prev, productIds: [...prev.productIds, ''] }));
-    };
-
-    const removeProductField = (index: number) => {
-        if (formData.productIds.length > 1) {
-            const newProductIds = formData.productIds.filter((_, i) => i !== index);
-            setFormData(prev => ({ ...prev, productIds: newProductIds }));
-        }
-    };
-    
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        const finalPromo = {
-            ...formData,
-            id: promotion?.id,
-            productIds: formData.productIds.filter(id => id !== ''),
-        };
-        onSave(finalPromo);
-    };
+    const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); onSave(formData); };
 
     if (!isOpen) return null;
-    
-    const lightInputClasses = "w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 placeholder-gray-400 dark:placeholder-gray-400 dark:text-white";
-
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-start justify-end">
-            <div className="bg-white dark:bg-gray-800 h-full w-full max-w-3xl flex flex-col relative">
-                <header className="p-6 border-b dark:border-gray-700 flex justify-between items-center sticky top-0 bg-white dark:bg-gray-800 z-10 shrink-0">
-                    <h2 className="text-xl font-semibold">{promotion ? 'Editar' : 'Agregar'} una promoción</h2>
-                    <div className="flex items-center gap-x-4">
-                        <button className="text-sm font-medium text-gray-700 dark:text-gray-200 px-3 py-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 border dark:border-gray-600 flex items-center gap-1">
-                            <IconEye className="w-4 h-4" /> Vista previa
-                        </button>
-                        <button onClick={onClose} className="text-gray-500 hover:text-gray-800 p-1"><IconX /></button>
+            <div className="bg-white dark:bg-gray-800 h-full w-full max-w-3xl flex flex-col p-6">
+                <h2 className="text-xl font-bold mb-4">{promotion ? 'Editar' : 'Nueva'} Promoción</h2>
+                <form onSubmit={handleSubmit} className="space-y-4 flex-1 overflow-y-auto">
+                    <input type="text" placeholder="Nombre" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full p-2 border rounded dark:bg-gray-700" required/>
+                    <div className="flex gap-4">
+                        <select value={formData.discountType} onChange={e => setFormData({...formData, discountType: e.target.value})} className="p-2 border rounded dark:bg-gray-700">
+                            <option value={DiscountType.Percentage}>Porcentaje</option>
+                            <option value={DiscountType.Fixed}>Monto Fijo</option>
+                        </select>
+                        <input type="number" placeholder="Valor" value={formData.discountValue} onChange={e => setFormData({...formData, discountValue: parseFloat(e.target.value)})} className="p-2 border rounded dark:bg-gray-700" required/>
                     </div>
-                </header>
-                <div className="flex flex-1 overflow-hidden">
-                    <form onSubmit={handleSubmit} className="flex-1 flex flex-col lg:w-2/3">
-                        <div className="p-6 flex-1 overflow-y-auto space-y-6">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre</label>
-                                <input type="text" name="name" value={formData.name} onChange={handleChange} required className={`${lightInputClasses} mt-1`}/>
-                            </div>
-                            
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Valor del descuento</label>
-                                <div className="flex items-center mt-1">
-                                    <select name="discountType" value={formData.discountType} onChange={handleChange} className={`${lightInputClasses} w-1/3 rounded-r-none border-r-0`}>
-                                        <option value={DiscountType.Percentage}>Porcentaje (%)</option>
-                                        <option value={DiscountType.Fixed}>Monto fijo ($)</option>
-                                    </select>
-                                    <div className="relative flex-1">
-                                        <input type="number" name="discountValue" value={formData.discountValue} onChange={handleChange} required className={`${lightInputClasses} rounded-l-none`}/>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Se aplica a</label>
-                                <select name="appliesTo" value={formData.appliesTo} onChange={handleChange} className={`${lightInputClasses} mt-1`}>
-                                    <option value={PromotionAppliesTo.SpecificProducts}>Productos específicos</option>
-                                </select>
-                            </div>
-
-                            {formData.appliesTo === PromotionAppliesTo.SpecificProducts && (
-                                <div className="p-4 border dark:border-gray-700 rounded-md bg-gray-50 dark:bg-gray-900/50">
-                                    {formData.productIds.map((pid, index) => (
-                                        <div key={index} className="flex items-center gap-x-2 mb-2">
-                                            <select value={pid} onChange={(e) => handleProductChange(index, e.target.value)} className={`${lightInputClasses} flex-1`}>
-                                                <option value="">Selecciona un producto</option>
-                                                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                            </select>
-                                            <button type="button" onClick={() => removeProductField(index)} disabled={formData.productIds.length <= 1} className="p-2 text-gray-500 hover:text-red-600 disabled:opacity-50"><IconTrash/></button>
-                                        </div>
-                                    ))}
-                                    <button type="button" onClick={addProductField} className="mt-2 text-emerald-600 font-semibold text-sm flex items-center gap-x-2 hover:text-emerald-800">
-                                        <IconPlus className="h-4 w-4" /> Agregar otro producto
-                                    </button>
-                                </div>
-                            )}
-
-                            <div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha de inicio</label>
-                                        <input type="date" name="startDate" value={formData.startDate} onChange={handleChange} className={`${lightInputClasses} mt-1`}/>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha de fin</label>
-                                        <input type="date" name="endDate" value={formData.endDate} onChange={handleChange} className={`${lightInputClasses} mt-1`}/>
-                                    </div>
-                                </div>
-                            </div>
+                    <select value={formData.appliesTo} onChange={e => setFormData({...formData, appliesTo: e.target.value})} className="w-full p-2 border rounded dark:bg-gray-700">
+                        <option value={PromotionAppliesTo.AllProducts}>Todos los productos</option>
+                        <option value={PromotionAppliesTo.SpecificProducts}>Productos específicos</option>
+                    </select>
+                    {formData.appliesTo === PromotionAppliesTo.SpecificProducts && (
+                        <div className="h-40 overflow-y-auto border p-2 rounded">
+                            {products.map(p => (
+                                <label key={p.id} className="block"><input type="checkbox" checked={formData.productIds.includes(p.id)} onChange={e => {
+                                    const ids = e.target.checked ? [...formData.productIds, p.id] : formData.productIds.filter((id: string) => id !== p.id);
+                                    setFormData({...formData, productIds: ids});
+                                }}/> {p.name}</label>
+                            ))}
                         </div>
-                        <footer className="p-6 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex justify-end items-center space-x-3 sticky bottom-0 shrink-0">
-                            <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">Cancelar</button>
-                            <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700">Agregar promoción</button>
-                        </footer>
-                    </form>
-                    <div className="w-1/3 bg-gray-100 dark:bg-gray-900/50 p-6 border-l dark:border-gray-700 hidden lg:block">
-                         <h3 className="font-semibold text-gray-800 dark:text-gray-200">Vista previa</h3>
-                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">Aparecerá una etiqueta de "Oferta" en los productos seleccionados dentro del rango de fechas.</p>
+                    )}
+                    <div className="flex gap-4">
+                        <input type="date" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} className="p-2 border rounded dark:bg-gray-700"/>
+                        <input type="date" value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} className="p-2 border rounded dark:bg-gray-700"/>
                     </div>
-                </div>
+                    <div className="flex justify-end gap-2">
+                        <button type="button" onClick={onClose} className="px-4 py-2 border rounded">Cancelar</button>
+                        <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded">Guardar</button>
+                    </div>
+                </form>
             </div>
         </div>
     );
@@ -1234,191 +893,47 @@ const PromotionModal: React.FC<{
 const PromotionsView: React.FC = () => {
     const [promotions, setPromotions] = useState<Promotion[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
+    const [editing, setEditing] = useState<Promotion | null>(null);
 
-    const fetchData = async () => {
-        try {
-            setIsLoading(true);
-            setError(null);
-            const [promoData, productData] = await Promise.all([getPromotions(), getProducts()]);
-            setPromotions(promoData);
-            setProducts(productData);
-        } catch (err) {
-            setError("No se pudieron cargar las promociones.");
-            console.error(err);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    const fetchData = async () => { const [pr, pd] = await Promise.all([getPromotions(), getProducts()]); setPromotions(pr); setProducts(pd); };
+    useEffect(() => { fetchData(); }, []);
 
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    const handleOpenModal = (promo: Promotion | null) => {
-        setEditingPromotion(promo);
-        setIsModalOpen(true);
-    };
-
-    const handleCloseModal = () => {
-        setIsModalOpen(false);
-        setEditingPromotion(null);
-    };
-
-    const handleSavePromotion = async (promoData: Omit<Promotion, 'id' | 'created_at'> & { id?: string }) => {
-        try {
-            await savePromotion(promoData);
-            await fetchData();
-            handleCloseModal();
-        } catch (error) {
-            alert("No se pudo guardar la promoción.");
-            console.error(error);
-        }
-    };
-
-    const handleDeletePromotion = (promoId: string) => {
-        if (window.confirm('¿Estás seguro de que quieres eliminar esta promoción?')) {
-            deletePromotion(promoId).then(() => fetchData()).catch(err => {
-                alert("No se pudo eliminar la promoción.");
-                console.error(err);
-            });
-        }
-    };
-    
-    if (isLoading) return <div className="text-center p-10">Cargando promociones...</div>;
-    if (error) return <div className="text-center p-10 bg-red-100 text-red-700 rounded-md">{error}</div>;
+    const handleSave = async (data: any) => { await savePromotion({...data, id: editing?.id}); fetchData(); setIsModalOpen(false); };
+    const handleDelete = async (id: string) => { if(confirm('¿Borrar?')) { await deletePromotion(id); fetchData(); }};
 
     return (
         <div>
-            {promotions.length === 0 ? (
-                <div className="text-center py-16 px-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                    <div className="mx-auto h-16 w-16 text-gray-300">
-                        <IconPercent className="h-16 w-16"/>
-                    </div>
-                    <h3 className="mt-4 text-lg font-semibold text-gray-800 dark:text-gray-200">Crea promociones y atrae más clientes</h3>
-                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">Llama la atención de tus clientes y aumenta tus ventas.</p>
-                    <div className="mt-6">
-                        <button onClick={() => handleOpenModal(null)} className="flex items-center mx-auto space-x-2 px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700">
-                            <IconPlus className="h-5 w-5" />
-                            <span>Nueva promoción</span>
-                        </button>
-                    </div>
-                </div>
-            ) : (
-                <div>
-                     <div className="flex justify-end mb-6">
-                         <button onClick={() => handleOpenModal(null)} className="flex items-center space-x-2 px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700">
-                            <IconPlus className="h-5 w-5" />
-                            <span>Nueva promoción</span>
-                        </button>
-                    </div>
-                    
-                    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border dark:border-gray-700">
-                        <h3 className="text-lg font-semibold mb-4">Promociones Activas</h3>
-                        <div className="space-y-4">
-                            {promotions.map(promo => {
-                                const now = new Date();
-                                const startDate = promo.startDate ? new Date(promo.startDate) : null;
-                                const endDate = promo.endDate ? new Date(promo.endDate) : null;
-                                
-                                // Adjust end date to be end of day
-                                if (endDate) {
-                                    endDate.setHours(23, 59, 59, 999);
-                                }
-
-                                let statusColor = 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400';
-                                let statusText = 'Inactiva';
-
-                                if (startDate && startDate > now) {
-                                    statusColor = 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400';
-                                    statusText = 'Programada';
-                                } else if (endDate && endDate < now) {
-                                    statusColor = 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500';
-                                    statusText = 'Finalizada';
-                                } else {
-                                    statusColor = 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400';
-                                    statusText = 'Activa';
-                                }
-
-                                return (
-                                    <div key={promo.id} className="p-4 border dark:border-gray-700 rounded-md flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <p className="font-bold text-gray-800 dark:text-gray-200 text-lg">{promo.name}</p>
-                                                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${statusColor}`}>
-                                                    {statusText}
-                                                </span>
-                                            </div>
-                                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                                <span className="font-bold text-emerald-600">{promo.discountValue}{promo.discountType === DiscountType.Percentage ? '%' : '$'} OFF</span> en {promo.appliesTo === PromotionAppliesTo.SpecificProducts ? `${promo.productIds.length} producto(s)` : 'todos los productos'}
-                                            </p>
-                                            <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                                <div className="flex items-center gap-1">
-                                                    <span className="font-medium text-gray-400">Inicio:</span>
-                                                    <span>{promo.startDate || 'Inmediato'}</span>
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                    <span className="font-medium text-gray-400">Fin:</span>
-                                                    <span>{promo.endDate || 'Indefinido'}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center">
-                                            <button onClick={() => handleOpenModal(promo)} className="p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"><IconPencil/></button>
-                                            <button onClick={() => handleDeletePromotion(promo.id)} className="p-2 text-gray-500 hover:text-red-600 dark:hover:text-red-400"><IconTrash/></button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+            <div className="flex justify-end mb-4"><button onClick={() => {setEditing(null); setIsModalOpen(true)}} className="bg-emerald-600 text-white px-4 py-2 rounded">Nueva Promoción</button></div>
+            <div className="space-y-2">
+                {promotions.map(p => (
+                    <div key={p.id} className="bg-white dark:bg-gray-800 p-4 rounded shadow flex justify-between">
+                        <div>
+                            <h4 className="font-bold">{p.name}</h4>
+                            <p className="text-sm">{p.discountValue}{p.discountType === 'percentage' ? '%' : '$'} OFF</p>
+                        </div>
+                        <div>
+                            <button onClick={() => {setEditing(p); setIsModalOpen(true)}} className="mr-2"><IconEdit/></button>
+                            <button onClick={() => handleDelete(p.id)} className="text-red-500"><IconTrash/></button>
                         </div>
                     </div>
-                </div>
-            )}
-            
-            <PromotionModal 
-                isOpen={isModalOpen}
-                onClose={handleCloseModal}
-                onSave={handleSavePromotion}
-                promotion={editingPromotion}
-                products={products}
-            />
+                ))}
+            </div>
+            <PromotionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSave} promotion={editing} products={products} />
         </div>
     );
 };
 
 const MenuManagement: React.FC = () => {
     const [activeTab, setActiveTab] = useState('products');
-
-    const tabs = [
-        { id: 'products', title: 'Productos' },
-        { id: 'personalizations', title: 'Personalizaciones' },
-        { id: 'promotions', title: 'Promociones' },
-    ];
-
+    const tabs = [{ id: 'products', title: 'Productos' }, { id: 'personalizations', title: 'Personalizaciones' }, { id: 'promotions', title: 'Promociones' }];
     return (
         <div className="space-y-6">
             <div className="border-b border-gray-200 dark:border-gray-700">
-                <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-                    {tabs.map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`${
-                                activeTab === tab.id
-                                    ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600'
-                            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm focus:outline-none`}
-                        >
-                            {tab.title}
-                        </button>
-                    ))}
+                <nav className="-mb-px flex space-x-8">
+                    {tabs.map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`${activeTab === tab.id ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-700'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}>{tab.title}</button>))}
                 </nav>
             </div>
-
             {activeTab === 'products' && <ProductsView />}
             {activeTab === 'personalizations' && <PersonalizationsView />}
             {activeTab === 'promotions' && <PromotionsView />}
@@ -1426,8 +941,6 @@ const MenuManagement: React.FC = () => {
     );
 };
 
-
-// --- Order Management ---
 const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onUpdateStatus: (id: string, status: OrderStatus) => void; onUpdatePayment: (id: string, status: PaymentStatus) => void }> = ({ order, onClose, onUpdateStatus, onUpdatePayment }) => {
     const [isClosing, setIsClosing] = useState(false);
 
@@ -1468,6 +981,8 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
         <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${isClosing ? 'pointer-events-none' : ''}`}>
             <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isClosing ? 'opacity-0' : 'opacity-100'}`} onClick={handleClose}></div>
             <div className={`bg-white dark:bg-gray-800 w-full max-w-2xl rounded-xl shadow-2xl transform transition-all duration-300 flex flex-col max-h-[90vh] ${isClosing ? 'scale-95 opacity-0 translate-y-4' : 'scale-100 opacity-100 translate-y-0'}`}>
+                
+                {/* Header */}
                 <div className="p-6 border-b dark:border-gray-700 flex justify-between items-start bg-gray-50 dark:bg-gray-900/50 rounded-t-xl">
                     <div>
                         <div className="flex items-center gap-2 mb-1">
@@ -1483,6 +998,7 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                              <a href={`https://wa.me/${order.customer.phone.replace(/\D/g,'')}`} target="_blank" className="hover:underline">{order.customer.phone}</a>
                         </p>
                     </div>
+                    
                      <div className="relative group">
                         <button className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"><IconMoreVertical /></button>
                         <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 shadow-xl rounded-lg border dark:border-gray-700 hidden group-hover:block z-10 overflow-hidden">
@@ -1491,6 +1007,8 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                         </div>
                     </div>
                 </div>
+
+                {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6">
                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                         <div className="md:col-span-2 space-y-4">
@@ -1516,6 +1034,8 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                                      <strong className="block mb-1">📝 Nota general del cliente:</strong> {order.generalComments}
                                  </div>
                              )}
+                             
+                             {/* Payment Proof Section */}
                              {order.paymentProof && (
                                  <div className="mt-4 border dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
                                      <h4 className="font-bold text-gray-900 dark:text-gray-100 mb-2 flex items-center gap-2">
@@ -1530,6 +1050,7 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                                  </div>
                              )}
                         </div>
+                        
                         <div className="space-y-6">
                             <div>
                                 <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2 border-b dark:border-gray-700 pb-2">
@@ -1555,6 +1076,7 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                                     )}
                                 </div>
                             </div>
+
                              <div>
                                 <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2 border-b dark:border-gray-700 pb-2">
                                     <IconPayment className="h-5 w-5 text-gray-400"/> Pago
@@ -1574,10 +1096,13 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                         </div>
                      </div>
                 </div>
+
+                {/* Footer */}
                 <div className="p-4 bg-white dark:bg-gray-800 border-t dark:border-gray-700 flex gap-3 justify-end">
                      <button onClick={handlePrint} className="px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
                          <IconPrinter className="h-5 w-5"/>
                      </button>
+                     
                      {order.status !== OrderStatus.Completed && order.status !== OrderStatus.Cancelled && (
                         <button onClick={handleAdvanceStatus} className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
                             <IconCheck className="h-5 w-5"/>
@@ -1635,7 +1160,7 @@ const TimeAgo: React.FC<{ date: Date; className?: string }> = ({ date, className
             else {
                 const mins = Math.floor(diffInSeconds / 60);
                 setText(`hace ${mins} min`);
-                setIsLate(mins > 15);
+                setIsLate(mins > 15); // Mark as late after 15 mins
             }
         };
         update();
@@ -1664,6 +1189,7 @@ const OrderCard: React.FC<{ order: Order; onClick: () => void }> = React.memo(({
                 <TimeAgo date={order.createdAt} className="text-xs block"/>
             </div>
         </div>
+        
         <div className="space-y-1 mb-4">
             {order.items.slice(0, 3).map((item, i) => (
                 <div key={i} className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
@@ -1672,6 +1198,7 @@ const OrderCard: React.FC<{ order: Order; onClick: () => void }> = React.memo(({
             ))}
             {order.items.length > 3 && <p className="text-xs text-gray-400 italic">+ {order.items.length - 3} más...</p>}
         </div>
+
         <div className="flex justify-between items-center pt-3 border-t dark:border-gray-700">
              <span className={`text-xs font-semibold px-2 py-0.5 rounded ${order.paymentStatus === 'paid' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}`}>
                  {order.paymentStatus === 'paid' ? 'PAGADO' : 'PENDIENTE'}
@@ -1787,6 +1314,7 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
     const [customerName, setCustomerName] = useState('');
     const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('pending');
     
+    // Cart logic
     const { cartItems, addToCart, removeFromCart, updateQuantity, cartTotal, clearCart } = useCart();
 
     useEffect(() => {
@@ -1828,8 +1356,8 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
             },
             items: cartItems,
             total: cartTotal,
-            status: OrderStatus.Confirmed,
-            branchId: 'main-branch', 
+            status: OrderStatus.Confirmed, // Manual orders start as Confirmed
+            branchId: 'main-branch', // Default
             orderType: orderType,
             tableId: orderType === OrderType.DineIn ? selectedTable : undefined,
             paymentStatus: paymentStatus
@@ -1848,66 +1376,138 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
     return (
          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white dark:bg-gray-900 w-full max-w-6xl h-[90vh] rounded-2xl shadow-2xl flex overflow-hidden border dark:border-gray-700">
+                
+                {/* Left: Product Selection */}
                 <div className="w-3/5 flex flex-col border-r dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                     <div className="p-4 border-b dark:border-gray-700 bg-white dark:bg-gray-800 flex gap-3">
                          <div className="relative flex-1">
                             <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5"/>
-                            <input type="text" placeholder="Buscar producto..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-lg border dark:border-gray-600 bg-gray-100 dark:bg-gray-700 focus:ring-2 focus:ring-emerald-500 outline-none"/>
+                            <input 
+                                type="text" 
+                                placeholder="Buscar producto..." 
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2.5 rounded-lg border dark:border-gray-600 bg-gray-100 dark:bg-gray-700 focus:ring-2 focus:ring-emerald-500 outline-none"
+                            />
                          </div>
                     </div>
+                    
+                    {/* Categories */}
                     <div className="flex gap-2 overflow-x-auto p-2 border-b dark:border-gray-700 bg-white dark:bg-gray-800">
-                        <button onClick={() => setActiveCategory('all')} className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${activeCategory === 'all' ? 'bg-emerald-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}>Todo</button>
+                        <button 
+                            onClick={() => setActiveCategory('all')}
+                            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${activeCategory === 'all' ? 'bg-emerald-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
+                        >
+                            Todo
+                        </button>
                         {categories.map(cat => (
-                            <button key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${activeCategory === cat.id ? 'bg-emerald-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}>{cat.name}</button>
+                            <button 
+                                key={cat.id}
+                                onClick={() => setActiveCategory(cat.id)}
+                                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${activeCategory === cat.id ? 'bg-emerald-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
+                            >
+                                {cat.name}
+                            </button>
                         ))}
                     </div>
+
+                    {/* Grid */}
                     <div className="flex-1 overflow-y-auto p-4">
                         <div className="grid grid-cols-3 gap-4">
                             {filteredProducts.map(product => (
-                                <div key={product.id} onClick={() => addToCart(product, 1)} className="bg-white dark:bg-gray-800 p-3 rounded-xl border dark:border-gray-700 cursor-pointer hover:border-emerald-500 hover:shadow-md transition-all group">
+                                <div 
+                                    key={product.id} 
+                                    onClick={() => addToCart(product, 1)}
+                                    className="bg-white dark:bg-gray-800 p-3 rounded-xl border dark:border-gray-700 cursor-pointer hover:border-emerald-500 hover:shadow-md transition-all group"
+                                >
                                     <div className="h-28 w-full bg-gray-200 dark:bg-gray-700 rounded-lg mb-3 overflow-hidden">
                                         <img src={product.imageUrl} alt={product.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
                                     </div>
                                     <h4 className="font-bold text-gray-800 dark:text-gray-100 text-sm line-clamp-2 leading-tight min-h-[2.5em]">{product.name}</h4>
                                     <div className="flex justify-between items-center mt-2">
                                         <span className="font-bold text-emerald-600 text-sm">${product.price.toFixed(2)}</span>
-                                        <div className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 p-1 rounded-md"><IconPlus className="h-4 w-4"/></div>
+                                        <div className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 p-1 rounded-md">
+                                            <IconPlus className="h-4 w-4"/>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     </div>
                 </div>
+
+                {/* Right: Order Details */}
                 <div className="w-2/5 flex flex-col bg-white dark:bg-gray-900 h-full relative">
                     <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800">
                         <h3 className="font-bold text-lg">Nuevo Pedido</h3>
                         <button onClick={onClose} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full"><IconX/></button>
                     </div>
+
                     <div className="p-4 space-y-4 border-b dark:border-gray-700">
+                        {/* Customer */}
                         <div>
                             <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Cliente</label>
-                            <input type="text" placeholder="Nombre del cliente" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full p-2 border dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none"/>
+                            <input 
+                                type="text" 
+                                placeholder="Nombre del cliente" 
+                                value={customerName}
+                                onChange={e => setCustomerName(e.target.value)}
+                                className="w-full p-2 border dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none"
+                            />
                         </div>
+
+                        {/* Type */}
                         <div className="grid grid-cols-2 gap-3">
-                            <button onClick={() => setOrderType(OrderType.TakeAway)} className={`p-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-2 ${orderType === OrderType.TakeAway ? 'bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'dark:border-gray-700'}`}><IconStore className="h-4 w-4"/> Para Llevar</button>
-                            <button onClick={() => setOrderType(OrderType.DineIn)} className={`p-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-2 ${orderType === OrderType.DineIn ? 'bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'dark:border-gray-700'}`}><IconTableLayout className="h-4 w-4"/> Comer Aquí</button>
+                            <button 
+                                onClick={() => setOrderType(OrderType.TakeAway)}
+                                className={`p-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-2 ${orderType === OrderType.TakeAway ? 'bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'dark:border-gray-700'}`}
+                            >
+                                <IconStore className="h-4 w-4"/> Para Llevar
+                            </button>
+                            <button 
+                                onClick={() => setOrderType(OrderType.DineIn)}
+                                className={`p-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-2 ${orderType === OrderType.DineIn ? 'bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'dark:border-gray-700'}`}
+                            >
+                                <IconTableLayout className="h-4 w-4"/> Comer Aquí
+                            </button>
                         </div>
+
                         {orderType === OrderType.DineIn && (
-                            <select value={selectedTable} onChange={e => setSelectedTable(e.target.value)} className="w-full p-2 border dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-800 outline-none text-sm">
+                            <select 
+                                value={selectedTable}
+                                onChange={e => setSelectedTable(e.target.value)}
+                                className="w-full p-2 border dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-800 outline-none text-sm"
+                            >
                                 <option value="">Seleccionar Mesa...</option>
-                                {zones.map(z => (<optgroup key={z.id} label={z.name}>{z.tables.map(t => (<option key={t.id} value={`${z.name} - ${t.name}`}>Mesa {t.name}</option>))}</optgroup>))}
+                                {zones.map(z => (
+                                    <optgroup key={z.id} label={z.name}>
+                                        {z.tables.map(t => (
+                                            <option key={t.id} value={`${z.name} - ${t.name}`}>Mesa {t.name}</option>
+                                        ))}
+                                    </optgroup>
+                                ))}
                             </select>
                         )}
                     </div>
+
+                    {/* Cart Items */}
                     <div className="flex-1 overflow-y-auto p-4 space-y-3">
                         {cartItems.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-2"><IconReceipt className="h-12 w-12 opacity-50"/><p>Carrito vacío</p></div>
+                            <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-2">
+                                <IconReceipt className="h-12 w-12 opacity-50"/>
+                                <p>Carrito vacío</p>
+                            </div>
                         ) : (
                             cartItems.map(item => (
                                 <div key={item.cartItemId} className="flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 p-2 rounded-lg border dark:border-gray-700">
                                     <div className="flex items-center gap-3">
-                                        <div className="bg-white dark:bg-gray-700 h-10 w-10 rounded-md flex items-center justify-center text-sm font-bold border dark:border-gray-600">{item.quantity}x</div>
-                                        <div className="flex-1"><p className="font-bold text-sm line-clamp-1">{item.name}</p><p className="text-xs text-gray-500">${item.price.toFixed(2)}</p></div>
+                                        <div className="bg-white dark:bg-gray-700 h-10 w-10 rounded-md flex items-center justify-center text-sm font-bold border dark:border-gray-600">
+                                            {item.quantity}x
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="font-bold text-sm line-clamp-1">{item.name}</p>
+                                            <p className="text-xs text-gray-500">${item.price.toFixed(2)}</p>
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <p className="font-bold text-sm">${(item.price * item.quantity).toFixed(2)}</p>
@@ -1920,15 +1520,31 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
                             ))
                         )}
                     </div>
+
+                    {/* Footer / Checkout */}
                     <div className="p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-                        <div className="flex justify-between mb-4"><span className="text-gray-500">Subtotal</span><span className="font-bold text-lg">${cartTotal.toFixed(2)}</span></div>
+                        <div className="flex justify-between mb-4">
+                            <span className="text-gray-500">Subtotal</span>
+                            <span className="font-bold text-lg">${cartTotal.toFixed(2)}</span>
+                        </div>
+
                         <div className="flex items-center justify-between mb-4 p-3 bg-white dark:bg-gray-700 rounded-lg border dark:border-gray-600">
                             <span className="text-sm font-medium">Estado del pago:</span>
-                            <button onClick={() => setPaymentStatus(s => s === 'paid' ? 'pending' : 'paid')} className={`px-3 py-1 rounded-full text-xs font-bold uppercase transition-colors ${paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{paymentStatus === 'paid' ? 'Pagado' : 'Pendiente'}</button>
+                            <button 
+                                onClick={() => setPaymentStatus(s => s === 'paid' ? 'pending' : 'paid')}
+                                className={`px-3 py-1 rounded-full text-xs font-bold uppercase transition-colors ${paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}
+                            >
+                                {paymentStatus === 'paid' ? 'Pagado' : 'Pendiente'}
+                            </button>
                         </div>
+
                         <div className="grid grid-cols-2 gap-3">
-                            <button onClick={() => {clearCart(); onClose();}} className="px-4 py-3 border dark:border-gray-600 rounded-xl font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">Cancelar</button>
-                            <button onClick={handleCreateOrder} className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-lg shadow-emerald-900/20">Confirmar (${cartTotal.toFixed(2)})</button>
+                            <button onClick={() => {clearCart(); onClose();}} className="px-4 py-3 border dark:border-gray-600 rounded-xl font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">
+                                Cancelar
+                            </button>
+                            <button onClick={handleCreateOrder} className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-lg shadow-emerald-900/20">
+                                Confirmar (${cartTotal.toFixed(2)})
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1950,7 +1566,10 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
 
     useEffect(() => {
         const load = async () => {
-            const [activeOrders, fetchedZones] = await Promise.all([getActiveOrders(), getZones()]);
+            const [activeOrders, fetchedZones] = await Promise.all([
+                getActiveOrders(),
+                getZones()
+            ]);
             setOrders(activeOrders);
             setZones(fetchedZones);
             if(fetchedZones.length > 0) setActiveZoneId(fetchedZones[0].id);
@@ -1963,12 +1582,12 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
 
     const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
-        try { await updateOrder(orderId, { status: newStatus }); } catch (e: any) { console.error(e); alert(`Error updating order status.`); }
+        try { await updateOrder(orderId, { status: newStatus }); } catch (e: any) { console.error(e); }
     };
     
     const updatePaymentStatus = async (orderId: string, newStatus: PaymentStatus) => {
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, paymentStatus: newStatus } : o));
-        try { await updateOrder(orderId, { paymentStatus: newStatus }); } catch (e: any) { console.error(e); alert(`Error updating payment status.`); }
+        try { await updateOrder(orderId, { paymentStatus: newStatus }); } catch (e: any) { console.error(e); }
     }
     
     const activeZone = useMemo(() => zones.find(z => z.id === activeZoneId), [zones, activeZoneId]);
@@ -1981,7 +1600,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
     const tableStats = useMemo(() => {
          const activeTables = orders.filter(o => o.tableId && o.status !== OrderStatus.Completed && o.status !== OrderStatus.Cancelled).length;
          const requestingBill = orders.filter(o => o.tableId && o.status === OrderStatus.Ready && o.paymentStatus === 'pending').length;
-         return { requestingBill, requestingWaiter: 0, pendingOrders: orders.filter(o => o.tableId && o.status === OrderStatus.Pending).length, activeTables }
+         return { requestingBill: requestingBill, requestingWaiter: 0, pendingOrders: orders.filter(o => o.tableId && o.status === OrderStatus.Pending).length, activeTables: activeTables }
     }, [orders]);
 
     const tabs = [{ id: 'panel-pedidos', title: 'Panel de pedidos' }, { id: 'panel-mesas', title: 'Panel de mesas' }, { id: 'comandas-digitales', title: 'Comandas digitales' }];
@@ -1999,8 +1618,12 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                             </div>
                             <div className="flex items-center gap-3">
                                 <div className="relative group">
-                                     <button className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors shadow-sm ${storeOpen ? 'border-green-900/30 bg-green-900/20 text-green-400' : 'border-red-900/30 bg-red-900/20 text-red-400'}`}><div className={`w-2 h-2 rounded-full ${storeOpen ? 'bg-green-500' : 'bg-red-500'}`}></div>{storeOpen ? 'Tienda Abierta' : 'Tienda Cerrada'}<IconChevronDown className="h-4 w-4 opacity-50 ml-2"/></button>
-                                    <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 shadow-lg rounded-lg border dark:border-gray-700 hidden group-hover:block z-10 p-1"><button onClick={() => setStoreOpen(o => !o)} className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 rounded flex items-center gap-2 text-gray-300"><IconToggleOff className="h-4 w-4"/> {storeOpen ? 'Cerrar Tienda' : 'Abrir Tienda'}</button></div>
+                                     <button className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors shadow-sm ${storeOpen ? 'border-green-900/30 bg-green-900/20 text-green-400' : 'border-red-900/30 bg-red-900/20 text-red-400'}`}>
+                                        <div className={`w-2 h-2 rounded-full ${storeOpen ? 'bg-green-500' : 'bg-red-500'}`}></div>{storeOpen ? 'Tienda Abierta' : 'Tienda Cerrada'}<IconChevronDown className="h-4 w-4 opacity-50 ml-2"/>
+                                    </button>
+                                    <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 shadow-lg rounded-lg border dark:border-gray-700 hidden group-hover:block z-10 p-1">
+                                        <button onClick={() => setStoreOpen(o => !o)} className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 rounded flex items-center gap-2 text-gray-300"><IconToggleOff className="h-4 w-4"/> {storeOpen ? 'Cerrar Tienda' : 'Abrir Tienda'}</button>
+                                    </div>
                                 </div>
                                 <button onClick={() => setIsNewOrderModalOpen(true)} className="bg-white text-gray-900 hover:bg-gray-100 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow transition-all"><IconPlus className="h-4 w-4 text-gray-900" /> Pedido Manual</button>
                             </div>
@@ -2008,7 +1631,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                         {orders.length === 0 ? (<EmptyOrdersView onNewOrderClick={() => setIsNewOrderModalOpen(true)} />) : (viewMode === 'board' ? (<OrdersKanbanBoard orders={orders} onOrderClick={setSelectedOrder} />) : (<div className="flex-1 overflow-auto rounded-lg border dark:border-gray-700"><OrderListView orders={orders} onOrderClick={setSelectedOrder} /></div>))}
                     </div>
                 );
-             case 'panel-mesas':
+            case 'panel-mesas':
                 return (
                     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900 p-4">
                         <div className="flex justify-end gap-3 mb-4"><button className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Ver uso de suscripción</button><button className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">Ver historial <IconClock className="h-4 w-4 text-gray-400"/></button></div>
@@ -2021,22 +1644,37 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                                 <div className="p-4 text-center"><p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{tableStats.activeTables}</p><p className="text-xs text-gray-500 uppercase tracking-wide mt-1">mesas activas</p></div>
                             </div>
                         </div>
-                        <div className="mb-6"><div className="flex gap-2 overflow-x-auto pb-2">{zones.map(zone => (<button key={zone.id} onClick={() => setActiveZoneId(zone.id)} className={`px-6 py-2 rounded-lg border font-medium text-sm transition-all whitespace-nowrap ${activeZoneId === zone.id ? 'border-green-500 text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-400' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'}`}>{zone.name}</button>))}</div></div>
+                        <div className="mb-6"><div className="flex gap-2 overflow-x-auto pb-2">{zones.map(zone => (<button key={zone.id} onClick={() => setActiveZoneId(zone.id)} className={`px-6 py-2 rounded-lg border font-medium text-sm transition-all whitespace-nowrap ${activeZoneId === zone.id ? 'border-green-500 text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-400' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'}`}>{zone.name}</button>))}{zones.length === 0 && (<div className="text-sm text-gray-500 p-2">No hay zonas configuradas. Ve a Configuración &gt; Zonas y mesas.</div>)}</div></div>
                         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex-1 p-8 overflow-auto relative min-h-[400px]">
-                            {activeZone ? (<div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${activeZone.cols}, minmax(80px, 1fr))`, gridTemplateRows: `repeat(${activeZone.rows}, minmax(80px, 1fr))` }}>
+                            {activeZone ? (
+                                <div className="grid gap-6" style={{gridTemplateColumns: `repeat(${activeZone.cols}, minmax(80px, 1fr))`, gridTemplateRows: `repeat(${activeZone.rows}, minmax(80px, 1fr))`}}>
                                     {activeZone.tables.map(table => {
                                         const { status, order } = getTableStatus(activeZone.name, table.name);
                                         const isOccupied = status === 'occupied';
-                                        return (<div key={table.id} onClick={() => isOccupied && order ? setSelectedOrder(order) : null} style={{ gridRow: `${table.row} / span ${table.height}`, gridColumn: `${table.col} / span ${table.width}`, }} className={`relative rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer border-2 ${table.shape === 'round' ? 'rounded-full aspect-square' : 'rounded-xl'} ${isOccupied ? 'bg-red-50 border-red-400 dark:bg-red-900/20 dark:border-red-500/50 shadow-md' : 'bg-gray-50 border-gray-200 dark:bg-gray-700/50 dark:border-gray-600 hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'}`}><span className={`text-2xl font-bold ${isOccupied ? 'text-red-500 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`}>{table.name}</span>{isOccupied && order && (<div className="absolute -top-2 -right-2"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold shadow-sm">{order.items.reduce((acc, i) => acc + i.quantity, 0)}</span></div>)}{isOccupied && (<div className="mt-1 px-2 py-0.5 bg-white dark:bg-gray-800 rounded text-[10px] font-medium text-gray-600 dark:text-gray-300 shadow-sm border border-gray-100 dark:border-gray-700 truncate max-w-[90%]">Ocupada</div>)}</div>);
+                                        return (
+                                            <div key={table.id} onClick={() => isOccupied && order ? setSelectedOrder(order) : null} style={{gridRow: `${table.row} / span ${table.height}`, gridColumn: `${table.col} / span ${table.width}`}} className={`relative rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer border-2 ${table.shape === 'round' ? 'rounded-full aspect-square' : 'rounded-xl'} ${isOccupied ? 'bg-red-50 border-red-400 dark:bg-red-900/20 dark:border-red-500/50 shadow-md' : 'bg-gray-50 border-gray-200 dark:bg-gray-700/50 dark:border-gray-600 hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'}`}>
+                                                <span className={`text-2xl font-bold ${isOccupied ? 'text-red-500 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`}>{table.name}</span>
+                                                {isOccupied && order && (<div className="absolute -top-2 -right-2"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold shadow-sm">{order.items.reduce((acc, i) => acc + i.quantity, 0)}</span></div>)}
+                                                {isOccupied && (<div className="mt-1 px-2 py-0.5 bg-white dark:bg-gray-800 rounded text-[10px] font-medium text-gray-600 dark:text-gray-300 shadow-sm border border-gray-100 dark:border-gray-700 truncate max-w-[90%]">Ocupada</div>)}
+                                            </div>
+                                        );
                                     })}
-                                    {Array.from({ length: activeZone.rows * activeZone.cols }).map((_, index) => { const row = Math.floor(index / activeZone.cols) + 1; const col = (index % activeZone.cols) + 1; const isOccupied = activeZone.tables.some(t => row >= t.row && row < t.row + t.height && col >= t.col && col < t.col + t.width); if (isOccupied) return null; return (<div key={`dot-${row}-${col}`} style={{ gridRow: row, gridColumn: col }} className="flex items-center justify-center pointer-events-none"><div className="w-1.5 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700"></div></div>) })}
-                                </div>) : (<div className="flex items-center justify-center h-full text-gray-400">Selecciona una zona para ver las mesas</div>)}
+                                    {Array.from({ length: activeZone.rows * activeZone.cols }).map((_, index) => {
+                                        const row = Math.floor(index / activeZone.cols) + 1; const col = (index % activeZone.cols) + 1;
+                                        const isOccupied = activeZone.tables.some(t => row >= t.row && row < t.row + t.height && col >= t.col && col < t.col + t.width);
+                                        if (isOccupied) return null;
+                                        return (<div key={`dot-${row}-${col}`} style={{ gridRow: row, gridColumn: col }} className="flex items-center justify-center pointer-events-none"><div className="w-1.5 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700"></div></div>)
+                                    })}
+                                </div>
+                            ) : (<div className="flex items-center justify-center h-full text-gray-400">Selecciona una zona para ver las mesas</div>)}
                             <div className="absolute bottom-4 right-4"><div className="bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2 cursor-pointer hover:bg-gray-800">Estás en tu periodo de prueba<IconChevronUp className="h-4 w-4 text-gray-400"/></div></div>
                         </div>
                     </div>
                 );
-            case 'comandas-digitales': return <div className="text-center p-10 text-gray-500 bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700">Comandas digitales (próximamente)</div>;
-            default: return null;
+            case 'comandas-digitales':
+                 return <div className="text-center p-10 text-gray-500 bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700">Comandas digitales (próximamente)</div>;
+            default:
+                return null;
         }
     };
     
@@ -2049,22 +1687,18 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
             </div>
              <div className="mt-6 flex-1">{renderContent()}</div>
             <NewOrderModal isOpen={isNewOrderModalOpen} onClose={() => setIsNewOrderModalOpen(false)} />
-            <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} onUpdateStatus={updateOrderStatus} onUpdatePayment={updatePaymentStatus} />
+            <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} onUpdateStatus={updateOrderStatus} onUpdatePayment={updatePaymentStatus}/>
         </div>
     );
 };
 
-// --- Missing Component Definitions ---
+// --- Analytics, Messages, Availability, Settings ---
 
 const Analytics: React.FC = () => {
+    const [orders] = usePersistentState<Order[]>('orders', []); // Mock persistence for demo
     const [query, setQuery] = useState('');
     const [insights, setInsights] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [orders, setOrders] = useState<Order[]>([]);
-
-    useEffect(() => {
-        getActiveOrders().then(setOrders);
-    }, []);
 
     const handleGetInsights = async () => {
         if (!query) return;
@@ -2082,11 +1716,7 @@ const Analytics: React.FC = () => {
                 <button onClick={handleGetInsights} disabled={isLoading} className="bg-indigo-600 text-white px-6 py-2 rounded-lg flex items-center space-x-2 hover:bg-indigo-700 disabled:bg-indigo-300"><IconSparkles /><span>{isLoading ? 'Analizando...' : 'Obtener Insights'}</span></button>
             </div>
             {isLoading && <div className="mt-6 text-center">Cargando...</div>}
-            {insights && (
-                <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border dark:border-gray-700 prose dark:prose-invert max-w-none">
-                    <pre className="whitespace-pre-wrap font-sans bg-transparent p-0">{insights}</pre>
-                </div>
-            )}
+            {insights && (<div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border dark:border-gray-700 prose dark:prose-invert max-w-none"><pre className="whitespace-pre-wrap font-sans bg-transparent p-0">{insights}</pre></div>)}
         </div>
     );
 };
@@ -2116,7 +1746,9 @@ const Messages: React.FC = () => {
                     <>
                         <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center"><h3 className="text-lg font-semibold">{selectedConversation.customerName}</h3><button className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"><IconMoreVertical /></button></div>
                         <div className="flex-1 p-6 overflow-y-auto space-y-4">{selectedConversation.messages.map(msg => (<div key={msg.id} className={`flex ${msg.sender === 'admin' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-md p-3 rounded-lg ${msg.sender === 'admin' ? 'bg-indigo-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200'}`}><p>{msg.text}</p><p className={`text-xs mt-1 ${msg.sender === 'admin' ? 'text-indigo-200' : 'text-gray-500 dark:text-gray-400'}`}>{new Date(msg.timestamp).toLocaleTimeString()}</p></div></div>))}</div>
-                        <div className="p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50"><div className="flex items-center space-x-2"><input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSendMessage()} placeholder="Escribe tu mensaje..." className="flex-1 px-4 py-2 border dark:border-gray-600 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-transparent" /><button onClick={handleSendMessage} className="bg-indigo-600 text-white rounded-full p-3 hover:bg-indigo-700"><IconSend /></button></div></div>
+                        <div className="p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                            <div className="flex items-center space-x-2"><input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSendMessage()} placeholder="Escribe tu mensaje..." className="flex-1 px-4 py-2 border dark:border-gray-600 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-transparent"/><button onClick={handleSendMessage} className="bg-indigo-600 text-white rounded-full p-3 hover:bg-indigo-700"><IconSend /></button></div>
+                        </div>
                     </>
                 ) : (<div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">Selecciona una conversación para chatear.</div>)}
             </div>
@@ -2129,210 +1761,129 @@ const AvailabilityView: React.FC = () => {
     const [categories, setCategories] = useState<Category[]>([]);
     const [personalizations, setPersonalizations] = useState<Personalization[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState('products');
     const [searchTerm, setSearchTerm] = useState('');
     const [filter, setFilter] = useState<'all' | 'unavailable'>('all');
 
-    useEffect(() => {
-        const load = async () => {
-            const [p, c, pers] = await Promise.all([getProducts(), getCategories(), getPersonalizations()]);
-            setProducts(p); setCategories(c); setPersonalizations(pers);
-            setIsLoading(false);
-        };
-        load();
-    }, []);
+    const fetchData = async () => {
+        try {
+            setIsLoading(true); setError(null);
+            const [fetchedProducts, fetchedCategories, fetchedPersonalizations] = await Promise.all([getProducts(), getCategories(), getPersonalizations()]);
+            setProducts(fetchedProducts); setCategories(fetchedCategories); setPersonalizations(fetchedPersonalizations);
+        } catch (err) { setError("Error al cargar datos."); console.error(err); } finally { setIsLoading(false); }
+    };
+    useEffect(() => { fetchData(); }, []);
 
-    const handleToggleProduct = async (id: string, status: boolean) => {
-        setProducts(prev => prev.map(p => p.id === id ? { ...p, available: !status } : p));
-        try { await updateProductAvailability(id, !status); } catch { setProducts(prev => prev.map(p => p.id === id ? { ...p, available: status } : p)); }
+    const handleToggleProduct = async (productId: string, currentStatus: boolean) => {
+        setProducts(prev => prev.map(p => p.id === productId ? { ...p, available: !currentStatus } : p));
+        try { await updateProductAvailability(productId, !currentStatus); } catch (error) { alert("No se pudo actualizar."); setProducts(prev => prev.map(p => p.id === productId ? { ...p, available: currentStatus } : p)); }
     };
 
-    const handleToggleOption = async (id: string, status: boolean) => {
-        setPersonalizations(prev => prev.map(p => ({...p, options: p.options.map(o => o.id === id ? {...o, available: !status} : o)})));
-        try { await updatePersonalizationOptionAvailability(id, !status); } catch { setPersonalizations(prev => prev.map(p => ({...p, options: p.options.map(o => o.id === id ? {...o, available: status} : o)}))); }
+    const handleTogglePersonalizationOption = async (optionId: string, currentStatus: boolean) => {
+        setPersonalizations(prev => prev.map(p => ({ ...p, options: p.options.map(opt => opt.id === optionId ? { ...opt, available: !currentStatus } : opt) })));
+        try { await updatePersonalizationOptionAvailability(optionId, !currentStatus); } catch (error) { alert("No se pudo actualizar."); setPersonalizations(prev => prev.map(p => ({ ...p, options: p.options.map(opt => opt.id === optionId ? { ...opt, available: currentStatus } : opt) }))); }
     };
 
-    const filteredProducts = useMemo(() => products.filter(p => (filter === 'all' || !p.available) && p.name.toLowerCase().includes(searchTerm.toLowerCase())), [products, filter, searchTerm]);
-    const groupedProducts = useMemo(() => categories.map(c => ({ ...c, products: filteredProducts.filter(p => p.categoryId === c.id) })).filter(c => c.products.length > 0), [filteredProducts, categories]);
-    
-    if (isLoading) return <div className="text-center p-10">Cargando...</div>;
+    const filteredProducts = useMemo(() => products.filter(p => filter === 'all' || !p.available).filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())), [products, filter, searchTerm]);
+    const groupedProducts = useMemo(() => categories.map(category => ({ ...category, products: filteredProducts.filter(p => p.categoryId === category.id) })).filter(category => category.products.length > 0), [filteredProducts, categories]);
+    const filteredPersonalizations = useMemo(() => {
+        const allOptions: (PersonalizationOption & { parentName: string })[] = [];
+        personalizations.forEach(p => p.options.forEach(opt => allOptions.push({ ...opt, parentName: p.name })));
+        return allOptions.filter(opt => filter === 'all' || !opt.available).filter(opt => opt.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    }, [personalizations, filter, searchTerm]);
+    const groupedPersonalizations = useMemo(() => {
+        const groups: { [key: string]: (PersonalizationOption & { parentName: string })[] } = {};
+        filteredPersonalizations.forEach(opt => { if (!groups[opt.parentName]) groups[opt.parentName] = []; groups[opt.parentName].push(opt); });
+        return Object.entries(groups).map(([name, options]) => ({ name, options }));
+    }, [filteredPersonalizations]);
 
+    const ToggleSwitch: React.FC<{ checked: boolean; onChange: () => void; id: string; label: string }> = ({ checked, onChange, id, label }) => (
+        <label htmlFor={id} className="flex items-center cursor-pointer"><div className="relative"><input id={id} type="checkbox" className="sr-only" checked={checked} onChange={onChange} /><div className={`block w-14 h-8 rounded-full ${checked ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div><div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform ${checked ? 'transform translate-x-6' : ''}`}></div></div><span className="ml-3 text-gray-700 dark:text-gray-300 font-medium hidden sm:inline">{label}</span></label>
+    );
+
+    if (isLoading) return <div className="text-center p-10">Cargando disponibilidad...</div>;
     return (
         <div className="space-y-6">
-            <div className="border-b border-gray-200 dark:border-gray-700"><nav className="-mb-px flex space-x-8"><button onClick={() => setActiveTab('products')} className={`${activeTab === 'products' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-gray-500'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}>Productos</button><button onClick={() => setActiveTab('personalizations')} className={`${activeTab === 'personalizations' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-gray-500'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}>Personalizaciones</button></nav></div>
-            <div className="flex justify-between gap-4"><div className="flex gap-2"><button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-md text-sm font-semibold ${filter === 'all' ? 'bg-green-100 text-green-800' : 'bg-white border'}`}>Todos</button><button onClick={() => setFilter('unavailable')} className={`px-4 py-2 rounded-md text-sm font-semibold ${filter === 'unavailable' ? 'bg-green-100 text-green-800' : 'bg-white border'}`}>Agotados</button></div><input type="text" placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="border p-2 rounded-md bg-transparent" /></div>
-            {activeTab === 'products' && (
-                <div className="space-y-6">{groupedProducts.map(cat => (<div key={cat.id} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border dark:border-gray-700"><h3 className="text-lg font-semibold mb-4">{cat.name}</h3>{cat.products.map(p => (<div key={p.id} className="flex justify-between py-2 items-center"><span>{p.name}</span><button onClick={() => handleToggleProduct(p.id, p.available)} className={`w-12 h-6 rounded-full relative transition-colors ${p.available ? 'bg-green-500' : 'bg-gray-300'}`}><div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${p.available ? 'left-7' : 'left-1'}`}></div></button></div>))}</div>))}</div>
-            )}
-            {activeTab === 'personalizations' && (
-                <div className="space-y-6">{personalizations.map(p => (<div key={p.id} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border dark:border-gray-700"><h3 className="text-lg font-semibold mb-4">{p.name}</h3>{p.options.map(o => (<div key={o.id} className="flex justify-between py-2 items-center"><span>{o.name}</span><button onClick={() => handleToggleOption(o.id, o.available)} className={`w-12 h-6 rounded-full relative transition-colors ${o.available ? 'bg-green-500' : 'bg-gray-300'}`}><div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${o.available ? 'left-7' : 'left-1'}`}></div></button></div>))}</div>))}</div>
-            )}
+            <div className="border-b border-gray-200 dark:border-gray-700"><nav className="-mb-px flex space-x-8">
+                {[{ id: 'products', title: 'Productos' }, { id: 'personalizations', title: 'Personalizaciones' }].map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`${activeTab === tab.id ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-700'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}>{tab.title}</button>))}
+            </nav></div>
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4"><div className="flex items-center gap-2"><button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-md text-sm font-semibold ${filter === 'all' ? 'bg-green-100 text-green-800' : 'bg-white border'}`}>Todos</button><button onClick={() => setFilter('unavailable')} className={`px-4 py-2 rounded-md text-sm font-semibold ${filter === 'unavailable' ? 'bg-green-100 text-green-800' : 'bg-white border'}`}>Agotados</button></div><input type="text" placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="block w-full sm:w-64 pl-3 pr-3 py-2 border rounded-md sm:text-sm"/></div>
+            {activeTab === 'products' && (<div className="space-y-6">{groupedProducts.map(category => (<div key={category.id} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border dark:border-gray-700"><h3 className="text-lg font-semibold mb-4">{category.name}</h3><div className="divide-y dark:divide-gray-700">{category.products.map(product => (<div key={product.id} className="flex items-center justify-between py-4"><span className="font-medium">{product.name}</span><ToggleSwitch checked={product.available} onChange={() => handleToggleProduct(product.id, product.available)} id={`p-${product.id}`} label={product.available ? 'Disponible' : 'Agotado'}/></div>))}</div></div>))}</div>)}
+            {activeTab === 'personalizations' && (<div className="space-y-6">{groupedPersonalizations.map(group => (<div key={group.name} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border dark:border-gray-700"><h3 className="text-lg font-semibold mb-4">{group.name}</h3><div className="divide-y dark:divide-gray-700">{group.options.map(opt => (<div key={opt.id} className="flex items-center justify-between py-4"><span className="font-medium">{opt.name}</span><ToggleSwitch checked={opt.available} onChange={() => handleTogglePersonalizationOption(opt.id, opt.available)} id={`o-${opt.id}`} label={opt.available ? 'Disponible' : 'Agotado'}/></div>))}</div></div>))}</div>)}
         </div>
     );
 };
 
 const SettingsCard: React.FC<{ title: string; description?: string; children: React.ReactNode; onSave?: () => void; onCancel?: () => void; noActions?: boolean }> = ({ title, description, children, onSave, onCancel, noActions }) => (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
-        <div className="p-6">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">{title}</h3>
-            {description && <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{description}</p>}
-            <div className="mt-6 space-y-4">
-                {children}
-            </div>
-        </div>
-        {!noActions && (
-            <div className="mt-6 px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t dark:border-gray-700 flex justify-end gap-x-3 rounded-b-lg">
-                <button onClick={onCancel} className="px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-600">Cancelar</button>
-                <button onClick={onSave} className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-semibold hover:bg-green-700">Guardar</button>
-            </div>
-        )}
-    </div>
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700"><div className="p-6"><h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">{title}</h3>{description && <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{description}</p>}<div className="mt-6 space-y-4">{children}</div></div>{!noActions && (<div className="mt-6 px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t dark:border-gray-700 flex justify-end gap-x-3 rounded-b-lg"><button onClick={onCancel} className="px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-600">Cancelar</button><button onClick={onSave} className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-semibold hover:bg-green-700">Guardar</button></div>)}</div>
 );
 
 const SearchableDropdown: React.FC<{ options: Currency[], selected: Currency, onSelect: (option: Currency) => void }> = ({ options, selected, onSelect }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
-    const dropdownRef = useRef<HTMLDivElement>(null);
-    const filteredOptions = options.filter(option => option.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    const [isOpen, setIsOpen] = useState(false); const [searchTerm, setSearchTerm] = useState(''); const dropdownRef = useRef<HTMLDivElement>(null);
     useEffect(() => { const handleClickOutside = (event: MouseEvent) => { if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) setIsOpen(false); }; document.addEventListener("mousedown", handleClickOutside); return () => document.removeEventListener("mousedown", handleClickOutside); }, []);
-    return (
-        <div className="relative" ref={dropdownRef}>
-            <button type="button" onClick={() => setIsOpen(!isOpen)} className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm pl-3 pr-10 py-2 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 sm:text-sm"><span className="block truncate">{selected.name}</span><span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none"><IconChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} /></span></button>
-            {isOpen && (<div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm"><div className="p-2"><input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-transparent focus:ring-green-500 focus:border-green-500"/></div>{filteredOptions.map(option => (<button key={option.code} type="button" onClick={() => { onSelect(option); setIsOpen(false); setSearchTerm(''); }} className="w-full text-left cursor-default select-none relative py-2 pl-10 pr-4 text-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"><span className={`font-normal block truncate ${selected.code === option.code ? 'font-medium' : 'font-normal'}`}>{option.name}</span></button>))}</div>)}
-        </div>
-    );
+    return (<div className="relative" ref={dropdownRef}><button type="button" onClick={() => setIsOpen(!isOpen)} className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm pl-3 pr-10 py-2 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-green-500 sm:text-sm"><span className="block truncate">{selected.name}</span><span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none"><IconChevronDown className="h-5 w-5 text-gray-400" /></span></button>{isOpen && (<div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm"><div className="p-2"><input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full px-3 py-2 border rounded-md" /></div>{options.filter(o => o.name.toLowerCase().includes(searchTerm.toLowerCase())).map(option => (<button key={option.code} type="button" onClick={() => { onSelect(option); setIsOpen(false); setSearchTerm(''); }} className="w-full text-left py-2 pl-10 pr-4 hover:bg-gray-100">{option.name}</button>))}</div>)}</div>);
 };
 
 const GeneralSettings: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
-    const [originalSettings, setOriginalSettings] = useState(settings.company);
-    useEffect(() => { setOriginalSettings(settings.company) }, [settings.company])
-    return (<SettingsCard title="Datos de empresa" onSave={onSave} onCancel={() => setSettings(prev => ({...prev, company: originalSettings}))}><label className="block text-sm font-medium">Nombre de empresa</label><input type="text" value={settings.company.name} onChange={e => setSettings(p => ({...p, company: {...p.company, name: e.target.value}}))} className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm bg-transparent"/><label className="block text-sm font-medium mt-4">Divisa</label><SearchableDropdown options={CURRENCIES} selected={settings.company.currency} onSelect={currency => setSettings(p => ({...p, company: {...p.company, currency}}))} /></SettingsCard>);
+    const [original, setOriginal] = useState(settings.company); useEffect(() => setOriginal(settings.company), [settings.company]);
+    return (<div className="space-y-6"><SettingsCard title="Datos de empresa" onSave={onSave} onCancel={() => setSettings(p => ({...p, company: original}))}><label>Nombre de empresa</label><input type="text" value={settings.company.name} onChange={e => setSettings(p => ({...p, company: {...p.company, name: e.target.value}}))} className="w-full border rounded p-2"/><label className="mt-4 block">Divisa</label><SearchableDropdown options={CURRENCIES} selected={settings.company.currency} onSelect={c => setSettings(p => ({...p, company: {...p.company, currency: c}}))} /></SettingsCard></div>);
 };
 
 const BranchSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
-    const [originalSettings, setOriginalSettings] = useState(settings.branch);
-    useEffect(() => { setOriginalSettings(settings.branch) }, [settings.branch]);
-    const inputClasses = "mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm";
-    return (<div className="space-y-6"><SettingsCard title="Datos de sucursal" onSave={onSave} onCancel={() => setSettings(prev => ({...prev, branch: originalSettings}))}><label className="block text-sm font-medium">Alias</label><input type="text" value={settings.branch.alias} onChange={e => setSettings(p => ({...p, branch: {...p.branch, alias: e.target.value}}))} className={inputClasses}/><label className="block text-sm font-medium mt-4">Dirección</label><input type="text" value={settings.branch.fullAddress} onChange={e => setSettings(p => ({...p, branch: {...p.branch, fullAddress: e.target.value}}))} className={inputClasses}/></SettingsCard></div>);
+    const [original, setOriginal] = useState(settings.branch); useEffect(() => setOriginal(settings.branch), [settings.branch]);
+    const handleImage = (e: any, field: any) => { if (e.target.files[0]) { const r = new FileReader(); r.onloadend = () => { const ns = {...settings, branch: {...settings.branch, [field]: r.result}}; setSettings(ns); saveAppSettings(ns); }; r.readAsDataURL(e.target.files[0]); }};
+    return (<div className="space-y-6"><SettingsCard title="Datos de sucursal" onSave={onSave} onCancel={() => setSettings(p => ({...p, branch: original}))}><label>Alias</label><input type="text" value={settings.branch.alias} onChange={e => setSettings(p => ({...p, branch: {...p.branch, alias: e.target.value}}))} className="w-full border rounded p-2"/><label className="mt-4 block">Dirección</label><input type="text" value={settings.branch.fullAddress} onChange={e => setSettings(p => ({...p, branch: {...p.branch, fullAddress: e.target.value}}))} className="w-full border rounded p-2"/></SettingsCard><div className="bg-white dark:bg-gray-800 p-6 rounded shadow border dark:border-gray-700"><h4>Logo</h4><input type="file" onChange={e => handleImage(e, 'logoUrl')} /></div></div>);
 };
 
 const ShippingSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
-    const [originalSettings, setOriginalSettings] = useState(settings.shipping);
-    useEffect(() => { setOriginalSettings(settings.shipping) }, [settings.shipping]);
-    return (<SettingsCard title="Costos de envío" onSave={onSave} onCancel={() => setSettings(prev => ({...prev, shipping: originalSettings}))}><select value={settings.shipping.costType} onChange={e => setSettings(p => ({...p, shipping: {...p.shipping, costType: e.target.value as ShippingCostType}}))} className="w-full px-3 py-2 border rounded-md bg-transparent">{Object.values(ShippingCostType).map(type => <option key={type} value={type}>{type}</option>)}</select></SettingsCard>);
+    const [original, setOriginal] = useState(settings.shipping); useEffect(() => setOriginal(settings.shipping), [settings.shipping]);
+    return (<div className="space-y-6"><SettingsCard title="Envíos" onSave={onSave} onCancel={() => setSettings(p => ({...p, shipping: original}))}><select value={settings.shipping.costType} onChange={e => setSettings(p => ({...p, shipping: {...p.shipping, costType: e.target.value as any}}))} className="w-full border rounded p-2"><option value={ShippingCostType.ToBeQuoted}>Por cotizar</option><option value={ShippingCostType.Free}>Gratis</option><option value={ShippingCostType.Fixed}>Fijo</option></select></SettingsCard></div>);
 };
 
 const PaymentSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
-    const [originalSettings, setOriginalSettings] = useState(settings.payment);
-    useEffect(() => { setOriginalSettings(settings.payment) }, [settings.payment]);
-    return (<SettingsCard title="Métodos de pago" onSave={onSave} onCancel={() => setSettings(prev => ({...prev, payment: originalSettings}))}><div className="space-y-2">{['Efectivo', 'Pago Móvil', 'Transferencia', 'Zelle'].map(m => (<label key={m} className="flex items-center"><input type="checkbox" checked={settings.payment.deliveryMethods.includes(m as any)} onChange={e => { const methods = e.target.checked ? [...settings.payment.deliveryMethods, m] : settings.payment.deliveryMethods.filter(pm => pm !== m); setSettings(p => ({...p, payment: {...p.payment, deliveryMethods: methods as any}})) }} className="mr-2" />{m}</label>))}</div></SettingsCard>);
+    const [original, setOriginal] = useState(settings.payment); useEffect(() => setOriginal(settings.payment), [settings.payment]);
+    return (<div className="space-y-6"><SettingsCard title="Métodos de Pago" onSave={onSave} onCancel={() => setSettings(p => ({...p, payment: original}))}><label><input type="checkbox" checked={settings.payment.showTipField} onChange={e => setSettings(p => ({...p, payment: {...p.payment, showTipField: e.target.checked}}))} /> Mostrar propina</label></SettingsCard></div>);
 };
 
 const HoursSettings: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
-    return (<SettingsCard title="Horarios" onSave={onSave} noActions><div className="text-gray-500">Configuración de horarios simplificada por ahora.</div></SettingsCard>);
+    return (<div className="space-y-6"><SettingsCard title="Horarios" onSave={onSave} onCancel={() => {}} noActions><p>Gestión de horarios próximamente.</p></SettingsCard></div>);
 };
 
 const ZonesAndTablesSettings: React.FC<{ zones: Zone[]; onAddZone: () => void; onEditZoneName: (zone: Zone) => void; onDeleteZone: (zoneId: string) => void; onEditZoneLayout: (zone: Zone) => void; }> = ({ zones, onAddZone, onEditZoneName, onDeleteZone, onEditZoneLayout }) => {
-    return (<div className="space-y-4"><div className="flex justify-end"><button onClick={onAddZone} className="bg-green-600 text-white px-4 py-2 rounded-md">Nueva Zona</button></div>{zones.map(z => (<div key={z.id} className="flex justify-between items-center p-4 border rounded-md"><span>{z.name}</span><div className="flex gap-2"><button onClick={() => onEditZoneLayout(z)} className="text-blue-500"><IconEdit/></button><button onClick={() => onDeleteZone(z.id)} className="text-red-500"><IconTrash/></button></div></div>))}</div>);
+    return (<div className="space-y-6"><div className="flex justify-end"><button onClick={onAddZone} className="bg-green-600 text-white px-4 py-2 rounded">Nueva Zona</button></div>{zones.map(z => (<div key={z.id} className="flex justify-between items-center p-4 bg-white dark:bg-gray-800 rounded shadow"><input defaultValue={z.name} onBlur={e => onEditZoneName({...z, name: e.target.value})} className="font-bold bg-transparent"/><div className="flex gap-2"><button onClick={() => onEditZoneLayout(z)}><IconEdit/></button><button onClick={() => onDeleteZone(z.id)} className="text-red-500"><IconTrash/></button></div></div>))}</div>);
 };
 
 const PrintingSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
-    const [originalSettings, setOriginalSettings] = useState(settings.printing);
-    useEffect(() => { setOriginalSettings(settings.printing) }, [settings.printing]);
-    return (<SettingsCard title="Impresión" onSave={onSave} onCancel={() => setSettings(prev => ({...prev, printing: originalSettings}))}><select value={settings.printing.method} onChange={e => setSettings(p => ({...p, printing: {method: e.target.value as any}}))} className="w-full border p-2 rounded bg-transparent">{Object.values(PrintingMethod).map(m => <option key={m} value={m}>{m}</option>)}</select></SettingsCard>);
+    const [original, setOriginal] = useState(settings.printing); useEffect(() => setOriginal(settings.printing), [settings.printing]);
+    return (<div className="space-y-6"><SettingsCard title="Impresión" onSave={onSave} onCancel={() => setSettings(p => ({...p, printing: original}))}><select value={settings.printing.method} onChange={e => setSettings(p => ({...p, printing: {method: e.target.value as any}}))} className="w-full border rounded p-2"><option value={PrintingMethod.Native}>Nativa</option><option value={PrintingMethod.Bluetooth}>Bluetooth</option><option value={PrintingMethod.USB}>USB</option></select></SettingsCard></div>);
 };
 
 const ZoneEditor: React.FC<{ initialZone: Zone; onSave: (zone: Zone) => void; onExit: () => void; }> = ({ initialZone, onSave, onExit }) => {
-    const [zone, setZone] = useState(initialZone);
-    const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
-    const gridRef = useRef<HTMLDivElement>(null);
-
-    const addTable = (row: number, col: number) => {
-        const newTable: Table = { id: crypto.randomUUID(), zoneId: zone.id, name: (zone.tables.length + 1).toString(), row, col, width: 1, height: 1, shape: 'square', status: 'available' };
-        setZone(prev => ({ ...prev, tables: [...prev.tables, newTable] }));
-    };
-
-    return (
-        <div className="fixed inset-0 bg-gray-50 dark:bg-gray-900 z-50 flex flex-col">
-            <header className="bg-white dark:bg-gray-800 p-4 border-b dark:border-gray-700 flex justify-between items-center shrink-0 z-10"><div className="flex items-center gap-x-4"><button onClick={onExit} className="flex items-center text-red-600 font-semibold text-sm"><IconLogoutAlt className="h-5 w-5 mr-1 transform rotate-180" />Salir</button><h2 className="text-xl font-bold">{zone.name}</h2></div><button onClick={() => onSave(zone)} className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700">Guardar</button></header>
-            <main className="flex-1 p-8 overflow-auto bg-gray-100 dark:bg-gray-900"><div className="bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 w-full min-h-full"><div className="grid" style={{ gridTemplateColumns: `repeat(${zone.cols}, minmax(60px, 1fr))`, gridTemplateRows: `repeat(${zone.rows}, minmax(60px, 1fr))`, gap: '1rem' }}>
-                {zone.tables.map(table => (<div key={table.id} className="flex items-center justify-center font-bold text-lg text-gray-800 dark:text-gray-100 cursor-pointer border-2 bg-white border-gray-300 dark:bg-gray-700 dark:border-gray-600" style={{ gridRow: `${table.row} / span ${table.height}`, gridColumn: `${table.col} / span ${table.width}` }}>{table.name}</div>))}
-                {Array.from({ length: zone.rows * zone.cols }).map((_, index) => { const row = Math.floor(index / zone.cols) + 1; const col = (index % zone.cols) + 1; if (zone.tables.some(t => row >= t.row && row < t.row + t.height && col >= t.col && col < t.col + t.width)) return null; return (<div key={`cell-${row}-${col}`} onClick={() => addTable(row, col)} className="bg-gray-100 dark:bg-gray-800/50 rounded-lg flex items-center justify-center text-gray-400 hover:bg-green-100 hover:text-green-600 cursor-pointer border-2 border-dashed border-gray-300 dark:border-gray-600" style={{ gridRow: row, gridColumn: col }}><IconPlus className="h-6 w-6"/></div>); })}
-            </div></div></main>
-        </div>
-    );
+    const [zone, setZone] = useState(initialZone); const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+    const addTable = () => { const nt: Table = { id: crypto.randomUUID(), zoneId: zone.id, name: `${zone.tables.length + 1}`, row: 1, col: 1, width: 1, height: 1, shape: 'square', status: 'available' }; setZone(prev => ({ ...prev, tables: [...prev.tables, nt] })); };
+    return (<div className="fixed inset-0 bg-gray-100 z-50 flex flex-col"><div className="p-4 bg-white flex justify-between"><button onClick={onExit}>Salir</button><h2 className="font-bold">{zone.name}</h2><button onClick={() => onSave(zone)} className="bg-green-600 text-white px-4 py-2 rounded">Guardar</button></div><div className="flex-1 p-8"><button onClick={addTable} className="mb-4 bg-blue-500 text-white px-4 py-2 rounded">Agregar Mesa</button><div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${zone.cols}, 100px)` }}>{zone.tables.map(t => (<div key={t.id} className="w-24 h-24 bg-white border flex items-center justify-center">{t.name}</div>))}</div></div></div>);
 };
 
 const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; onEditZoneLayout: (zone: Zone) => void; initialPage?: SettingsPage; }> = ({ isOpen, onClose, onEditZoneLayout, initialPage = 'general' }) => {
-    const [settings, setSettings] = useState<AppSettings | null>(null);
-    const [activePage, setActivePage] = useState<SettingsPage>(initialPage);
-    const [zones, setZones] = useState<Zone[]>([]);
-
-    useEffect(() => { if (isOpen) { setActivePage(initialPage); getAppSettings().then(setSettings); getZones().then(setZones); } }, [isOpen, initialPage]);
-
-    const handleSaveSettings = async () => { if (!settings) return; try { await saveAppSettings(settings); alert("¡Configuración guardada!"); } catch { alert("Error al guardar."); } };
-    const handleAddZone = async () => { const name = prompt("Nombre de zona:"); if (name) { await saveZone({ name, rows: 5, cols: 5 }); getZones().then(setZones); } };
-    const handleEditZoneName = async (z: Zone) => { await saveZone(z); getZones().then(setZones); };
-    const handleDeleteZone = async (id: string) => { if (confirm("Borrar zona?")) { await deleteZone(id); getZones().then(setZones); } };
-
+    const [settings, setSettings] = useState<AppSettings | null>(null); const [activePage, setActivePage] = useState<SettingsPage>(initialPage); const [zones, setZones] = useState<Zone[]>([]);
+    useEffect(() => { if (isOpen) { getAppSettings().then(setSettings); getZones().then(setZones); } }, [isOpen]);
+    const handleSave = async () => { if (settings) await saveAppSettings(settings); onClose(); };
+    const renderPage = () => { switch(activePage) { case 'general': return <GeneralSettings onSave={handleSave} settings={settings!} setSettings={setSettings as any} />; case 'zones-tables': return <ZonesAndTablesSettings zones={zones} onAddZone={async () => { await saveZone({name: 'Nueva Zona', rows: 5, cols: 5}); setZones(await getZones()); }} onEditZoneName={async (z) => { await saveZone(z); }} onDeleteZone={async (id) => { await deleteZone(id); setZones(await getZones()); }} onEditZoneLayout={onEditZoneLayout} />; default: return <div>Configuración</div>; } };
     if (!isOpen || !settings) return null;
-
-    const renderPage = () => {
-        switch (activePage) {
-            case 'general': return <GeneralSettings onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
-            case 'store-data': return <BranchSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
-            case 'shipping-costs': return <ShippingSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
-            case 'payment-methods': return <PaymentSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
-            case 'hours': return <HoursSettings onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
-            case 'zones-tables': return <ZonesAndTablesSettings zones={zones} onAddZone={handleAddZone} onEditZoneName={handleEditZoneName} onDeleteZone={handleDeleteZone} onEditZoneLayout={onEditZoneLayout} />;
-            case 'printing': return <PrintingSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
-            default: return null;
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-40 flex justify-end">
-            <div className="bg-white dark:bg-gray-900 h-full w-full max-w-5xl flex flex-col relative">
-                <header className="p-4 border-b dark:border-gray-700 flex justify-between items-center shrink-0"><h2 className="text-xl font-bold">Configuración</h2><button onClick={onClose}><IconX /></button></header>
-                <div className="flex flex-1 overflow-hidden">
-                    <aside className="w-64 border-r dark:border-gray-700 p-4"><nav className="space-y-1">{['general', 'store-data', 'shipping-costs', 'payment-methods', 'hours', 'zones-tables', 'printing'].map(id => (<button key={id} onClick={() => setActivePage(id as SettingsPage)} className={`w-full text-left px-3 py-2 rounded-md ${activePage === id ? 'bg-green-50 dark:bg-green-900/50' : ''}`}>{id}</button>))}</nav></aside>
-                    <main className="flex-1 p-6 overflow-y-auto bg-gray-50 dark:bg-gray-900/50">{renderPage()}</main>
-                </div>
-            </div>
-        </div>
-    );
+    return (<div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex justify-end"><div className="w-full max-w-5xl bg-white dark:bg-gray-900 h-full flex"><div className="w-64 border-r p-4"><button onClick={() => setActivePage('general')} className="block w-full text-left p-2">General</button><button onClick={() => setActivePage('zones-tables')} className="block w-full text-left p-2">Zonas y Mesas</button></div><div className="flex-1 p-8 overflow-y-auto"><button onClick={onClose} className="mb-4">Cerrar</button>{renderPage()}</div></div></div>);
 };
 
-const QRModal: React.FC<{ isOpen: boolean; onClose: () => void; url: string; title: string; filename: string; }> = ({ isOpen, onClose, url, title }) => {
+const QRModal: React.FC<{ isOpen: boolean; onClose: () => void; url: string; title: string; filename: string; }> = ({ isOpen, onClose, url, title, filename }) => {
     if (!isOpen) return null;
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(url)}`;
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-sm text-center p-8"><h2 className="text-xl font-bold mb-4">{title}</h2><img src={qrUrl} alt="QR" className="mx-auto" /><button onClick={onClose} className="mt-4 bg-gray-200 px-4 py-2 rounded">Cerrar</button></div>
-        </div>
-    );
+    return (<div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={onClose}><div className="bg-white p-8 rounded text-center"><h2 className="text-xl font-bold mb-4">{title}</h2><img src={qrUrl} alt="QR" /><button onClick={onClose} className="mt-4 bg-gray-200 px-4 py-2 rounded">Cerrar</button></div></div>);
 };
 
 const ShareView: React.FC<{ onGoToTableSettings: () => void }> = ({ onGoToTableSettings }) => {
-    const [settings, setSettings] = useState<AppSettings | null>(null);
-    const [zones, setZones] = useState<Zone[]>([]);
-    const [qrModal, setQrModal] = useState({ open: false, url: '', title: '', filename: '' });
-
-    useEffect(() => { Promise.all([getAppSettings(), getZones()]).then(([s, z]) => { setSettings(s); setZones(z); }); }, []);
-
-    if (!settings) return <div>Cargando...</div>;
-    const menuLink = `${window.location.origin + window.location.pathname}#/menu`;
-
-    return (
-        <div className="space-y-6">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border dark:border-gray-700">
-                <h2 className="text-xl font-bold mb-4">Comparte tu menú</h2>
-                <div className="flex gap-4"><input readOnly value={menuLink} className="flex-1 border p-2 rounded bg-transparent" /><button onClick={() => navigator.clipboard.writeText(menuLink)} className="bg-gray-200 px-4 py-2 rounded">Copiar</button><button onClick={() => setQrModal({ open: true, url: menuLink, title: "QR Menú", filename: "menu.png" })} className="bg-gray-200 px-4 py-2 rounded">QR</button></div>
-            </div>
-            {zones.map(z => (<div key={z.id} className="bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"><h3 className="font-bold mb-4">{z.name}</h3><div className="grid grid-cols-4 gap-4">{z.tables.map(t => (<button key={t.id} onClick={() => setQrModal({ open: true, url: `${menuLink}?table=${t.name}&zone=${z.name}`, title: `Mesa ${t.name}`, filename: `qr-${t.name}.png` })} className="border p-4 rounded text-center hover:bg-gray-50 dark:hover:bg-gray-700">Mesa {t.name}</button>))}</div></div>))}
-            <QRModal isOpen={qrModal.open} onClose={() => setQrModal({ ...qrModal, open: false })} url={qrModal.url} title={qrModal.title} filename={qrModal.filename} />
-        </div>
-    );
+    const baseUrl = window.location.origin + window.location.pathname; const menuLink = `${baseUrl}#/menu`;
+    const copy = () => navigator.clipboard.writeText(menuLink).then(() => alert('Copiado'));
+    return (<div className="p-6 bg-white dark:bg-gray-800 rounded shadow"><h2>Compartir Menú</h2><div className="flex gap-2 mt-4"><input readOnly value={menuLink} className="border p-2 flex-1"/><button onClick={copy} className="bg-gray-200 px-4 py-2 rounded">Copiar</button></div></div>);
 };
 
 const AdminView: React.FC = () => {
@@ -2352,26 +1903,13 @@ const AdminView: React.FC = () => {
             setTimeout(() => setLastNewOrder(null), 5000); 
             if (currentPage !== 'orders') setHasUnreadOrders(true);
         });
-        
-        const unlockAudio = () => {
-             const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-             if(AudioContext) {
-                 const ctx = new AudioContext();
-                 ctx.resume();
-             }
-             window.removeEventListener('click', unlockAudio);
-             window.removeEventListener('touchstart', unlockAudio);
-        };
-        
-        window.addEventListener('click', unlockAudio);
-        window.addEventListener('touchstart', unlockAudio);
-
+        const unlockAudio = () => { const AudioContext = window.AudioContext || (window as any).webkitAudioContext; if(AudioContext) { const ctx = new AudioContext(); ctx.resume(); } window.removeEventListener('click', unlockAudio); window.removeEventListener('touchstart', unlockAudio); };
+        window.addEventListener('click', unlockAudio); window.addEventListener('touchstart', unlockAudio);
         return () => { unsubscribe(); };
     }, [currentPage]);
 
-    useEffect(() => {
-        if (currentPage === 'orders') setHasUnreadOrders(false);
-    }, [currentPage]);
+    useEffect(() => { let interval: any; if (hasUnreadOrders) { let visible = true; interval = setInterval(() => { document.title = visible ? "(1) ¡Nuevo Pedido!" : "ALTOQUE FOOD"; visible = !visible; }, 1000); } else { document.title = "ALTOQUE FOOD"; } return () => clearInterval(interval); }, [hasUnreadOrders]);
+    useEffect(() => { if (currentPage === 'orders') setHasUnreadOrders(false); }, [currentPage]);
 
     const openTableSettings = () => { setIsSettingsOpen(true); };
     const handleEditZoneLayout = (zone: Zone) => { setZoneToEdit(zone); setIsSettingsOpen(false); setIsZoneEditorOpen(true); };

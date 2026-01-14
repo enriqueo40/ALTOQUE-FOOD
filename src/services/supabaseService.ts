@@ -17,7 +17,7 @@ let supabase: SupabaseClient | null = null;
 let ordersChannel: RealtimeChannel | null = null;
 let menuChannel: RealtimeChannel | null = null;
 
-// Event Listeners for Orders
+// Event Listeners for Orders (Observer Pattern)
 type OrderCallback = (payload: any) => void;
 const orderInsertListeners: OrderCallback[] = [];
 const orderUpdateListeners: OrderCallback[] = [];
