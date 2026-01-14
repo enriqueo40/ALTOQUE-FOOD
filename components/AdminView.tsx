@@ -1040,8 +1040,7 @@ const PromotionModal: React.FC<{
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-start justify-end">
             <div className="bg-white dark:bg-gray-800 h-full w-full max-w-3xl flex flex-col relative">
                 <header className="p-6 border-b dark:border-gray-700 flex justify-between items-center sticky top-0 bg-white dark:bg-gray-800 z-10 shrink-0">
-                    {/* Fix: replaced undefined 'personalization' with 'promotion' */}
-                    <h2 className="text-xl font-semibold">{promotion ? 'Editar' : 'Agregar'} una promoción</h2>
+                    <h2 className="text-xl font-semibold">{personalization ? 'Editar' : 'Agregar'} una promoción</h2>
                     <div className="flex items-center gap-x-4">
                         <button className="text-sm font-medium text-gray-700 dark:text-gray-200 px-3 py-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 border dark:border-gray-600">Vista previa</button>
                         <button onClick={onClose} className="text-gray-500 hover:text-gray-800 p-1"><IconX /></button>
@@ -3401,4 +3400,576 @@ const ZoneEditor: React.FC<{
     const isCellOccupied = (row: number, col: number, tableIdToIgnore: string | null = null): boolean => {
         return zone.tables.some(table => {
             if (table.id === tableIdToIgnore) return false;
+            return row >= table.row && row < table.row + table.height &&
+                   col >= table.col && col < table.col + table.width;
+        });
+    };
+    
+    const handleTableUpdate = (updatedTable: Table) => {
+        // Check for collisions before updating state
+        for (let r = 0; r < updatedTable.height; r++) {
+            for (let c = 0; c < updatedTable.width; c++) {
+                if (isCellOccupied(updatedTable.row + r, updatedTable.col + c, updatedTable.id)) {
+                    alert("La mesa no puede superponerse con otra existente.");
+                    return; // Abort update
+                }
+            }
+        }
+
+        setZone(prevZone => ({
+            ...prevZone,
+            tables: prevZone.tables.map(t => t.id === updatedTable.id ? updatedTable : t),
+        }));
+    };
+    
+    const addTable = (row: number, col: number) => {
+        if (isCellOccupied(row, col)) return;
+
+        const newTable: Table = {
+            id: crypto.randomUUID(), // Use standard UUID generator for Supabase compatibility
+            zoneId: zone.id,
+            name: (zone.tables.length + 1).toString(),
+            row,
+            col,
+            width: 1,
+            height: 1,
+            shape: 'square',
+            status: 'available',
+        };
+
+        setZone(prev => ({ ...prev, tables: [...prev.tables, newTable] }));
+        setSelectedTableId(newTable.id);
+    };
+    
+    const deleteTable = (tableId: string) => {
+         setZone(prev => ({
+            ...prev,
+            tables: prev.tables.filter(t => t.id !== tableId)
+        }));
+        setSelectedTableId(null);
+    }
+    
+    const TableEditorSidebar: React.FC<{
+        table: Table;
+        onUpdate: (table: Table) => void;
+        onDelete: (tableId: string) => void;
+        onClose: () => void;
+    }> = ({ table, onUpdate, onDelete, onClose }) => {
+        if (!table) return null;
+        return (
+            <div className="absolute top-0 left-0 h-full w-80 bg-white dark:bg-gray-800 shadow-lg z-20 flex flex-col p-4 border-r dark:border-gray-700">
+                <div className="flex justify-between items-center mb-4">
+                    <button onClick={onClose} className="flex items-center text-sm font-semibold">
+                       <IconArrowLeft className="h-4 w-4 mr-1"/> Mesa {table.name}
+                    </button>
+                </div>
+                 <div className="space-y-4 flex-grow">
+                     <div>
+                        <label className="text-sm font-medium">Identificador</label>
+                        <input type="text" value={table.name} onChange={e => onUpdate({...table, name: e.target.value})} className="mt-1 w-full p-2 border dark:border-gray-600 rounded-md bg-transparent"/>
+                    </div>
+                     <div>
+                        <label className="text-sm font-medium">Forma</label>
+                        <select value={table.shape} onChange={e => onUpdate({...table, shape: e.target.value as 'square' | 'round'})} className="mt-1 w-full p-2 border dark:border-gray-600 rounded-md bg-transparent dark:bg-gray-800">
+                            <option value="square">Cuadrada</option>
+                            <option value="round">Redonda</option>
+                        </select>
+                    </div>
+                     <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className="text-sm font-medium">Ancho</label>
+                            <input type="number" min="1" value={table.width} onChange={e => onUpdate({...table, width: Math.max(1, parseInt(e.target.value) || 1)})} className="mt-1 w-full p-2 border dark:border-gray-600 rounded-md bg-transparent" />
+                        </div>
+                         <div>
+                            <label className="text-sm font-medium">Altura</label>
+                            <input type="number" min="1" value={table.height} onChange={e => onUpdate({...table, height: Math.max(1, parseInt(e.target.value) || 1)})} className="mt-1 w-full p-2 border dark:border-gray-600 rounded-md bg-transparent"/>
+                        </div>
+                    </div>
+                 </div>
+                 <button onClick={() => onDelete(table.id)} className="w-full text-red-600 dark:text-red-400 py-2 text-sm font-semibold border border-red-200 dark:border-red-800 rounded-md hover:bg-red-50 dark:hover:bg-red-900/50">Borrar</button>
+            </div>
+        );
+    }
+    
+
+    return (
+        <div className="fixed inset-0 bg-gray-50 dark:bg-gray-900 z-50 flex flex-col">
+            <header className="bg-white dark:bg-gray-800 p-4 border-b dark:border-gray-700 flex justify-between items-center shrink-0 z-10">
+                <div className="flex items-center gap-x-4">
+                    <button onClick={onExit} className="flex items-center text-red-600 font-semibold text-sm">
+                        <IconLogoutAlt className="h-5 w-5 mr-1 transform rotate-180" />
+                        Salir
+                    </button>
+                    <h2 className="text-xl font-bold">{zone.name}</h2>
+                </div>
+                <button onClick={() => onSave(zone)} className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700">
+                    Guardar
+                </button>
+            </header>
+            <div className="flex-1 flex overflow-hidden relative">
+                {selectedTable && <TableEditorSidebar table={selectedTable} onUpdate={handleTableUpdate} onDelete={deleteTable} onClose={() => setSelectedTableId(null)}/>}
+                
+                <main className="flex-1 p-8 overflow-auto bg-gray-100 dark:bg-gray-900" onClick={(e) => { if(e.target === e.currentTarget) setSelectedTableId(null)}}>
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 w-full min-h-full">
+                        <div
+                            ref={gridRef}
+                            className="grid"
+                            style={{
+                                gridTemplateColumns: `repeat(${zone.cols}, minmax(60px, 1fr))`,
+                                gridTemplateRows: `repeat(${zone.rows}, minmax(60px, 1fr))`,
+                                gap: '1rem'
+                            }}
+                        >
+                           {/* Render tables using pure CSS Grid positioning */}
+                            {zone.tables.map(table => (
+                                <div
+                                    key={table.id}
+                                    onClick={() => setSelectedTableId(table.id)}
+                                    className={`flex items-center justify-center font-bold text-lg text-gray-800 dark:text-gray-100 cursor-pointer border-2 transition-all duration-200
+                                        ${table.shape === 'round' ? 'rounded-full' : 'rounded-lg'}
+                                        ${selectedTableId === table.id ? 'bg-green-200 border-green-500 dark:bg-green-800 dark:border-green-400 ring-2 ring-green-500' : 'bg-white border-gray-300 dark:bg-gray-700 dark:border-gray-600 hover:border-emerald-400'}`
+                                    }
+                                    style={{
+                                        gridRow: `${table.row} / span ${table.height}`,
+                                        gridColumn: `${table.col} / span ${table.width}`,
+                                    }}
+                                >
+                                    {table.name}
+                                </div>
+                            ))}
+                            {/* Render placeholders only in unoccupied cells */}
+                            {Array.from({ length: zone.rows * zone.cols }).map((_, index) => {
+                                const row = Math.floor(index / zone.cols) + 1;
+                                const col = (index % zone.cols) + 1;
+                                if (isCellOccupied(row, col)) return null;
+                                return (
+                                    <div
+                                        key={`cell-${row}-${col}`}
+                                        onClick={() => addTable(row, col)}
+                                        className="bg-gray-100 dark:bg-gray-800/50 rounded-lg flex items-center justify-center text-gray-400 hover:bg-green-100 hover:text-green-600 cursor-pointer border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-green-400"
+                                        style={{ gridRow: row, gridColumn: col }}
+                                    >
+                                        <IconPlus className="h-6 w-6"/>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+    );
+};
+
+const SettingsModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    onEditZoneLayout: (zone: Zone) => void;
+    initialPage?: SettingsPage;
+}> = ({ isOpen, onClose, onEditZoneLayout, initialPage = 'general' }) => {
+    const [settings, setSettings] = useState<AppSettings | null>(null);
+    const [activePage, setActivePage] = useState<SettingsPage>(initialPage);
+    const [zones, setZones] = useState<Zone[]>([]);
+
+    useEffect(() => {
+        if (isOpen) {
+            setActivePage(initialPage);
+            getAppSettings().then(setSettings);
+            fetchData();
+        }
+    }, [isOpen, initialPage]);
+
+    const handleSaveSettings = async () => {
+        if (!settings) return;
+        try {
+            await saveAppSettings(settings);
+            alert("¡Configuración guardada!");
+        } catch (error) {
+            alert("Error al guardar la configuración.");
+            console.error(error);
+        }
+    };
+
+    const fetchData = async () => {
+        try {
+            const data = await getZones();
+            setZones(data);
+        } catch (err) {
+            console.error('Failed to load zones.', err);
+        }
+    };
+
+    const handleAddZone = async () => {
+        const name = prompt("Enter new zone name:");
+        if (name) {
+            await saveZone({ name, rows: 5, cols: 5 });
+            fetchData();
+        }
+    };
+
+    const handleEditZoneName = async (zone: Zone) => {
+        if (zone.name.trim() === '') return;
+        await saveZone({ id: zone.id, name: zone.name, rows: zone.rows, cols: zone.cols });
+        fetchData();
+    };
+
+    const handleDeleteZone = async (zoneId: string) => {
+        if (window.confirm("Are you sure you want to delete this zone and all its tables?")) {
+            await deleteZone(zoneId);
+            fetchData();
+        }
+    };
+
+    const handleEditLayout = (zone: Zone) => {
+        onEditZoneLayout(zone);
+        // Don't close modal here, let parent handle it to switch views smoothly
+    };
+    
+    if (!isOpen || !settings) return null;
+
+    const navItems: { id: SettingsPage; name: string; icon: React.ReactNode }[] = [
+        { id: 'general', name: 'General', icon: <IconSettings /> },
+        { id: 'store-data', name: 'Datos de la tienda', icon: <IconStore /> },
+        { id: 'shipping-costs', name: 'Costos de envío', icon: <IconDelivery /> },
+        { id: 'payment-methods', name: 'Métodos de pago', icon: <IconPayment /> },
+        { id: 'hours', name: 'Horarios', icon: <IconClock /> },
+        { id: 'zones-tables', name: 'Zonas y mesas', icon: <IconTableLayout /> },
+        { id: 'printing', name: 'Impresión', icon: <IconPrinter /> },
+    ];
+
+    const renderPage = () => {
+        switch (activePage) {
+            case 'general': return <GeneralSettings onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
+            case 'store-data': return <BranchSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
+            case 'shipping-costs': return <ShippingSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
+            case 'payment-methods': return <PaymentSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
+            case 'hours': return <HoursSettings onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
+            case 'zones-tables': return <ZonesAndTablesSettings zones={zones} onAddZone={handleAddZone} onEditZoneName={handleEditZoneName} onDeleteZone={handleDeleteZone} onEditZoneLayout={handleEditLayout} />;
+            case 'printing': return <PrintingSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
+            default: return null;
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-40 flex justify-end">
+            <div className="bg-white dark:bg-gray-900 h-full w-full max-w-5xl flex flex-col relative">
+                <header className="p-4 border-b dark:border-gray-700 flex justify-between items-center shrink-0">
+                    <div className="flex items-center gap-x-4">
+                        <h2 className="text-xl font-bold">Configuración</h2>
+                    </div>
+                    <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"><IconX /></button>
+                </header>
+                <div className="flex flex-1 overflow-hidden">
+                    <aside className="w-64 border-r dark:border-gray-700 p-4">
+                        <nav className="space-y-1">
+                            {navItems.map(item => (
+                                <button key={item.id} onClick={() => setActivePage(item.id)} className={`w-full flex items-center gap-x-3 px-3 py-2.5 rounded-md text-sm font-medium ${activePage === item.id ? 'bg-green-50 text-green-700 dark:bg-green-900/50 dark:text-green-300' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+                                    {item.icon}
+                                    {item.name}
+                                </button>
+                            ))}
+                        </nav>
+                    </aside>
+                    <main className="flex-1 p-6 overflow-y-auto bg-gray-50 dark:bg-gray-900/50">
+                        {renderPage()}
+                    </main>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const QRModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    url: string;
+    title: string;
+    filename: string;
+}> = ({ isOpen, onClose, url, title, filename }) => {
+    if (!isOpen) return null;
+
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(url)}`;
+
+    const handleDownload = async () => {
+        try {
+            const response = await fetch(qrUrl);
+            if (!response.ok) throw new Error('Network response was not ok.');
+            const blob = await response.blob();
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+        } catch (error) {
+            console.error("Failed to download QR code:", error);
+            alert("No se pudo descargar el código QR.");
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-sm text-center p-8" onClick={e => e.stopPropagation()}>
+                <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">{title}</h2>
+                <p className="text-gray-500 dark:text-gray-400 mb-6">Escanea este código para abrir el menú.</p>
+                <div className="flex justify-center">
+                    <img src={qrUrl} alt={title} className="w-64 h-64 rounded-lg border-4 border-white dark:border-gray-700" />
+                </div>
+                <div className="mt-8 flex flex-col sm:flex-row gap-4">
+                    <button onClick={handleDownload} className="w-full px-4 py-3 bg-green-600 text-white rounded-md text-sm font-semibold hover:bg-green-700">
+                        Descargar QR
+                    </button>
+                    <button onClick={onClose} className="w-full px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md text-sm font-semibold hover:bg-gray-300 dark:hover:bg-gray-600">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const ShareView: React.FC<{ onGoToTableSettings: () => void }> = ({ onGoToTableSettings }) => {
+    const [activeTab, setActiveTab] = useState<'domicilio' | 'mesas' | 'multi-sucursal'>('domicilio');
+    const [settings, setSettings] = useState<AppSettings | null>(null);
+    const [zones, setZones] = useState<Zone[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+    const [qrModalData, setQrModalData] = useState({ url: '', title: '', filename: '' });
+    const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const [appSettings, zoneData] = await Promise.all([
+                    getAppSettings(),
+                    getZones()
+                ]);
+                setSettings(appSettings);
+                setZones(zoneData);
+            } catch (error) {
+                console.error("Failed to load share data:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
+    const showToast = (message: string) => {
+        setToastMessage(message);
+        setTimeout(() => setToastMessage(null), 3000);
+    };
+
+    const copyToClipboard = (text: string) => {
+        navigator.clipboard.writeText(text).then(() => {
+            showToast("Enlace copiado al portapapeles");
+        });
+    };
+    
+    const openQrModal = (url: string, title: string, filename: string) => {
+        setQrModalData({ url, title, filename });
+        setIsQrModalOpen(true);
+    };
+
+    if (isLoading || !settings) {
+         return <div className="p-10 text-center">Cargando opciones de compartir...</div>;
+    }
+
+    const baseUrl = window.location.origin + window.location.pathname;
+    const menuLink = `${baseUrl}#/menu`;
+
+    return (
+        <div className="space-y-6">
+             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6 mb-6">
+                <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">Comparte tu menú digital</h2>
+                <div className="flex items-center gap-4">
+                    <input type="text" readOnly value={menuLink} className="flex-1 bg-gray-100 dark:bg-gray-700 border-none rounded-lg px-4 py-3 text-gray-600 dark:text-gray-300 font-mono text-sm focus:ring-0"/>
+                    <button onClick={() => copyToClipboard(menuLink)} className="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 px-4 py-3 rounded-lg font-semibold transition-colors">Copiar</button>
+                    <button onClick={() => openQrModal(menuLink, "Código QR del Menú", "menu-qr.png")} className="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 px-4 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2">
+                        <IconQR className="h-5 w-5"/> QR
+                    </button>
+                    <a href={menuLink} target="_blank" rel="noopener noreferrer" className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2">
+                        <IconExternalLink className="h-5 w-5"/> Abrir
+                    </a>
+                </div>
+            </div>
+
+            <div className="border-b border-gray-200 dark:border-gray-700">
+                <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+                    <button onClick={() => setActiveTab('domicilio')} className={`${activeTab === 'domicilio' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}>Domicilios y Recoger</button>
+                    <button onClick={() => setActiveTab('mesas')} className={`${activeTab === 'mesas' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}>Mesas (Dine-in)</button>
+                    <button onClick={() => setActiveTab('multi-sucursal')} className={`${activeTab === 'multi-sucursal' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}>Multi-sucursal</button>
+                </nav>
+            </div>
+
+            {activeTab === 'domicilio' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6 flex flex-col items-center text-center hover:border-emerald-500 transition-colors cursor-pointer group" onClick={() => copyToClipboard(menuLink)}>
+                         <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                            <IconDelivery className="h-8 w-8"/>
+                         </div>
+                         <h3 className="font-bold text-lg mb-2">Enlace para Domicilios</h3>
+                         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Comparte este enlace en tus redes sociales (Instagram, Facebook) y perfil de WhatsApp Business.</p>
+                         <span className="text-emerald-600 font-semibold text-sm">Click para copiar</span>
+                    </div>
+                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6 flex flex-col items-center text-center hover:border-emerald-500 transition-colors cursor-pointer group" onClick={() => copyToClipboard(menuLink)}>
+                         <div className="w-16 h-16 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                            <IconStore className="h-8 w-8"/>
+                         </div>
+                         <h3 className="font-bold text-lg mb-2">Enlace para Recoger</h3>
+                         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Ideal para clientes que quieren ordenar antes de llegar a tu local.</p>
+                         <span className="text-emerald-600 font-semibold text-sm">Click para copiar</span>
+                    </div>
+                </div>
+            )}
             
+            {activeTab === 'mesas' && (
+                <div className="space-y-6">
+                    {zones.length === 0 ? (
+                         <div className="text-center py-10 px-6 border-2 border-dashed dark:border-gray-600 rounded-lg">
+                            <IconTableLayout className="h-10 w-10 mx-auto text-gray-400 mb-3"/>
+                            <h4 className="text-md font-semibold text-gray-800 dark:text-gray-200">No tienes mesas configuradas</h4>
+                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 mb-4">Configura tus zonas y mesas primero para generar sus códigos QR.</p>
+                            <button onClick={onGoToTableSettings} className="text-emerald-600 font-semibold hover:underline">Ir a configuración de mesas</button>
+                        </div>
+                    ) : (
+                        zones.map(zone => (
+                            <div key={zone.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6">
+                                <h3 className="font-bold text-lg mb-4 border-b dark:border-gray-700 pb-2">{zone.name}</h3>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                    {zone.tables.map(table => {
+                                        const tableUrl = `${menuLink}?table=${table.name}&zone=${zone.name}`;
+                                        return (
+                                            <div key={table.id} className="border dark:border-gray-600 rounded-lg p-4 text-center hover:shadow-md transition-shadow bg-gray-50 dark:bg-gray-900/50">
+                                                <p className="font-bold text-lg mb-2">{table.name}</p>
+                                                <button 
+                                                    onClick={() => openQrModal(tableUrl, `Mesa ${table.name} - ${zone.name}`, `qr-${zone.name}-${table.name}.png`)}
+                                                    className="text-xs bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 px-3 py-1.5 rounded-md font-medium hover:bg-gray-100 dark:hover:bg-gray-600"
+                                                >
+                                                    Ver QR
+                                                </button>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            )}
+
+            {activeTab === 'multi-sucursal' && (
+                 <div className="text-center py-16 px-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="mx-auto h-16 w-16 text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                        <IconStore className="h-10 w-10" />
+                    </div>
+                    <h3 className="mt-4 text-lg font-semibold text-gray-800 dark:text-gray-200">Gestión Multi-sucursal</h3>
+                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">Próximamente podrás gestionar múltiples sucursales y generar enlaces únicos para cada una.</p>
+                </div>
+            )}
+
+            <QRModal 
+                isOpen={isQrModalOpen} 
+                onClose={() => setIsQrModalOpen(false)} 
+                url={qrModalData.url} 
+                title={qrModalData.title} 
+                filename={qrModalData.filename}
+            />
+            
+            {toastMessage && (
+                <div className="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-2 animate-fade-in-up">
+                    <IconCheck className="h-5 w-5 text-emerald-400"/>
+                    {toastMessage}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const AdminView: React.FC = () => {
+    const [currentPage, setCurrentPage] = useState<AdminViewPage>('dashboard');
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false); // Placeholder for preview modal logic
+    const [theme, toggleTheme] = useTheme();
+    
+    // State for Zone Editor Logic
+    const [isZoneEditorOpen, setIsZoneEditorOpen] = useState(false);
+    const [zoneToEdit, setZoneToEdit] = useState<Zone | null>(null);
+
+    const openTableSettings = () => {
+        setIsSettingsOpen(true);
+        // In a real app, pass initialPage='zones-tables' prop to SettingsModal
+    };
+    
+    const handleEditZoneLayout = (zone: Zone) => {
+        setZoneToEdit(zone);
+        setIsSettingsOpen(false);
+        setIsZoneEditorOpen(true);
+    };
+
+    const handleSaveZoneLayout = async (updatedZone: Zone) => {
+        try {
+            await saveZoneLayout(updatedZone);
+            setIsZoneEditorOpen(false);
+            setZoneToEdit(null);
+            setIsSettingsOpen(true); // Return to settings
+        } catch (error) {
+            alert("Error al guardar la distribución: " + error);
+        }
+    };
+
+    const renderPage = () => {
+        switch (currentPage) {
+            case 'dashboard': return <Dashboard />;
+            case 'products': return <MenuManagement />;
+            case 'orders': return <OrderManagement onSettingsClick={openTableSettings} />;
+            case 'analytics': return <Analytics />;
+            case 'messages': return <Messages />;
+            case 'availability': return <AvailabilityView />;
+            case 'share': return <ShareView onGoToTableSettings={openTableSettings}/>;
+            case 'tutorials': return <div className="p-10 text-center text-gray-500">Tutoriales próximamente...</div>;
+            default: return <Dashboard />;
+        }
+    };
+
+    return (
+        <div className="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-200 overflow-hidden transition-colors duration-200">
+            <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
+            <div className="flex-1 flex flex-col min-w-0">
+                <Header 
+                    title={PAGE_TITLES[currentPage]} 
+                    onSettingsClick={() => setIsSettingsOpen(true)} 
+                    onPreviewClick={() => setIsPreviewOpen(true)}
+                    theme={theme}
+                    toggleTheme={toggleTheme}
+                />
+                <main className="flex-1 overflow-auto p-8 scroll-smooth">
+                    <div className="max-w-7xl mx-auto">
+                        {renderPage()}
+                    </div>
+                </main>
+            </div>
+            
+            {isZoneEditorOpen && zoneToEdit && (
+                <ZoneEditor 
+                    initialZone={zoneToEdit}
+                    onSave={handleSaveZoneLayout}
+                    onExit={() => {
+                        setIsZoneEditorOpen(false);
+                        setZoneToEdit(null);
+                        setIsSettingsOpen(true);
+                    }}
+                />
+            )}
+            
+            <SettingsModal 
+                isOpen={isSettingsOpen} 
+                onClose={() => setIsSettingsOpen(false)} 
+                onEditZoneLayout={handleEditZoneLayout}
+            />
+        </div>
+    );
+};
+
+export default AdminView;

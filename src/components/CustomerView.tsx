@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
@@ -192,13 +193,17 @@ const RestaurantHero: React.FC<{
 
 const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price: number, promotion?: Promotion } => {
     const now = new Date();
-    // Filter active promotions based on dates and product applicability
+    // Filtramos promociones activas basándonos en fechas y si aplican al producto
     const activePromotions = promotions.filter(p => {
-        const startDate = p.startDate ? new Date(p.startDate + 'T00:00:00') : null;
-        const endDate = p.endDate ? new Date(p.endDate + 'T23:59:59') : null;
+        const startDate = p.startDate ? new Date(p.startDate) : null;
+        const endDate = p.endDate ? new Date(p.endDate) : null;
         
-        if (startDate && now < startDate) return false;
-        if (endDate && now > endDate) return false;
+        if (startDate && startDate > now) return false;
+        if (endDate) {
+            const adjustedEndDate = new Date(endDate);
+            adjustedEndDate.setHours(23, 59, 59, 999);
+            if (now > adjustedEndDate) return false;
+        }
         
         if (p.appliesTo === PromotionAppliesTo.AllProducts) return true;
         return p.productIds?.includes(product.id);
@@ -206,7 +211,7 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
 
     if (activePromotions.length === 0) return { price: product.price };
 
-    // Find best discount
+    // Buscamos el mejor descuento disponible
     let bestPrice = product.price;
     let bestPromo: Promotion | undefined;
 
@@ -233,7 +238,7 @@ const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: 
 
     return (
         <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group relative overflow-hidden">
-            {/* Promotion Ribbon */}
+            {/* Cinta de Descuento (Ribbon) */}
             {hasDiscount && (
                 <div className="absolute top-0 left-0 bg-rose-600 text-white text-[10px] font-black px-2.5 py-1 rounded-br-lg z-10 shadow-lg flex flex-col items-center">
                     <span>-{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}</span>
@@ -257,7 +262,7 @@ const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: 
                     <p className="text-sm text-gray-400 line-clamp-2 mt-1 leading-snug">{product.description}</p>
                 </div>
                 <div className="flex justify-between items-end mt-2">
-                    {/* Price Hierarchy */}
+                    {/* Jerarquía de Precios */}
                     <div className="flex flex-col">
                         {hasDiscount && (
                             <span className="text-[10px] text-gray-500 line-through font-medium opacity-60">{currency} ${product.price.toFixed(2)}</span>
@@ -401,6 +406,7 @@ const ProductDetailModal: React.FC<{
         return (selectedOptions[pid] || []).some(o => o.id === oid);
     };
 
+    // Cálculo dinámico para el botón
     let totalOptionsPrice = 0;
     (Object.values(selectedOptions) as PersonalizationOption[][]).forEach(group => group.forEach(opt => { totalOptionsPrice += Number(opt.price || 0); }));
     const totalPrice = (basePrice + totalOptionsPrice) * quantity;
@@ -440,7 +446,7 @@ const ProductDetailModal: React.FC<{
                         )}
                     </div>
                     
-                    {/* Active Promotion Banner */}
+                    {/* Banner de Promoción Activa */}
                     {promotion && (
                         <div className="mb-4 flex items-center gap-2 bg-rose-900/20 border border-rose-500/30 p-2.5 rounded-xl animate-pulse-subtle">
                             <IconTag className="h-4 w-4 text-rose-500" />
@@ -492,6 +498,7 @@ const ProductDetailModal: React.FC<{
                             <button onClick={() => setQuantity(q => q + 1)} className="p-2 rounded-full hover:bg-gray-700 text-white transition-colors"><IconPlus className="h-5 w-5"/></button>
                         </div>
                     </div>
+                    {/* Botón con Cálculo Dinámico */}
                     <button onClick={handleAdd} className="w-full font-black py-4 px-6 rounded-xl transition-all transform active:scale-[0.98] shadow-2xl flex justify-between items-center bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-900/50">
                         <span className="uppercase tracking-tight">Agregar al pedido</span>
                         <span className="text-xl">${totalPrice.toFixed(2)}</span>
@@ -849,6 +856,7 @@ export default function CustomerView() {
 
     useEffect(() => {
         fetchMenuData();
+        // Suscripción Real-time: Si el admin cambia una oferta, se refleja aquí al instante
         subscribeToMenuUpdates(fetchMenuData);
         
         const intervalId = setInterval(fetchMenuData, 30000);
