@@ -248,7 +248,7 @@ const ProductListItem: React.FC<{product: Product, onEdit: () => void, onDuplica
                         <div className="p-2">
                             <p className="px-2 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Acciones</p>
                             <button onClick={() => { onEdit(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-x-3 px-2 py-2 text-sm text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"><IconPencil className="h-4 w-4" /> Editar</button>
-                            <button onClick={() => { onDuplicate(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-x-3 px-2 py-2 text-sm text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"><IconDuplicate className="h-4 w-4" /> Duplicar</button>
+                            <button onClick={() => { onDuplicate(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-x-3 px-2 py-2 text-sm text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"><IconDuplicate className="h-4 w-4" /> Duplicar</button>
                             <button onClick={() => { onDelete(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-x-3 px-2 py-2 text-sm text-red-600 dark:text-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-900/50"><IconTrash className="h-4 w-4" /> Borrar</button>
                         </div>
                     </div>
@@ -318,7 +318,7 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
             );
             setFormData(prev => ({ ...prev, description }));
         } catch (error) {
-            console.error("Failed to generate description:", error);
+            console.error("Error generating description:", error);
             alert("No se pudo generar la descripción.");
         } finally {
             setIsGenerating(false);
@@ -1239,7 +1239,7 @@ const PromotionsView: React.FC = () => {
                                 } else {
                                     statusColor = 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400';
                                     statusText = 'Activa';
-                                    nameColor = 'text-emerald-600 dark:text-emerald-400 font-black';
+                                    nameColor = 'text-emerald-500 dark:text-emerald-400 font-black'; // Vibrant highlight for active ones
                                 }
 
                                 return (

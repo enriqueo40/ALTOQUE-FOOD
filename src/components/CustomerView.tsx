@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
@@ -191,26 +190,28 @@ const RestaurantHero: React.FC<{
     );
 };
 
+// --- Lógica de Promociones mejorada ---
+
 /**
- * Helper para calcular el precio final basándose en promociones activas
+ * Helper para calcular el precio final basándose en promociones activas.
+ * Compara todas las promociones aplicables y devuelve el precio más bajo.
  */
-const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price: number, promotion?: Promotion } => {
+const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price: number, promotion?: Promotion, hasSavings: boolean } => {
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
 
-    // Filtrar promociones activas para la fecha de hoy
+    // Filtrar promociones activas para hoy
     const activePromos = promotions.filter(p => {
         const isDateActive = (!p.startDate || todayStr >= p.startDate) && (!p.endDate || todayStr <= p.endDate);
         if (!isDateActive) return false;
 
-        // Si aplica a todos o si el producto está en la lista
+        // Verifica si aplica a todos o si el ID del producto está vinculado
         if (p.appliesTo === PromotionAppliesTo.AllProducts) return true;
         return p.productIds?.includes(product.id);
     });
 
-    if (activePromos.length === 0) return { price: product.price };
+    if (activePromos.length === 0) return { price: product.price, hasSavings: false };
 
-    // Buscar la promoción que otorgue el mejor descuento
     let bestPrice = product.price;
     let bestPromo: Promotion | undefined;
 
@@ -228,22 +229,26 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
         }
     });
 
-    return { price: bestPrice, promotion: bestPromo };
+    const hasSavings = bestPrice < product.price;
+    return { price: bestPrice, promotion: bestPromo, hasSavings };
 };
 
 const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: () => void; currency: string; promotions: Promotion[] }> = ({ product, quantityInCart, onClick, currency, promotions }) => {
-    const { price: finalPrice, promotion } = getDiscountedPrice(product, promotions);
-    const hasDiscount = promotion !== undefined;
+    const { price: finalPrice, promotion, hasSavings } = getDiscountedPrice(product, promotions);
 
     return (
         <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group relative overflow-hidden">
-            {/* Listón de Oferta */}
-            {hasDiscount && (
-                <div className="absolute top-0 left-0 bg-rose-600 text-white text-[10px] font-black px-2.5 py-1 rounded-br-lg z-10 shadow-lg flex items-center gap-1">
-                    <IconTag className="h-3 w-3" />
-                    <span>-{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}</span>
+            {/* Cinta de Oferta (Ribbon) */}
+            {hasSavings && promotion && (
+                <div className="absolute top-0 left-0 bg-rose-600 text-white text-[10px] font-black px-2 py-1.5 rounded-br-lg z-10 shadow-lg flex flex-col items-center leading-none">
+                    <span className="flex items-center gap-0.5">
+                        <IconTag className="h-2 w-2" />
+                        {promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}
+                    </span>
+                    <span className="text-[6px] uppercase opacity-90 mt-0.5 tracking-tighter">OFF</span>
                 </div>
             )}
+            
             <div className="relative h-24 w-24 flex-shrink-0">
                 <img src={product.imageUrl} alt={product.name} className="w-full h-full rounded-lg object-cover" />
                 {quantityInCart > 0 && (
@@ -252,23 +257,26 @@ const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: 
                     </div>
                 )}
             </div>
+            
             <div className="flex-1 flex flex-col justify-between py-1">
                 <div>
-                    <h3 className="font-bold text-gray-100 leading-tight group-hover:text-emerald-400 transition-colors">{product.name}</h3>
+                    <h3 className={`font-bold leading-tight group-hover:text-emerald-400 transition-colors ${hasSavings ? 'text-rose-100' : 'text-gray-100'}`}>
+                        {product.name}
+                    </h3>
                     <p className="text-sm text-gray-400 line-clamp-2 mt-1 leading-snug">{product.description}</p>
                 </div>
                 <div className="flex justify-between items-end mt-2">
                     <div className="flex flex-col">
-                        {hasDiscount && (
-                            <span className="text-[10px] text-gray-500 line-through mb-0.5">
+                        {hasSavings && (
+                            <span className="text-[10px] text-gray-500 line-through font-medium opacity-70 mb-0.5">
                                 {currency} ${product.price.toFixed(2)}
                             </span>
                         )}
-                        <p className={`font-black text-lg ${hasDiscount ? 'text-rose-500' : 'text-white'}`}>
+                        <p className={`font-black text-lg ${hasSavings ? 'text-rose-500' : 'text-white'}`}>
                             {currency} ${finalPrice.toFixed(2)}
                         </p>
                     </div>
-                    <div className="bg-gray-700 p-1.5 rounded-full text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors shadow-sm">
+                    <div className={`p-1.5 rounded-full shadow-sm transition-colors ${hasSavings ? 'bg-rose-900/40 text-rose-400 group-hover:bg-rose-600 group-hover:text-white' : 'bg-gray-700 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white'}`}>
                         <IconPlus className="h-4 w-4" />
                     </div>
                 </div>
@@ -388,7 +396,7 @@ const ProductDetailModal: React.FC<{
         setTimeout(onClose, 300);
     };
 
-    const { price: discountedPrice, promotion } = getDiscountedPrice(product, promotions);
+    const { price: discountedPrice, promotion, hasSavings } = getDiscountedPrice(product, promotions);
 
     const handleOptionToggle = (personalization: Personalization, option: PersonalizationOption) => {
         setSelectedOptions(prev => {
@@ -421,10 +429,11 @@ const ProductDetailModal: React.FC<{
                 <div className="h-64 w-full flex-shrink-0 relative">
                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover rounded-t-3xl sm:rounded-t-2xl" />
                      <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent h-full w-full pointer-events-none"></div>
-                     {promotion && (
-                        <div className="absolute top-6 left-6 bg-rose-600 text-white px-3 py-1 rounded-full text-xs font-black shadow-xl z-10 flex items-center gap-1.5 animate-pulse">
+                     
+                     {hasSavings && (
+                        <div className="absolute top-6 left-6 bg-rose-600 text-white px-3 py-1.5 rounded-full text-xs font-black shadow-xl z-10 flex items-center gap-1.5 animate-pulse uppercase tracking-wider">
                             <IconTag className="h-3 w-3" />
-                            OFERTA ACTIVA
+                            ¡Super Oferta!
                         </div>
                      )}
                 </div>
@@ -433,7 +442,7 @@ const ProductDetailModal: React.FC<{
                     <div className="flex justify-between items-start mb-2">
                         <h2 className="text-3xl font-black text-white">{product.name}</h2>
                     </div>
-                    {promotion && (
+                    {hasSavings && promotion && (
                         <div className="mb-4 flex items-center gap-2 bg-rose-900/20 border border-rose-500/30 p-2.5 rounded-xl">
                             <p className="text-xs font-bold text-rose-400">Promoción activa: {promotion.name}</p>
                         </div>
@@ -476,12 +485,12 @@ const ProductDetailModal: React.FC<{
                 <div className="p-4 border-t border-gray-800 bg-gray-900 rounded-b-3xl sm:rounded-b-2xl safe-bottom">
                     <div className="flex items-center justify-between gap-4 mb-4">
                          <div className="flex flex-col">
-                            {promotion && (
-                                <span className="text-xs text-gray-500 line-through">
+                            {hasSavings && (
+                                <span className="text-xs text-gray-500 line-through font-medium opacity-60">
                                     {currency} ${product.price.toFixed(2)}
                                 </span>
                             )}
-                            <span className="text-gray-400 font-bold uppercase text-xs tracking-widest">Total Unitario: <span className={promotion ? 'text-rose-400' : 'text-emerald-400'}>${(totalPrice / quantity).toFixed(2)}</span></span>
+                            <span className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">Total Unitario: <span className={hasSavings ? 'text-rose-400' : 'text-emerald-400'}>${(totalPrice / quantity).toFixed(2)}</span></span>
                          </div>
                          <div className="flex items-center gap-6 bg-gray-800 rounded-full px-2 py-1 border border-gray-700">
                             <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="p-2 rounded-full hover:bg-gray-700 text-white transition-colors"><IconMinus className="h-5 w-5"/></button>
@@ -493,7 +502,7 @@ const ProductDetailModal: React.FC<{
                         const flatOptions = (Object.values(selectedOptions) as PersonalizationOption[][]).reduce((acc: PersonalizationOption[], curr: PersonalizationOption[]) => acc.concat(curr), []);
                         // Pasar el producto con el precio descontado al carrito
                         onAddToCart({ ...product, price: discountedPrice }, quantity, comments, flatOptions);
-                    }} className="w-full font-black py-4 px-6 rounded-xl transition-all transform active:scale-[0.98] shadow-2xl flex justify-between items-center bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-900/50">
+                    }} className={`w-full font-black py-4 px-6 rounded-xl transition-all transform active:scale-[0.98] shadow-2xl flex justify-between items-center text-white ${hasSavings ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-900/50' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-900/50'}`}>
                         <span className="uppercase tracking-tight">Agregar al pedido</span>
                         <span className="text-xl">${totalPrice.toFixed(2)}</span>
                     </button>
