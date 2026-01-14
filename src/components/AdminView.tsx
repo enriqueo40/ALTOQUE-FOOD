@@ -33,6 +33,7 @@ const playChicAlert = () => {
         if (!AudioContext) return;
         
         const ctx = new AudioContext();
+        
         const masterGain = ctx.createGain();
         masterGain.gain.setValueAtTime(0.3, ctx.currentTime);
         masterGain.connect(ctx.destination);
@@ -47,8 +48,8 @@ const playChicAlert = () => {
 
         const gain1 = ctx.createGain();
         gain1.gain.setValueAtTime(0, ctx.currentTime);
-        gain1.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.05);
-        gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
+        gain1.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.05); 
+        gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5); 
         osc1.connect(gain1);
         gain1.connect(masterGain);
 
@@ -254,8 +255,8 @@ const Dashboard: React.FC = () => {
     const totalSales = useMemo(() => orders.reduce((sum, order) => sum + order.total, 0), [orders]);
     const totalOrders = orders.length;
 
-    const previousDaySales = totalSales * 0.9;
-    const previousDayOrders = Math.floor(totalOrders * 0.9);
+    const previousDaySales = totalSales * 0.9; 
+    const previousDayOrders = Math.floor(totalOrders * 0.9); 
     
     const totalEnvios = orders.filter(o => o.orderType === OrderType.Delivery).length;
     const totalPropinas = 0; 
@@ -630,7 +631,7 @@ const ProductsView: React.FC = () => {
     const handleSaveProduct = async (productData: Omit<Product, 'id' | 'created_at'> & { id?: string }) => {
         try {
             await saveProduct(productData);
-            await fetchData(); // Refetch data to show changes
+            await fetchData(); 
         } catch (error) {
             alert("No se pudo guardar el producto.");
         } finally {
@@ -651,7 +652,7 @@ const ProductsView: React.FC = () => {
     const handleSaveCategory = async (categoryData: Omit<Category, 'id' | 'created_at'> & { id?: string }) => {
         try {
             await saveCategory(categoryData);
-            await fetchData(); // Refetch data
+            await fetchData(); 
         } catch (error) {
             alert("No se pudo guardar la categoría.");
         } finally {
@@ -1405,6 +1406,7 @@ const MenuManagement: React.FC = () => {
     );
 };
 
+
 // --- Order Management Components ---
 
 const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onUpdateStatus: (id: string, status: OrderStatus) => void; onUpdatePayment: (id: string, status: PaymentStatus) => void }> = ({ order, onClose, onUpdateStatus, onUpdatePayment }) => {
@@ -1447,6 +1449,8 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
         <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${isClosing ? 'pointer-events-none' : ''}`}>
             <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isClosing ? 'opacity-0' : 'opacity-100'}`} onClick={handleClose}></div>
             <div className={`bg-white dark:bg-gray-800 w-full max-w-2xl rounded-xl shadow-2xl transform transition-all duration-300 flex flex-col max-h-[90vh] ${isClosing ? 'scale-95 opacity-0 translate-y-4' : 'scale-100 opacity-100 translate-y-0'}`}>
+                
+                {/* Header */}
                 <div className="p-6 border-b dark:border-gray-700 flex justify-between items-start bg-gray-50 dark:bg-gray-900/50 rounded-t-xl">
                     <div>
                         <div className="flex items-center gap-2 mb-1">
@@ -1472,6 +1476,7 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                     </div>
                 </div>
 
+                {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6">
                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                         <div className="md:col-span-2 space-y-4">
@@ -1498,6 +1503,7 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                                  </div>
                              )}
                              
+                             {/* Payment Proof Section */}
                              {order.paymentProof && (
                                  <div className="mt-4 border dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
                                      <h4 className="font-bold text-gray-900 dark:text-gray-100 mb-2 flex items-center gap-2">
@@ -1559,6 +1565,7 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                      </div>
                 </div>
 
+                {/* Footer */}
                 <div className="p-4 bg-white dark:bg-gray-800 border-t dark:border-gray-700 flex gap-3 justify-end">
                      <button onClick={handlePrint} className="px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
                          <IconPrinter className="h-5 w-5"/>
@@ -1621,7 +1628,7 @@ const TimeAgo: React.FC<{ date: Date; className?: string }> = ({ date, className
             else {
                 const mins = Math.floor(diffInSeconds / 60);
                 setText(`hace ${mins} min`);
-                setIsLate(mins > 15); 
+                setIsLate(mins > 15); // Mark as late after 15 mins
             }
         };
         update();
@@ -2041,7 +2048,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
         };
         load();
 
-        const channel = subscribeToNewOrders(
+        const unsubscribe = subscribeToNewOrders(
             (newOrder) => {
                 setOrders(prev => [newOrder, ...prev]);
             },
@@ -2051,7 +2058,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
         );
 
         return () => {
-            unsubscribeFromChannel();
+            unsubscribe();
         };
     }, []);
 
@@ -2312,7 +2319,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
     );
 };
 
-// --- Analytics Component ---
+// --- Analytics Components ---
 const Analytics: React.FC = () => {
     const [orders] = usePersistentState<Order[]>('orders', []); 
     const [query, setQuery] = useState('');
@@ -2357,7 +2364,8 @@ const Analytics: React.FC = () => {
     );
 };
 
-// --- Messages Component ---
+
+// --- Messages Components ---
 const Messages: React.FC = () => {
     const [conversations, setConversations] = usePersistentState<Conversation[]>('conversations', MOCK_CONVERSATIONS);
     const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(conversations[0] || null);
@@ -2446,7 +2454,6 @@ const Messages: React.FC = () => {
     );
 };
 
-// --- Availability View ---
 const AvailabilityView: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -2682,7 +2689,6 @@ const AvailabilityView: React.FC = () => {
     );
 };
 
-// --- Settings Components ---
 const SettingsCard: React.FC<{ title: string; description?: string; children: React.ReactNode; onSave?: () => void; onCancel?: () => void; noActions?: boolean }> = ({ title, description, children, onSave, onCancel, noActions }) => (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
         <div className="p-6">
@@ -2806,6 +2812,7 @@ const BranchSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppS
                 const imageUrl = reader.result as string;
                 setSettings(prev => {
                     const newSettings = {...prev, branch: {...prev.branch, [field]: imageUrl}};
+                    // Auto-save on image upload
                     saveAppSettings(newSettings).then(() => {
                         alert("Imagen cargada y guardada.");
                     }).catch(() => {
@@ -3187,7 +3194,7 @@ const HoursSettings: React.FC<{ onSave: () => Promise<void>; settings: AppSettin
                     : schedule
                 )
             };
-            saveAppSettings(newSettings); 
+            saveAppSettings(newSettings); // Auto-save on change
             return newSettings;
         });
     };
@@ -3209,7 +3216,7 @@ const HoursSettings: React.FC<{ onSave: () => Promise<void>; settings: AppSettin
                     : schedule
                 )
             };
-            saveAppSettings(newSettings);
+            saveAppSettings(newSettings); // Auto-save on change
             return newSettings;
         });
     };
@@ -3230,7 +3237,7 @@ const HoursSettings: React.FC<{ onSave: () => Promise<void>; settings: AppSettin
         };
         setSettings(prev => {
             const newSettings = { ...prev, schedules: [...prev.schedules, newSchedule]};
-            saveAppSettings(newSettings);
+            saveAppSettings(newSettings); // Auto-save on change
             return newSettings;
         });
         setActiveScheduleId(newSchedule.id);
@@ -3406,7 +3413,6 @@ const PrintingSettingsView: React.FC<{ onSave: () => Promise<void>; settings: Ap
     );
 };
 
-// --- Zone Editor Component ---
 const ZoneEditor: React.FC<{
     initialZone: Zone;
     onSave: (zone: Zone) => void;
@@ -3427,11 +3433,12 @@ const ZoneEditor: React.FC<{
     };
     
     const handleTableUpdate = (updatedTable: Table) => {
+        // Check for collisions before updating state
         for (let r = 0; r < updatedTable.height; r++) {
             for (let c = 0; c < updatedTable.width; c++) {
                 if (isCellOccupied(updatedTable.row + r, updatedTable.col + c, updatedTable.id)) {
                     alert("La mesa no puede superponerse con otra existente.");
-                    return;
+                    return; // Abort update
                 }
             }
         }
@@ -3446,7 +3453,7 @@ const ZoneEditor: React.FC<{
         if (isCellOccupied(row, col)) return;
 
         const newTable: Table = {
-            id: crypto.randomUUID(), 
+            id: crypto.randomUUID(), // Use standard UUID generator for Supabase compatibility
             zoneId: zone.id,
             name: (zone.tables.length + 1).toString(),
             row,
@@ -3540,6 +3547,7 @@ const ZoneEditor: React.FC<{
                                 gap: '1rem'
                             }}
                         >
+                           {/* Render tables using pure CSS Grid positioning */}
                             {zone.tables.map(table => (
                                 <div
                                     key={table.id}
@@ -3556,6 +3564,7 @@ const ZoneEditor: React.FC<{
                                     {table.name}
                                 </div>
                             ))}
+                            {/* Render placeholders only in unoccupied cells */}
                             {Array.from({ length: zone.rows * zone.cols }).map((_, index) => {
                                 const row = Math.floor(index / zone.cols) + 1;
                                 const col = (index % zone.cols) + 1;
@@ -3579,7 +3588,6 @@ const ZoneEditor: React.FC<{
     );
 };
 
-// --- Settings Modal ---
 const SettingsModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
@@ -3815,51 +3823,4 @@ const ShareView: React.FC<{ onGoToTableSettings: () => void }> = ({ onGoToTableS
 
             <div className="border-b border-gray-200 dark:border-gray-700">
                 <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-                    <button onClick={() => setActiveTab('domicilio')} className={`${activeTab === 'domicilio' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}>Domicilios y Recoger</button>
-                    <button onClick={() => setActiveTab('mesas')} className={`${activeTab === 'mesas' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}>Mesas (Dine-in)</button>
-                    <button onClick={() => setActiveTab('multi-sucursal')} className={`${activeTab === 'multi-sucursal' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}>Multi-sucursal</button>
-                </nav>
-            </div>
-
-            {activeTab === 'domicilio' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6 flex flex-col items-center text-center hover:border-emerald-500 transition-colors cursor-pointer group" onClick={() => copyToClipboard(menuLink)}>
-                         <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                            <IconDelivery className="h-8 w-8"/>
-                         </div>
-                         <h3 className="font-bold text-lg mb-2">Enlace para Domicilios</h3>
-                         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Comparte este enlace en tus redes sociales (Instagram, Facebook) y perfil de WhatsApp Business.</p>
-                         <span className="text-emerald-600 font-semibold text-sm">Click para copiar</span>
-                    </div>
-                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6 flex flex-col items-center text-center hover:border-emerald-500 transition-colors cursor-pointer group" onClick={() => copyToClipboard(menuLink)}>
-                         <div className="w-16 h-16 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                            <IconStore className="h-8 w-8"/>
-                         </div>
-                         <h3 className="font-bold text-lg mb-2">Enlace para Recoger</h3>
-                         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Ideal para clientes que quieren ordenar antes de llegar a tu local.</p>
-                         <span className="text-emerald-600 font-semibold text-sm">Click para copiar</span>
-                    </div>
-                </div>
-            )}
-            
-            {activeTab === 'mesas' && (
-                <div className="space-y-6">
-                    {zones.length === 0 ? (
-                         <div className="text-center py-10 px-6 border-2 border-dashed dark:border-gray-600 rounded-lg">
-                            <IconTableLayout className="h-10 w-10 mx-auto text-gray-400 mb-3"/>
-                            <h4 className="text-md font-semibold text-gray-800 dark:text-gray-200">No tienes mesas configuradas</h4>
-                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 mb-4">Configura tus zonas y mesas primero para generar sus códigos QR.</p>
-                            <button onClick={onGoToTableSettings} className="text-emerald-600 font-semibold hover:underline">Ir a configuración de mesas</button>
-                        </div>
-                    ) : (
-                        zones.map(zone => (
-                            <div key={zone.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6">
-                                <h3 className="font-bold text-lg mb-4 border-b dark:border-gray-700 pb-2">{zone.name}</h3>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                                    {zone.tables.map(table => {
-                                        const tableUrl = `${menuLink}?table=${table.name}&zone=${zone.name}`;
-                                        return (
-                                            <div key={table.id} className="border dark:border-gray-600 rounded-lg p-4 text-center hover:shadow-md transition-shadow bg-gray-50 dark:bg-gray-900/50">
-                                                <p className="font-bold text-lg mb-2">{table.name}</p>
-                                                <button 
-                                                    onClick={() => openQrModal(tableUrl, `Mesa ${table.name} - ${zone.name}`, `qr-${zone.name}-${table.name}.png`)}
+                    <button onClick={() => setActiveTab('domicilio')} className={`${activeTab === 'domicilio' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text

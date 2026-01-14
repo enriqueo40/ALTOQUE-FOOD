@@ -17,6 +17,11 @@ let supabase: SupabaseClient | null = null;
 let ordersChannel: RealtimeChannel | null = null;
 let menuChannel: RealtimeChannel | null = null;
 
+// Event Listeners for Orders
+type OrderCallback = (payload: any) => void;
+const orderInsertListeners: OrderCallback[] = [];
+const orderUpdateListeners: OrderCallback[] = [];
+
 // Helper function to get the client or throw an error.
 // This uses a singleton pattern to create the client only once.
 const getClient = (): SupabaseClient => {
@@ -449,59 +454,62 @@ export const updateOrder = async (orderId: string, updates: Partial<Order>): Pro
     }
 };
 
-// Real-time Subscription for Admin (Orders)
+// Helper transformation
+const transformOrderPayload = (payload: any) => {
+    return {
+       id: payload.id,
+       customer: payload.customer,
+       items: payload.items,
+       status: payload.status,
+       total: payload.total,
+       createdAt: new Date(payload.created_at),
+       branchId: payload.branch_id,
+       orderType: payload.order_type,
+       tableId: payload.table_id,
+       generalComments: payload.general_comments,
+       paymentStatus: payload.payment_status,
+       paymentProof: payload.customer?.paymentProof
+    };
+};
+
+// Real-time Subscription for Admin (Orders) - Multi-Listener Capable
 export const subscribeToNewOrders = (
     onInsert: (payload: any) => void, 
     onUpdate?: (payload: any) => void
 ) => {
     const client = getClient();
-    if (ordersChannel) {
-        client.removeChannel(ordersChannel).then(() => { ordersChannel = null; });
+    
+    // Register listeners
+    orderInsertListeners.push(onInsert);
+    if (onUpdate) orderUpdateListeners.push(onUpdate);
+
+    // Initialize channel only if not active
+    if (!ordersChannel) {
+        ordersChannel = client.channel('orders-channel');
+        ordersChannel
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
+                 const transformed = transformOrderPayload(payload.new);
+                 // Broadcast to all insert listeners
+                 orderInsertListeners.forEach(listener => listener(transformed));
+            })
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
+                 const transformed = transformOrderPayload(payload.new);
+                 // Broadcast to all update listeners
+                 orderUpdateListeners.forEach(listener => listener(transformed));
+            })
+            .subscribe();
     }
     
-    ordersChannel = client.channel('orders-channel');
-    ordersChannel
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-             const newOrder = payload.new;
-             const transformed = {
-                id: newOrder.id,
-                customer: newOrder.customer,
-                items: newOrder.items,
-                status: newOrder.status,
-                total: newOrder.total,
-                createdAt: new Date(newOrder.created_at),
-                branchId: newOrder.branch_id,
-                orderType: newOrder.order_type,
-                tableId: newOrder.table_id,
-                generalComments: newOrder.general_comments,
-                paymentStatus: newOrder.payment_status,
-                paymentProof: newOrder.customer?.paymentProof
-             };
-            onInsert(transformed);
-        })
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
-            if (onUpdate) {
-                 const updatedOrder = payload.new;
-                 const transformed = {
-                    id: updatedOrder.id,
-                    customer: updatedOrder.customer,
-                    items: updatedOrder.items,
-                    status: updatedOrder.status,
-                    total: updatedOrder.total,
-                    createdAt: new Date(updatedOrder.created_at),
-                    branchId: updatedOrder.branch_id,
-                    orderType: updatedOrder.order_type,
-                    tableId: updatedOrder.table_id,
-                    generalComments: updatedOrder.general_comments,
-                    paymentStatus: updatedOrder.payment_status,
-                    paymentProof: updatedOrder.customer?.paymentProof
-                 };
-                onUpdate(transformed);
-            }
-        })
-        .subscribe();
-    
-    return ordersChannel;
+    // Return a unsubscribe function for the *specific* listener passed
+    return () => {
+        const insertIndex = orderInsertListeners.indexOf(onInsert);
+        if (insertIndex > -1) orderInsertListeners.splice(insertIndex, 1);
+
+        if (onUpdate) {
+            const updateIndex = orderUpdateListeners.indexOf(onUpdate);
+            if (updateIndex > -1) orderUpdateListeners.splice(updateIndex, 1);
+        }
+    };
 }
 
 // Real-time Subscription for Menu (Customers)
