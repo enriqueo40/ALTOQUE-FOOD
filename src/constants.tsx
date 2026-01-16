@@ -3,6 +3,7 @@ import React from 'react';
 import { Product, Category, Order, OrderStatus, Conversation, Personalization, Promotion, Zone, Customer, OrderType, DiscountType, PromotionAppliesTo, Table, Currency, AppSettings, ShippingCostType, PrintingMethod } from './types';
 
 // SVG Icon Components
+// Fix: Added optional title prop for accessibility/tooltips.
 export const IconComponent: React.FC<{ d: string; className?: string; title?: string }> = ({ d, className = "h-6 w-6", title }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
         {title && <title>{title}</title>}
@@ -53,6 +54,7 @@ export const IconGripVertical: React.FC<{ className?: string }> = ({ className }
 export const IconPencil: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" className={className} />;
 export const IconPercent: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M9.548 3.452a.75.75 0 010 1.096l-6 7.5a.75.75 0 11-1.096-1.096l6-7.5a.75.75 0 011.096 0zM15 7.5a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-2.25 6a2.25 2.25 0 100 4.5 2.25 2.25 0 000-4.5z" className={className} />;
 export const IconTag: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M12.586 2.586a2 2 0 00-2.828 0L7.172 5.172a2 2 0 000 2.828l4.242 4.242a2 2 0 002.828 0l2.586-2.586a2 2 0 000-2.828l-4.242-4.242zM14.5 9.5a1 1 0 11-2 0 1 1 0 012 0z" className={className} />;
+// Fix: Added optional title prop to fix type error.
 export const IconInfo: React.FC<{ className?: string; title?: string }> = ({ className, title }) => <IconComponent d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" className={className} title={title} />;
 export const IconLogoutAlt: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m-3 0l3-3m0 0l-3-3m3 3H9" className={className} />;
 export const IconSun: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M12 3v2.25m6.364.364l-1.591 1.591M21 12h-2.25m-.364 6.364l-1.591-1.591M12 18.75V21m-6.364-.364l1.591-1.591M3 12h2.25m.364-6.364l1.591 1.591M12 12a4.5 4.5 0 100-9 4.5 4.5 0 000 9z" className={className} />;
@@ -233,7 +235,7 @@ export const INITIAL_SETTINGS: AppSettings = {
         alias: 'ANYVAL PARK - Suc.',
         fullAddress: '',
         googleMapsLink: '',
-        whatsappNumber: '+58 4146945877',
+        whatsappNumber: '584146945877',
         logoUrl: '',
         coverImageUrl: '',
     },
