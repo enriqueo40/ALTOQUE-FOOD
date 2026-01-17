@@ -948,20 +948,34 @@ const CheckoutView: React.FC<{
                 </div>
                  <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 px-6 rounded-xl shadow-lg flex items-center justify-center gap-3 transition-all transform active:scale-[0.98]">
                     <IconWhatsapp className="h-6 w-6" />
-                    Realizar Pedido
+                    Confirmar Pedido
                 </button>
             </div>
         </form>
     )
 }
 
-const OrderConfirmation: React.FC<{ onNewOrder: () => void, settings: AppSettings }> = ({ onNewOrder, settings }) => (
+const OrderConfirmation: React.FC<{ onNewOrder: () => void, settings: AppSettings, whatsappUrl: string | null }> = ({ onNewOrder, settings, whatsappUrl }) => (
     <div className="p-6 text-center flex flex-col items-center justify-center h-[80vh] animate-fade-in">
         <div className="w-24 h-24 bg-emerald-500/20 rounded-full flex items-center justify-center mb-6">
             <svg className="w-12 h-12 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
         </div>
-        <h3 className="text-3xl font-bold mb-3 text-white">¡Pedido Enviado!</h3>
-        <p className="text-gray-400 mb-8 text-lg leading-relaxed">Te redirigimos a WhatsApp con los detalles de tu orden. El equipo de {settings.company.name} confirmará tu pedido en breve.</p>
+        <h3 className="text-3xl font-bold mb-3 text-white">¡Pedido Guardado!</h3>
+        <p className="text-gray-400 mb-8 text-lg leading-relaxed">
+            Tu pedido ha sido registrado en el sistema. Para finalizar, envíalo a nuestro WhatsApp.
+        </p>
+        
+        {whatsappUrl && (
+            <a 
+                href={whatsappUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="w-full max-w-xs bg-green-600 hover:bg-green-500 text-white py-4 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 mb-4 animate-bounce"
+            >
+                <IconWhatsapp className="h-6 w-6"/> Enviar a WhatsApp
+            </a>
+        )}
+
         <button onClick={onNewOrder} className="w-full max-w-xs bg-gray-800 text-white py-4 rounded-xl font-bold hover:bg-gray-700 transition-colors border border-gray-700">
             Volver al Inicio
         </button>
@@ -992,6 +1006,7 @@ export default function CustomerView() {
     const [tableInfo, setTableInfo] = useState<{ table: string; zone: string } | null>(null);
     // State for Order Type (Delivery, TakeAway, DineIn)
     const [orderType, setOrderType] = useState<OrderType>(OrderType.Delivery);
+    const [lastWhatsappUrl, setLastWhatsappUrl] = useState<string | null>(null);
 
     const { cartItems, addToCart, removeFromCart, updateQuantity, clearCart, cartTotal, itemCount } = useCart();
     
@@ -1200,31 +1215,18 @@ export default function CustomerView() {
             ];
         }
 
-        // FIXED: Sanitize the number to ensure it's digits only. 
-        // This prevents 404 errors if the user saved "+58..." or "0414..."
         const rawNumber = settings.branch.whatsappNumber || '';
         const cleanPhoneNumber = rawNumber.replace(/\D/g, ''); 
 
-        if (!cleanPhoneNumber) {
+        let whatsappUrl = null;
+        if (cleanPhoneNumber) {
+            const whatsappMessage = encodeURIComponent(messageParts.filter(p => p !== '').join('\n'));
+            whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhoneNumber}&text=${whatsappMessage}`;
+        } else {
             alert("El número de WhatsApp del restaurante no está configurado correctamente.");
-            return;
         }
-
-        const whatsappMessage = encodeURIComponent(messageParts.filter(p => p !== '').join('\n'));
         
-        // Changed to api.whatsapp.com for better compatibility and deep linking logic
-        const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhoneNumber}&text=${whatsappMessage}`;
-        
-        // Use a temporary anchor tag to simulate a user click. 
-        // This is more reliable than window.open for deep links and avoids some popup blockers.
-        const link = document.createElement('a');
-        link.href = whatsappUrl;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
+        setLastWhatsappUrl(whatsappUrl);
         setView('confirmation');
     };
 
@@ -1306,7 +1308,7 @@ export default function CustomerView() {
                 )}
 
                 {view === 'confirmation' && (
-                    <OrderConfirmation onNewOrder={handleStartNewOrder} settings={settings} />
+                    <OrderConfirmation onNewOrder={handleStartNewOrder} settings={settings} whatsappUrl={lastWhatsappUrl} />
                 )}
 
                 {selectedProduct && (
