@@ -3,12 +3,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Ordo: Restaurant & Cafe SaaS</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Performance Optimization: Preconnect to critical domains -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://images.unsplash.com">
+    <link rel="preconnect" href="https://cnbntnnhxlvkvallumdg.supabase.co"> 
+    
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
         // Apply theme from localStorage to prevent FOUC
@@ -21,6 +25,7 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
         }
         /* Custom scrollbar for webkit */
         ::-webkit-scrollbar {
@@ -39,6 +44,11 @@
         }
         ::-webkit-scrollbar-thumb:hover {
             background: #94a3b8; 
+        }
+        
+        /* Smooth image loading */
+        img {
+            transition: opacity 0.3s ease-in-out;
         }
     </style>
     <script>
@@ -62,7 +72,7 @@
 }
 </script>
 </head>
-<body class="bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
+<body class="bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-200 antialiased selection:bg-emerald-500 selection:text-white">
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
 </body>
