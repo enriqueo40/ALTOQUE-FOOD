@@ -1,8 +1,9 @@
+
 import React from 'react';
 import { Product, Category, Order, OrderStatus, Conversation, Personalization, Promotion, Zone, Customer, OrderType, DiscountType, PromotionAppliesTo, Table, Currency, AppSettings, ShippingCostType, PrintingMethod } from './types';
 
 // SVG Icon Components
-// Added optional title prop for accessibility/tooltips.
+// Fix: Added optional title prop for accessibility/tooltips.
 export const IconComponent: React.FC<{ d: string; className?: string; title?: string }> = ({ d, className = "h-6 w-6", title }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
         {title && <title>{title}</title>}
@@ -119,6 +120,7 @@ export const MOCK_CUSTOMER: Customer = {
 };
 
 export const MOCK_ORDERS: Order[] = [
+    // Fix: Added cartItemId to each item to satisfy the CartItem type.
     { id: 'ORD-1234', items: [{...PRODUCTS[1], cartItemId: 'mock-ci-1', quantity: 1}, {...PRODUCTS[4], cartItemId: 'mock-ci-2', quantity: 2}], customer: MOCK_CUSTOMER, status: OrderStatus.Pending, total: 14.00, createdAt: new Date(Date.now() - 5 * 60 * 1000), branchId: 'main' },
     { id: 'ORD-5678', items: [{...PRODUCTS[7], cartItemId: 'mock-ci-3', quantity: 1}], customer: MOCK_CUSTOMER, status: OrderStatus.Preparing, total: 8.50, createdAt: new Date(Date.now() - 15 * 60 * 1000), branchId: 'main' },
     { id: 'ORD-9012', items: [{...PRODUCTS[10], cartItemId: 'mock-ci-4', quantity: 1}], customer: MOCK_CUSTOMER, status: OrderStatus.Ready, total: 4.75, createdAt: new Date(Date.now() - 30 * 60 * 1000), branchId: 'main' },
