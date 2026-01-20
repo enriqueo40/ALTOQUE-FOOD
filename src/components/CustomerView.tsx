@@ -722,7 +722,7 @@ const CheckoutView: React.FC<{
     orderType: OrderType 
 }> = ({ cartTotal, onPlaceOrder, settings, orderType }) => {
     const [customer, setCustomer] = useState<Customer>({
-        name: '', phone: '', address: { colonia: '', calle: '', numero: '', entreCalles: '', referencias: '' }
+        name: '', phone: '', address: { colonia: '', calle: '', numero: '', entreCalles: '', referencias: '', googleMapsLink: '' }
     });
     const [tipAmount, setTipAmount] = useState<number>(0);
     const [paymentProof, setPaymentProof] = useState<string | null>(null);
@@ -781,16 +781,16 @@ const CheckoutView: React.FC<{
                     ...prev,
                     address: {
                         ...prev.address,
-                        location: { lat: latitude, lng: longitude },
                         googleMapsLink: link,
-                        referencias: prev.address.referencias ? `${prev.address.referencias} (Ubicación GPS adjunta)` : '(Ubicación GPS adjunta)'
+                        referencias: prev.address.referencias ? `${prev.address.referencias} (Ubicación GPS capturada)` : '(Ubicación GPS capturada)'
                     }
                 }));
                 setIsLocating(false);
+                alert("📍 Ubicación capturada con éxito.");
             },
             (error) => {
                 console.error("Error obteniendo ubicación:", error);
-                alert("No se pudo obtener tu ubicación. Asegúrate de dar permisos de ubicación a la página.");
+                alert("No se pudo obtener tu ubicación. Por favor, asegúrate de permitir el acceso al GPS.");
                 setIsLocating(false);
             }
         );
@@ -820,20 +820,18 @@ const CheckoutView: React.FC<{
 
             {isDelivery && (
                 <div className="space-y-4 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center mb-2">
                         <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Entrega</h3>
-                        <button type="button" onClick={handleGetLocation} disabled={isLocating} className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors disabled:opacity-50">
-                            {isLocating ? <span className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full"></span> : <IconLocationMarker className="h-3 w-3" />}
-                            {isLocating ? 'Ubicando...' : 'Usar mi ubicación actual'}
+                        <button 
+                            type="button" 
+                            onClick={handleGetLocation} 
+                            disabled={isLocating}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${customer.address.googleMapsLink ? 'bg-emerald-500 text-white' : 'bg-white text-gray-900 hover:bg-gray-100'}`}
+                        >
+                            {isLocating ? <div className="h-3 w-3 border-2 border-gray-900 border-t-transparent rounded-full animate-spin"></div> : <IconLocationMarker className="h-4 w-4"/>}
+                            {customer.address.googleMapsLink ? 'Ubicación GPS OK' : 'Compartir mi ubicación exacta'}
                         </button>
                     </div>
-                    
-                    {customer.address.googleMapsLink && (
-                        <div className="bg-emerald-500/20 text-emerald-400 text-xs p-2 rounded-lg flex items-center gap-2 animate-fade-in">
-                            <IconCheck className="h-4 w-4" /> Ubicación GPS capturada correctamente
-                        </div>
-                    )}
-
                     <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-2">
                             <label className={labelClasses}>Calle</label>
@@ -1171,7 +1169,7 @@ export default function CustomerView() {
         const lineSeparator = "━━━━━━━━━━━━━━━━━━━━";
 
         const proofMessage = paymentProof ? "\n📸 *Comprobante de pago adjunto*" : "";
-        const locationMessage = customer.address.googleMapsLink ? `\n📍 *Ubicación GPS:* ${customer.address.googleMapsLink}` : "";
+        const locationMessage = customer.address.googleMapsLink ? `\n📍 *Ubicación GPS EXACTA:* ${customer.address.googleMapsLink}` : "";
 
         if (orderType === OrderType.DineIn) {
             messageParts = [
@@ -1244,6 +1242,7 @@ export default function CustomerView() {
                 customer.address.calle ? `🏠 ${customer.address.calle} #${customer.address.numero}` : '',
                 customer.address.colonia ? `🏙️ Col. ${customer.address.colonia}` : '',
                 customer.address.referencias ? `👀 Ref: ${customer.address.referencias}` : '',
+                locationMessage,
                 lineSeparator,
                 `🛒 *DETALLE DEL PEDIDO*`,
                 ...itemDetails,
@@ -1258,7 +1257,6 @@ export default function CustomerView() {
                 lineSeparator,
                 `💳 Método: ${paymentMethod}`,
                 proofMessage,
-                locationMessage,
                 `✅ Estado: PENDIENTE DE CONFIRMACIÓN`
             ];
         }
