@@ -55,42 +55,64 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}></div>
-            <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-xl shadow-2xl flex flex-col relative max-h-[90vh]">
+            <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-xl shadow-2xl flex flex-col relative max-h-[90vh] overflow-hidden">
                 <div className="p-6 border-b dark:border-gray-700 flex justify-between items-center">
                     <h2 className="text-xl font-bold">Pedido #{order.id.slice(0, 6)}</h2>
                     <OrderStatusBadge status={order.status} />
                 </div>
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-1">
-                            <p className="text-xs font-bold text-gray-500">CLIENTE</p>
-                            <p className="font-semibold">{order.customer.name}</p>
-                            <p className="text-sm">{order.customer.phone}</p>
+                            <p className="text-xs font-bold text-gray-500 uppercase">Cliente</p>
+                            <p className="font-semibold text-lg">{order.customer.name}</p>
+                            <p className="text-sm font-mono">{order.customer.phone}</p>
                         </div>
-                        <div className="space-y-1">
-                            <p className="text-xs font-bold text-gray-500">ENVÍO</p>
-                            <p className="text-sm">{order.customer.address.calle} #{order.customer.address.numero}, {order.customer.address.colonia}</p>
-                            {order.customer.address.googleMapsLink && (
-                                <a href={order.customer.address.googleMapsLink} target="_blank" className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg"><IconLocationMarker className="h-4 w-4"/> Ver GPS</a>
-                            )}
-                        </div>
-                    </div>
-                    <div className="divide-y dark:divide-gray-700">
-                        {order.items.map((item, i) => (
-                            <div key={i} className="py-2 flex justify-between">
-                                <span>{item.quantity}x {item.name}</span>
-                                <span className="font-bold">${(item.price * item.quantity).toFixed(2)}</span>
+                        <div className="space-y-2">
+                            <p className="text-xs font-bold text-gray-500 uppercase">Datos de Entrega</p>
+                            <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border dark:border-gray-700">
+                                <p className="text-sm font-medium">{order.customer.address.calle} #{order.customer.address.numero}</p>
+                                <p className="text-xs text-gray-500">{order.customer.address.colonia}</p>
+                                {order.customer.address.referencias && <p className="text-xs italic text-gray-400 mt-1">"{order.customer.address.referencias}"</p>}
+                                
+                                {order.customer.address.googleMapsLink && (
+                                    <a 
+                                        href={order.customer.address.googleMapsLink} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="mt-4 flex items-center justify-center gap-2 w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all font-bold shadow-md shadow-blue-900/20"
+                                    >
+                                        <IconLocationMarker className="h-4 w-4"/>
+                                        Abrir en Google Maps
+                                    </a>
+                                )}
                             </div>
-                        ))}
+                        </div>
                     </div>
-                    <div className="pt-4 border-t flex justify-between font-bold text-xl">
+                    <div className="space-y-3">
+                        <p className="text-xs font-bold text-gray-500 uppercase">Productos</p>
+                        <div className="divide-y dark:divide-gray-700">
+                            {order.items.map((item, i) => (
+                                <div key={i} className="py-3 flex justify-between items-start">
+                                    <div className="flex gap-3">
+                                        <span className="font-bold text-emerald-600">{item.quantity}x</span>
+                                        <div>
+                                            <p className="font-medium text-sm">{item.name}</p>
+                                            {item.comments && <p className="text-xs text-gray-400 italic">"{item.comments}"</p>}
+                                        </div>
+                                    </div>
+                                    <span className="font-bold text-sm">${(item.price * item.quantity).toFixed(2)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="pt-4 border-t dark:border-gray-700 flex justify-between font-bold text-xl">
                         <span>TOTAL</span>
-                        <span>${order.total.toFixed(2)}</span>
+                        <span className="text-emerald-600">${order.total.toFixed(2)}</span>
                     </div>
                 </div>
-                <div className="p-4 border-t dark:border-gray-700 flex gap-3">
-                    <button onClick={() => onUpdateStatus(order.id, OrderStatus.Cancelled)} className="px-4 py-2 border rounded text-red-500 font-bold">Cancelar</button>
-                    <button onClick={handleAdvance} className="flex-1 bg-emerald-600 text-white font-bold py-2 rounded">Avanzar Estado</button>
+                <div className="p-4 border-t dark:border-gray-700 flex gap-3 bg-gray-50 dark:bg-gray-900/50">
+                    <button onClick={() => onUpdateStatus(order.id, OrderStatus.Cancelled)} className="px-4 py-2 border dark:border-gray-600 rounded-lg text-red-500 font-bold hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">Cancelar</button>
+                    <button onClick={handleAdvance} className="flex-1 bg-emerald-600 text-white font-bold py-2 rounded-lg hover:bg-emerald-700 transition-transform active:scale-95 shadow-lg shadow-emerald-900/20">Avanzar Estado</button>
                 </div>
             </div>
         </div>
@@ -108,10 +130,13 @@ const OrderManagement: React.FC = () => {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {orders.map(o => (
-                <div key={o.id} onClick={() => setSelOrder(o)} className="bg-white dark:bg-gray-800 p-4 rounded-xl border dark:border-gray-700 cursor-pointer shadow-sm">
-                    <div className="flex justify-between mb-2"><span className="font-bold">#{o.id.slice(0,4)}</span><OrderStatusBadge status={o.status}/></div>
-                    <p className="font-medium">{o.customer.name}</p>
-                    <p className="text-xl font-bold text-emerald-600 mt-2">${o.total.toFixed(2)}</p>
+                <div key={o.id} onClick={() => setSelOrder(o)} className="bg-white dark:bg-gray-800 p-4 rounded-xl border dark:border-gray-700 cursor-pointer shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
+                    <div className="flex justify-between mb-2"><span className="font-bold text-xs text-gray-400">#{o.id.slice(0,6)}</span><OrderStatusBadge status={o.status}/></div>
+                    <p className="font-bold text-lg text-gray-800 dark:text-gray-100">{o.customer.name}</p>
+                    <div className="flex justify-between items-end mt-3">
+                        <p className="text-sm text-gray-500">{o.items.length} item(s)</p>
+                        <p className="text-xl font-bold text-emerald-600">${o.total.toFixed(2)}</p>
+                    </div>
                 </div>
             ))}
             <OrderDetailModal order={selOrder} onClose={() => setSelOrder(null)} onUpdateStatus={(id, s) => updateOrder(id, {status: s})} onUpdatePayment={(id, p) => updateOrder(id, {paymentStatus: p})} />
@@ -125,7 +150,7 @@ const AdminView: React.FC = () => {
     return (
         <div className="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-200">
             <Sidebar currentPage={page} setCurrentPage={setPage} />
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col overflow-hidden">
                 <Header title={PAGE_TITLES[page]} onSettingsClick={() => {}} theme={theme} toggleTheme={toggleTheme} />
                 <main className="flex-1 overflow-auto p-8">
                     {page === 'orders' && <OrderManagement />}

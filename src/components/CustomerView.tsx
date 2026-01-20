@@ -472,18 +472,29 @@ const CheckoutView: React.FC<{
     };
 
     const handleGetLocation = () => {
-        if (!navigator.geolocation) return alert("Navegador no soporta GPS.");
+        if (!navigator.geolocation) return alert("Tu navegador no soporta geolocalización por GPS.");
         setIsLocating(true);
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 const { latitude, longitude } = position.coords;
                 const link = `https://www.google.com/maps?q=${latitude},${longitude}`;
-                setCustomer(prev => ({ ...prev, address: { ...prev.address, googleMapsLink: link } }));
+                setCustomer(prev => ({ 
+                    ...prev, 
+                    address: { 
+                        ...prev.address, 
+                        googleMapsLink: link,
+                        referencias: prev.address.referencias ? `${prev.address.referencias} (📍 Ubicación GPS compartida)` : '(📍 Ubicación GPS compartida)'
+                    } 
+                }));
                 setIsLocating(false);
-                alert("📍 Ubicación capturada.");
+                alert("📍 ¡Ubicación capturada con éxito!");
             },
-            () => { alert("Error capturando GPS."); setIsLocating(false); },
-            { enableHighAccuracy: true }
+            (error) => { 
+                console.error("Error capturando GPS:", error);
+                alert("No pudimos obtener tu ubicación. Por favor, asegúrate de permitir el acceso al GPS en tu navegador."); 
+                setIsLocating(false); 
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
     };
 
@@ -498,44 +509,65 @@ const CheckoutView: React.FC<{
     const finalTotal = cartTotal + (isDelivery && settings.shipping.fixedCost ? settings.shipping.fixedCost : 0) + tipAmount;
 
     return (
-        <form onSubmit={(e) => { e.preventDefault(); onPlaceOrder(customer, selectedPaymentMethod, tipAmount, paymentProof); }} className="p-4 space-y-6 pb-44">
+        <form onSubmit={(e) => { e.preventDefault(); onPlaceOrder(customer, selectedPaymentMethod, tipAmount, paymentProof); }} className="p-4 space-y-6 pb-44 animate-fade-in">
             <div className="space-y-4 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
-                <h3 className="font-bold text-lg text-white">Tus datos</h3>
-                <input type="text" value={customer.name} onChange={e => setCustomer(c => ({...c, name: e.target.value}))} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white" placeholder="Nombre completo" required />
-                {orderType !== OrderType.DineIn && <input type="tel" value={customer.phone} onChange={e => setCustomer(c => ({...c, phone: e.target.value}))} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white" placeholder="WhatsApp" required />}
+                <h3 className="font-bold text-lg text-white flex items-center gap-2">
+                    <span className="w-1.5 h-5 bg-emerald-500 rounded-full"></span>
+                    Tus datos
+                </h3>
+                <input type="text" value={customer.name} onChange={e => setCustomer(c => ({...c, name: e.target.value}))} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Nombre completo" required />
+                {orderType !== OrderType.DineIn && <input type="tel" value={customer.phone} onChange={e => setCustomer(c => ({...c, phone: e.target.value}))} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white outline-none focus:ring-2 focus:ring-emerald-500" placeholder="WhatsApp" required />}
             </div>
 
             {isDelivery && (
                 <div className="space-y-4 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
-                    <div className="flex justify-between items-center">
-                        <h3 className="font-bold text-lg text-white">Entrega</h3>
-                        <button type="button" onClick={handleGetLocation} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${customer.address.googleMapsLink ? 'bg-emerald-500 text-white' : 'bg-white text-gray-900'}`}>
+                    <div className="flex justify-between items-center mb-2">
+                        <h3 className="font-bold text-lg text-white flex items-center gap-2">
+                            <span className="w-1.5 h-5 bg-emerald-500 rounded-full"></span>
+                            Entrega
+                        </h3>
+                        <button 
+                            type="button" 
+                            onClick={handleGetLocation} 
+                            disabled={isLocating}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg ${customer.address.googleMapsLink ? 'bg-emerald-500 text-white scale-105 shadow-emerald-900/40' : 'bg-white text-gray-900 hover:bg-emerald-50 active:scale-95'}`}
+                        >
                             {isLocating ? <div className="h-4 w-4 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" /> : <IconLocationMarker className="h-4 w-4"/>}
-                            {customer.address.googleMapsLink ? 'GPS Listo ✓' : 'Compartir mi Ubicación Exacta'}
+                            {customer.address.googleMapsLink ? '📍 GPS Listo ✓' : 'Compartir mi Ubicación Exacta'}
                         </button>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                        <input type="text" name="calle" value={customer.address.calle} onChange={handleAddressChange} className="col-span-2 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white" placeholder="Calle" required />
-                        <input type="text" name="numero" value={customer.address.numero} onChange={handleAddressChange} className="px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white" placeholder="Nro Ext" required />
-                        <input type="text" name="colonia" value={customer.address.colonia} onChange={handleAddressChange} className="px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white" placeholder="Colonia" required />
+                        <input type="text" name="calle" value={customer.address.calle} onChange={handleAddressChange} className="col-span-2 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Calle" required />
+                        <input type="text" name="numero" value={customer.address.numero} onChange={handleAddressChange} className="px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Nro Ext" required />
+                        <input type="text" name="colonia" value={customer.address.colonia} onChange={handleAddressChange} className="px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Colonia" required />
                     </div>
-                    <input type="text" name="referencias" value={customer.address.referencias} onChange={handleAddressChange} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white" placeholder="Referencias (casa azul, etc)" />
+                    <input type="text" name="referencias" value={customer.address.referencias} onChange={handleAddressChange} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Referencias (casa azul, portón, etc)" />
                 </div>
             )}
 
             <div className="space-y-3 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
-                 <h3 className="font-bold text-lg text-white">Pago</h3>
+                 <h3 className="font-bold text-lg text-white flex items-center gap-2">
+                    <span className="w-1.5 h-5 bg-emerald-500 rounded-full"></span>
+                    Pago
+                 </h3>
                  <div className="space-y-2">
                     {availablePaymentMethods.map(method => (
-                        <label key={method} className={`flex justify-between items-center p-4 rounded-xl cursor-pointer border ${selectedPaymentMethod === method ? 'bg-emerald-900/20 border-emerald-500' : 'bg-gray-800 border-gray-700'}`}>
-                            <span className="text-white">{method}</span>
+                        <label key={method} className={`flex justify-between items-center p-4 rounded-xl cursor-pointer border transition-all ${selectedPaymentMethod === method ? 'bg-emerald-900/20 border-emerald-500 ring-1 ring-emerald-500' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}>
+                            <span className="text-white font-medium">{method}</span>
                             <input type="radio" name="payment" value={method} checked={selectedPaymentMethod === method} onChange={() => setSelectedPaymentMethod(method)} className="h-5 w-5 accent-emerald-500" />
                         </label>
                     ))}
                     {(selectedPaymentMethod === 'Pago Móvil' || selectedPaymentMethod === 'Transferencia') && (
-                         <div className="mt-4 p-4 bg-gray-700/50 rounded-xl border border-gray-600">
-                             <input type="file" className="text-sm text-gray-400" accept="image/*" onChange={handleProofUpload} />
-                             {paymentProof && <img src={paymentProof} className="mt-2 h-32 w-auto rounded border" alt="Comprobante" />}
+                         <div className="mt-4 p-4 bg-gray-700/50 rounded-xl border border-gray-600 animate-slide-up">
+                             <p className="text-xs font-bold text-gray-400 mb-2 uppercase">Subir comprobante</p>
+                             <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-500 rounded-xl cursor-pointer hover:bg-gray-800 transition-colors">
+                                <div className="flex flex-col items-center justify-center">
+                                    <IconUpload className="w-8 h-8 text-gray-400 mb-1"/>
+                                    <p className="text-xs text-gray-400 font-medium">Toca para cargar captura</p>
+                                </div>
+                                <input type="file" className="hidden" accept="image/*" onChange={handleProofUpload} />
+                             </label>
+                             {paymentProof && <img src={paymentProof} className="mt-4 h-48 w-full object-contain rounded border border-emerald-500 shadow-lg" alt="Comprobante" />}
                          </div>
                     )}
                  </div>
@@ -543,7 +575,7 @@ const CheckoutView: React.FC<{
             
             <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-gray-900 border-t border-gray-800 p-4 z-30 shadow-2xl">
                  <div className="flex justify-between font-bold text-xl text-white mb-4 px-2"><span>Total</span><span>${finalTotal.toFixed(2)}</span></div>
-                 <button type="submit" className="w-full bg-green-600 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-3">
+                 <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-3 shadow-lg shadow-green-900/30 transition-transform active:scale-95">
                     <IconWhatsapp className="h-6 w-6" /> Realizar Pedido
                 </button>
             </div>
@@ -551,7 +583,6 @@ const CheckoutView: React.FC<{
     )
 }
 
-// Fix: Re-adding missing OrderConfirmation component
 const OrderConfirmation: React.FC<{ onNewOrder: () => void, settings: AppSettings }> = ({ onNewOrder, settings }) => (
     <div className="p-6 text-center flex flex-col items-center justify-center h-[80vh] animate-fade-in">
         <div className="w-24 h-24 bg-emerald-500/20 rounded-full flex items-center justify-center mb-6">
@@ -611,18 +642,18 @@ export default function CustomerView() {
 
         try { await saveOrder(newOrder); } catch(e) { return alert("Error guardando pedido."); }
 
-        // Fix: Changed 'company' to 'settings.company' to fix the reference error.
         let messageParts = [
             `🧾 *PEDIDO - ${settings.company.name.toUpperCase()}*`,
-            `Cliente: ${customer.name}`,
-            `Tipo: ${orderType}`,
-            orderType === OrderType.Delivery ? `Dirección: ${customer.address.calle} #${customer.address.numero}, ${customer.address.colonia}` : '',
+            `👤 Cliente: ${customer.name}`,
+            `🏷️ Tipo: ${orderType}`,
+            orderType === OrderType.Delivery ? `🏠 Dirección: ${customer.address.calle} #${customer.address.numero}, ${customer.address.colonia}` : '',
             customer.address.googleMapsLink ? `📍 *UBICACIÓN GPS:* ${customer.address.googleMapsLink}` : '',
             `-------------------`,
             ...cartItems.map(i => `• ${i.quantity}x ${i.name}`),
             `-------------------`,
-            `*TOTAL: ${settings.company.currency.code} $${finalTotal.toFixed(2)}*`,
-            `Método: ${paymentMethod}`
+            `*TOTAL A PAGAR: ${settings.company.currency.code} $${finalTotal.toFixed(2)}*`,
+            `💳 Método: ${paymentMethod}`,
+            paymentProof ? `📸 *Comprobante adjunto*` : ''
         ];
 
         const whatsappUrl = `https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(messageParts.filter(p => p !== '').join('\n'))}`;
@@ -646,7 +677,7 @@ export default function CustomerView() {
                 {view === 'checkout' && <CheckoutView cartTotal={cartTotal} onPlaceOrder={handlePlaceOrder} settings={settings} orderType={orderType} />}
                 {view === 'confirmation' && <OrderConfirmation onNewOrder={() => { clearCart(); setView('menu'); }} settings={settings} />}
                 {selectedProduct && <ProductDetailModal product={selectedProduct} onAddToCart={(p, q, c, o) => { addToCart(p, q, c, o); setSelectedProduct(null); }} onClose={() => setSelectedProduct(null)} personalizations={allPersonalizations} promotions={allPromotions} />}
-                {view === 'menu' && itemCount > 0 && <footer className="fixed bottom-4 left-4 right-4 max-w-md mx-auto z-20"><button onClick={() => setView('cart')} className="w-full bg-emerald-500 text-white font-bold py-4 px-6 rounded-2xl flex justify-between shadow-2xl"><span>Ver Pedido ({itemCount})</span><span>${cartTotal.toFixed(2)}</span></button></footer>}
+                {view === 'menu' && itemCount > 0 && <footer className="fixed bottom-4 left-4 right-4 max-w-md mx-auto z-20"><button onClick={() => setView('cart')} className="w-full bg-emerald-500 text-white font-bold py-4 px-6 rounded-2xl flex justify-between shadow-2xl transition-transform active:scale-95"><span>Ver Pedido ({itemCount})</span><span>${cartTotal.toFixed(2)}</span></button></footer>}
                 <Chatbot />
             </div>
         </div>
