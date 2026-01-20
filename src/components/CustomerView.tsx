@@ -472,7 +472,7 @@ const CheckoutView: React.FC<{
     };
 
     const handleGetLocation = () => {
-        if (!navigator.geolocation) return alert("Tu navegador no soporta geolocalización por GPS.");
+        if (!navigator.geolocation) return alert("Tu navegador no soporta geolocalización.");
         setIsLocating(true);
         navigator.geolocation.getCurrentPosition(
             (position) => {
@@ -480,21 +480,17 @@ const CheckoutView: React.FC<{
                 const link = `https://www.google.com/maps?q=${latitude},${longitude}`;
                 setCustomer(prev => ({ 
                     ...prev, 
-                    address: { 
-                        ...prev.address, 
-                        googleMapsLink: link,
-                        referencias: prev.address.referencias ? `${prev.address.referencias} (📍 Ubicación GPS compartida)` : '(📍 Ubicación GPS compartida)'
-                    } 
+                    address: { ...prev.address, googleMapsLink: link } 
                 }));
                 setIsLocating(false);
-                alert("📍 ¡Ubicación capturada con éxito!");
+                alert("📍 Ubicación GPS capturada correctamente.");
             },
-            (error) => { 
-                console.error("Error capturando GPS:", error);
-                alert("No pudimos obtener tu ubicación. Por favor, asegúrate de permitir el acceso al GPS en tu navegador."); 
-                setIsLocating(false); 
+            (error) => {
+                console.error(error);
+                alert("Error al capturar ubicación. Por favor permite el acceso al GPS.");
+                setIsLocating(false);
             },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 10000 }
         );
     };
 
@@ -530,7 +526,7 @@ const CheckoutView: React.FC<{
                             type="button" 
                             onClick={handleGetLocation} 
                             disabled={isLocating}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg ${customer.address.googleMapsLink ? 'bg-emerald-500 text-white scale-105 shadow-emerald-900/40' : 'bg-white text-gray-900 hover:bg-emerald-50 active:scale-95'}`}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg ${customer.address.googleMapsLink ? 'bg-emerald-500 text-white scale-105' : 'bg-white text-gray-900 hover:bg-emerald-50 active:scale-95'}`}
                         >
                             {isLocating ? <div className="h-4 w-4 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" /> : <IconLocationMarker className="h-4 w-4"/>}
                             {customer.address.googleMapsLink ? '📍 GPS Listo ✓' : 'Compartir mi Ubicación Exacta'}
@@ -538,10 +534,10 @@ const CheckoutView: React.FC<{
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <input type="text" name="calle" value={customer.address.calle} onChange={handleAddressChange} className="col-span-2 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Calle" required />
-                        <input type="text" name="numero" value={customer.address.numero} onChange={handleAddressChange} className="px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Nro Ext" required />
+                        <input type="text" name="numero" value={customer.address.numero} onChange={handleAddressChange} className="px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Número Ext" required />
                         <input type="text" name="colonia" value={customer.address.colonia} onChange={handleAddressChange} className="px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Colonia" required />
                     </div>
-                    <input type="text" name="referencias" value={customer.address.referencias} onChange={handleAddressChange} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Referencias (casa azul, portón, etc)" />
+                    <input type="text" name="referencias" value={customer.address.referencias} onChange={handleAddressChange} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Referencias (color casa, portón, etc)" />
                 </div>
             )}
 
@@ -552,19 +548,17 @@ const CheckoutView: React.FC<{
                  </h3>
                  <div className="space-y-2">
                     {availablePaymentMethods.map(method => (
-                        <label key={method} className={`flex justify-between items-center p-4 rounded-xl cursor-pointer border transition-all ${selectedPaymentMethod === method ? 'bg-emerald-900/20 border-emerald-500 ring-1 ring-emerald-500' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}>
+                        <label key={method} className={`flex justify-between items-center p-4 rounded-xl cursor-pointer border transition-all ${selectedPaymentMethod === method ? 'bg-emerald-900/20 border-emerald-500' : 'bg-gray-800 border-gray-700'}`}>
                             <span className="text-white font-medium">{method}</span>
                             <input type="radio" name="payment" value={method} checked={selectedPaymentMethod === method} onChange={() => setSelectedPaymentMethod(method)} className="h-5 w-5 accent-emerald-500" />
                         </label>
                     ))}
                     {(selectedPaymentMethod === 'Pago Móvil' || selectedPaymentMethod === 'Transferencia') && (
-                         <div className="mt-4 p-4 bg-gray-700/50 rounded-xl border border-gray-600 animate-slide-up">
-                             <p className="text-xs font-bold text-gray-400 mb-2 uppercase">Subir comprobante</p>
+                         <div className="mt-4 p-4 bg-gray-700/50 rounded-xl border border-gray-600 animate-slide-up text-center">
+                             <p className="text-xs font-bold text-gray-400 mb-2 uppercase">Subir comprobante de pago</p>
                              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-500 rounded-xl cursor-pointer hover:bg-gray-800 transition-colors">
-                                <div className="flex flex-col items-center justify-center">
-                                    <IconUpload className="w-8 h-8 text-gray-400 mb-1"/>
-                                    <p className="text-xs text-gray-400 font-medium">Toca para cargar captura</p>
-                                </div>
+                                <IconUpload className="w-8 h-8 text-gray-400 mb-1"/>
+                                <p className="text-xs text-gray-400 font-medium">Toca para cargar captura</p>
                                 <input type="file" className="hidden" accept="image/*" onChange={handleProofUpload} />
                              </label>
                              {paymentProof && <img src={paymentProof} className="mt-4 h-48 w-full object-contain rounded border border-emerald-500 shadow-lg" alt="Comprobante" />}
@@ -652,8 +646,7 @@ export default function CustomerView() {
             ...cartItems.map(i => `• ${i.quantity}x ${i.name}`),
             `-------------------`,
             `*TOTAL A PAGAR: ${settings.company.currency.code} $${finalTotal.toFixed(2)}*`,
-            `💳 Método: ${paymentMethod}`,
-            paymentProof ? `📸 *Comprobante adjunto*` : ''
+            `💳 Método: ${paymentMethod}`
         ];
 
         const whatsappUrl = `https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(messageParts.filter(p => p !== '').join('\n'))}`;
