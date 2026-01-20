@@ -1216,7 +1216,6 @@ const PromotionsView: React.FC = () => {
                                 const startDate = promo.startDate ? new Date(promo.startDate) : null;
                                 const endDate = promo.endDate ? new Date(promo.endDate) : null;
                                 
-                                // Adjust end date to be end of day
                                 if (endDate) {
                                     endDate.setHours(23, 59, 59, 999);
                                 }
@@ -1451,6 +1450,17 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                                             <p className="font-medium">{order.customer.address.calle} #{order.customer.address.numero}</p>
                                             <p className="text-gray-500">{order.customer.address.colonia}</p>
                                             {order.customer.address.referencias && <p className="text-xs mt-1 italic text-gray-500">"{order.customer.address.referencias}"</p>}
+                                            
+                                            {order.customer.address.googleMapsLink && (
+                                                <a 
+                                                    href={order.customer.address.googleMapsLink} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    className="mt-3 flex items-center justify-center gap-2 w-full py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors font-semibold"
+                                                >
+                                                    <IconLocationMarker className="h-4 w-4"/> Ver ubicación GPS
+                                                </a>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -2856,23 +2866,11 @@ const BranchSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppS
                 )}
             </SettingsCard>
 
-            <SettingsCard title="Número de WhatsApp para pedidos" onSave={onSave} onCancel={handleCancel}>
-                <p className="text-sm text-gray-500 dark:text-gray-400">El número al que llegarán las comandas de los pedidos.</p>
-                <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Número de contacto</label>
-                    <div className="mt-1 flex rounded-md shadow-sm">
-                        <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 sm:text-sm">
-                            <IconWhatsapp className="h-4 w-4" />
-                        </span>
-                        <input 
-                            type="text" 
-                            value={settings.branch.whatsappNumber} 
-                            onChange={e => setSettings(p => ({...p, branch: {...p.branch, whatsappNumber: e.target.value}}))} 
-                            className="flex-1 min-w-0 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-none rounded-r-md focus:ring-green-500 focus:border-green-500 sm:text-sm text-gray-900 dark:text-white"
-                            placeholder="584146945877"
-                        />
-                    </div>
-                    <p className="mt-2 text-xs text-yellow-600 dark:text-yellow-400">IMPORTANTE: Ingresa el código de país sin el símbolo '+'. Ej: 58414...</p>
+            <SettingsCard title="Número de WhatsApp para pedidos" noActions>
+                <p className="text-sm text-gray-500 dark:text-gray-400">El número al que llegarán las comandas de los pedidos a domicilio</p>
+                <div className="flex justify-between items-center mt-2">
+                    <span className="font-mono text-gray-800 dark:text-gray-200">{settings.branch.whatsappNumber}</span>
+                    <button type="button" className="px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-600">Cambiar número</button>
                 </div>
             </SettingsCard>
             
@@ -3864,3 +3862,19 @@ const ShareView: React.FC<{ onGoToTableSettings: () => void }> = ({ onGoToTableS
                                                 >
                                                     Ver QR
                                                 </button>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            )}
+
+            {activeTab === 'multi-sucursal' && (
+                 <div className="text-center py-16 px-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="mx-auto h-16 w-16 text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                        <IconStore className="h-10 w-10" />
+                    </div>
+                    <h3 className="mt-4 text-lg font-semibold text-gray-800 dark:text-gray

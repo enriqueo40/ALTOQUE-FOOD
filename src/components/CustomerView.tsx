@@ -606,6 +606,8 @@ const CheckoutView: React.FC<{ cartTotal: number, onPlaceOrder: (customer: Custo
     const [customer, setCustomer] = useState<Customer>({ name: '', phone: '', address: { colonia: '', calle: '', numero: '', entreCalles: '', referencias: '' } });
     const [tipAmount, setTipAmount] = useState<number>(0);
     const [paymentProof, setPaymentProof] = useState<string | null>(null);
+    const [isLocating, setIsLocating] = useState(false);
+
     const isDelivery = orderType === OrderType.Delivery;
     const isPickup = orderType === OrderType.TakeAway;
     const isDineIn = orderType === OrderType.DineIn;
@@ -620,6 +622,35 @@ const CheckoutView: React.FC<{ cartTotal: number, onPlaceOrder: (customer: Custo
     const shippingCost: number = (isDelivery && settings.shipping.costType === ShippingCostType.Fixed) ? (Number(settings.shipping.fixedCost) || 0) : 0;
     const finalTotal = (Number(cartTotal) || 0) + Number(shippingCost) + (Number(tipAmount) || 0);
     
+    const handleGetLocation = () => {
+        if (!navigator.geolocation) {
+            alert("Tu navegador no soporta geolocalización.");
+            return;
+        }
+        setIsLocating(true);
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                const link = `https://www.google.com/maps?q=${latitude},${longitude}`;
+                setCustomer(prev => ({
+                    ...prev,
+                    address: {
+                        ...prev.address,
+                        location: { lat: latitude, lng: longitude },
+                        googleMapsLink: link,
+                        referencias: prev.address.referencias ? `${prev.address.referencias} (Ubicación GPS adjunta)` : '(Ubicación GPS adjunta)'
+                    }
+                }));
+                setIsLocating(false);
+            },
+            (error) => {
+                console.error("Error obteniendo ubicación:", error);
+                alert("No se pudo obtener tu ubicación. Asegúrate de dar permisos de ubicación a la página.");
+                setIsLocating(false);
+            }
+        );
+    };
+
     return (
         <form onSubmit={handleSubmit} className="p-4 space-y-6 pb-44 animate-fade-in">
             <div className="space-y-4 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
@@ -629,7 +660,18 @@ const CheckoutView: React.FC<{ cartTotal: number, onPlaceOrder: (customer: Custo
             </div>
             {isDelivery && (
                 <div className="space-y-4 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
-                    <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Entrega</h3>
+                    <div className="flex justify-between items-center">
+                        <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full inline-block"></span> Entrega</h3>
+                        <button type="button" onClick={handleGetLocation} disabled={isLocating} className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors disabled:opacity-50">
+                            {isLocating ? <span className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full"></span> : <IconLocationMarker className="h-3 w-3" />}
+                            {isLocating ? 'Ubicando...' : 'Usar mi ubicación'}
+                        </button>
+                    </div>
+                    {customer.address.googleMapsLink && (
+                        <div className="bg-emerald-500/20 text-emerald-400 text-xs p-2 rounded-lg flex items-center gap-2">
+                            <IconCheck className="h-4 w-4" /> Ubicación GPS capturada correctamente
+                        </div>
+                    )}
                     <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-2"><label className={labelClasses}>Calle</label><input type="text" name="calle" value={customer.address.calle} onChange={handleAddressChange} className={inputClasses} required /></div>
                         <div><label className={labelClasses}>Número Ext.</label><input type="text" name="numero" value={customer.address.numero} onChange={handleAddressChange} className={inputClasses} required /></div>
@@ -760,9 +802,10 @@ export default function CustomerView() {
         const currency = settings.company.currency.code;
         const lineSeparator = "━━━━━━━━━━━━━━━━━━━━";
         const proofMessage = paymentProof ? "\n📸 *Comprobante de pago adjunto*" : "";
+        const locationMessage = customer.address.googleMapsLink ? `\n📍 *Ubicación GPS:* ${customer.address.googleMapsLink}` : "";
+
         let messageParts: string[] = [];
-        // (Simplified Message Building Logic for brevity, assume full message construction here like previous versions)
-        messageParts = [`🧾 *TICKET DE PEDIDO*`, `📍 *${settings.company.name.toUpperCase()}*`, lineSeparator, `👤 *${customer.name}*`, `📞 ${customer.phone}`, lineSeparator, ...itemDetails, lineSeparator, `💰 Total: ${currency} $${finalTotal.toFixed(2)}`, `💳 Método: ${paymentMethod}`, proofMessage, `✅ Estado: PENDIENTE`];
+        messageParts = [`🧾 *TICKET DE PEDIDO*`, `📍 *${settings.company.name.toUpperCase()}*`, lineSeparator, `👤 *${customer.name}*`, `📞 ${customer.phone}`, lineSeparator, ...itemDetails, lineSeparator, `💰 Total: ${currency} $${finalTotal.toFixed(2)}`, `💳 Método: ${paymentMethod}`, proofMessage, locationMessage, `✅ Estado: PENDIENTE`];
 
         const rawNumber = settings.branch.whatsappNumber || '';
         const cleanPhoneNumber = rawNumber.replace(/\D/g, ''); 
