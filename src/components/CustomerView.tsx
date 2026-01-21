@@ -480,14 +480,17 @@ const CheckoutView: React.FC<{
                 const link = `https://www.google.com/maps?q=${latitude},${longitude}`;
                 setCustomer(prev => ({ 
                     ...prev, 
-                    address: { ...prev.address, googleMapsLink: link } 
+                    address: { 
+                      ...prev.address, 
+                      googleMapsLink: link 
+                    } 
                 }));
                 setIsLocating(false);
                 alert("📍 Ubicación GPS capturada correctamente.");
             },
             (error) => {
                 console.error(error);
-                alert("Error al capturar ubicación. Por favor permite el acceso al GPS.");
+                alert("Error al capturar ubicación. Por favor permite el acceso al GPS en tu navegador.");
                 setIsLocating(false);
             },
             { enableHighAccuracy: true, timeout: 10000 }
@@ -526,7 +529,7 @@ const CheckoutView: React.FC<{
                             type="button" 
                             onClick={handleGetLocation} 
                             disabled={isLocating}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg ${customer.address.googleMapsLink ? 'bg-emerald-500 text-white scale-105' : 'bg-white text-gray-900 hover:bg-emerald-50 active:scale-95'}`}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg ${customer.address.googleMapsLink ? 'bg-emerald-500 text-white scale-105 shadow-emerald-900/40' : 'bg-white text-gray-900 hover:bg-emerald-50 active:scale-95'}`}
                         >
                             {isLocating ? <div className="h-4 w-4 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" /> : <IconLocationMarker className="h-4 w-4"/>}
                             {customer.address.googleMapsLink ? '📍 GPS Listo ✓' : 'Compartir mi Ubicación Exacta'}
