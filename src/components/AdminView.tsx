@@ -18,7 +18,7 @@ const PAGE_TITLES: { [key in AdminViewPage]: string } = { dashboard: 'Inicio', p
 
 const Sidebar: React.FC<{ currentPage: AdminViewPage; setCurrentPage: (page: AdminViewPage) => void }> = ({ currentPage, setCurrentPage }) => (
     <aside className="w-64 bg-white dark:bg-gray-800 shadow-md flex flex-col">
-        <div className="h-20 flex items-center justify-center border-b dark:border-gray-700 font-bold">ALTOQUE FOOD</div>
+        <div className="h-20 flex items-center justify-center border-b dark:border-gray-700 font-bold dark:text-white">ALTOQUE FOOD</div>
         <nav className="flex-1 px-4 py-6 space-y-2">
             {[ {id:'dashboard', name:'Inicio', icon:<IconHome/>}, {id:'orders', name:'Pedidos', icon:<IconOrders/>}, {id:'products', name:'Menú', icon:<IconMenu/>}, {id:'availability', name:'Disponibilidad', icon:<IconAvailability/>}, {id:'share', name:'Compartir', icon:<IconShare/>}, {id:'tutorials', name:'Tutoriales', icon:<IconTutorials/>}].map(item => (
                 <button key={item.id} onClick={() => setCurrentPage(item.id as AdminViewPage)} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg ${currentPage === item.id ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/50' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
@@ -31,10 +31,10 @@ const Sidebar: React.FC<{ currentPage: AdminViewPage; setCurrentPage: (page: Adm
 
 const Header: React.FC<{ title: string; onSettingsClick: () => void; theme: 'light' | 'dark'; toggleTheme: () => void; }> = ({ title, onSettingsClick, theme, toggleTheme }) => (
     <header className="h-20 bg-white dark:bg-gray-800 border-b dark:border-gray-700 flex items-center justify-between px-8">
-        <h2 className="text-2xl font-bold">{title}</h2>
+        <h2 className="text-2xl font-bold dark:text-white">{title}</h2>
         <div className="flex items-center space-x-6">
-            <button onClick={onSettingsClick} className="flex items-center gap-2 font-medium"><IconSettings className="h-5 w-5"/> Configuración</button>
-             <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">{theme === 'light' ? <IconMoon /> : <IconSun />}</button>
+            <button onClick={onSettingsClick} className="flex items-center gap-2 font-medium dark:text-gray-300"><IconSettings className="h-5 w-5"/> Configuración</button>
+             <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-300">{theme === 'light' ? <IconMoon /> : <IconSun />}</button>
         </div>
     </header>
 );
@@ -57,33 +57,38 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}></div>
             <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-xl shadow-2xl flex flex-col relative max-h-[90vh] overflow-hidden">
                 <div className="p-6 border-b dark:border-gray-700 flex justify-between items-center">
-                    <h2 className="text-xl font-bold">Pedido #{order.id.slice(0, 6)}</h2>
+                    <h2 className="text-xl font-bold dark:text-white">Pedido #{order.id.slice(0, 6)}</h2>
                     <OrderStatusBadge status={order.status} />
                 </div>
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-1">
                             <p className="text-xs font-bold text-gray-500 uppercase">Cliente</p>
-                            <p className="font-semibold text-lg">{order.customer.name}</p>
-                            <p className="text-sm font-mono">{order.customer.phone}</p>
+                            <p className="font-semibold text-lg dark:text-white">{order.customer.name}</p>
+                            <p className="text-sm font-mono dark:text-gray-400">{order.customer.phone}</p>
                         </div>
                         <div className="space-y-2">
                             <p className="text-xs font-bold text-gray-500 uppercase">Datos de Entrega</p>
-                            <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border dark:border-gray-700">
-                                <p className="text-sm font-medium">{order.customer.address.calle} #{order.customer.address.numero}</p>
+                            <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border dark:border-gray-700">
+                                <p className="text-sm font-medium dark:text-white">{order.customer.address.calle} #{order.customer.address.numero}</p>
                                 <p className="text-xs text-gray-500">{order.customer.address.colonia}</p>
                                 {order.customer.address.referencias && <p className="text-xs italic text-gray-400 mt-1">"{order.customer.address.referencias}"</p>}
                                 
-                                {order.customer.address.googleMapsLink && (
+                                {/* GPS BUTTON IN ADMIN PANEL - HIGH VISIBILITY */}
+                                {order.customer.address.googleMapsLink ? (
                                     <a 
                                         href={order.customer.address.googleMapsLink} 
                                         target="_blank" 
                                         rel="noopener noreferrer"
-                                        className="mt-4 flex items-center justify-center gap-2 w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all font-bold shadow-md shadow-blue-900/20"
+                                        className="mt-4 flex items-center justify-center gap-2 w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all font-bold shadow-lg shadow-blue-900/30"
                                     >
-                                        <IconLocationMarker className="h-4 w-4"/>
-                                        Ver Ubicación GPS
+                                        <IconLocationMarker className="h-5 w-5"/>
+                                        VER UBICACIÓN GPS EXACTA
                                     </a>
+                                ) : (
+                                    <div className="mt-4 p-2 bg-gray-100 dark:bg-gray-800 rounded border border-dashed dark:border-gray-700 text-center">
+                                        <p className="text-[10px] text-gray-500 font-medium">Ubicación GPS no disponible</p>
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -96,16 +101,16 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                                     <div className="flex gap-3">
                                         <span className="font-bold text-emerald-600">{item.quantity}x</span>
                                         <div>
-                                            <p className="font-medium text-sm">{item.name}</p>
+                                            <p className="font-medium text-sm dark:text-gray-200">{item.name}</p>
                                             {item.comments && <p className="text-xs text-gray-400 italic">"{item.comments}"</p>}
                                         </div>
                                     </div>
-                                    <span className="font-bold text-sm">${(item.price * item.quantity).toFixed(2)}</span>
+                                    <span className="font-bold text-sm dark:text-gray-300">${(item.price * item.quantity).toFixed(2)}</span>
                                 </div>
                             ))}
                         </div>
                     </div>
-                    <div className="pt-4 border-t dark:border-gray-700 flex justify-between font-bold text-xl">
+                    <div className="pt-4 border-t dark:border-gray-700 flex justify-between font-bold text-xl dark:text-white">
                         <span>TOTAL</span>
                         <span className="text-emerald-600">${order.total.toFixed(2)}</span>
                     </div>
@@ -130,11 +135,14 @@ const OrderManagement: React.FC = () => {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {orders.map(o => (
-                <div key={o.id} onClick={() => setSelOrder(o)} className="bg-white dark:bg-gray-800 p-4 rounded-xl border dark:border-gray-700 cursor-pointer shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
-                    <div className="flex justify-between mb-2"><span className="font-bold text-xs text-gray-400">#{o.id.slice(0,6)}</span><OrderStatusBadge status={o.status}/></div>
+                <div key={o.id} onClick={() => setSelOrder(o)} className="bg-white dark:bg-gray-800 p-4 rounded-xl border dark:border-gray-700 cursor-pointer shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 group">
+                    <div className="flex justify-between mb-2"><span className="font-bold text-xs text-gray-400 group-hover:text-emerald-500">#{o.id.slice(0,6)}</span><OrderStatusBadge status={o.status}/></div>
                     <p className="font-bold text-lg text-gray-800 dark:text-gray-100">{o.customer.name}</p>
                     <div className="flex justify-between items-end mt-3">
-                        <p className="text-sm text-gray-500">{o.items.length} item(s)</p>
+                        <div>
+                             <p className="text-sm text-gray-500">{o.items.length} item(s)</p>
+                             {o.customer.address.googleMapsLink && <span className="text-[10px] text-blue-500 font-bold flex items-center gap-1 mt-1"><IconLocationMarker className="h-3 w-3"/> GPS DISPONIBLE</span>}
+                        </div>
                         <p className="text-xl font-bold text-emerald-600">${o.total.toFixed(2)}</p>
                     </div>
                 </div>
@@ -148,13 +156,13 @@ const AdminView: React.FC = () => {
     const [page, setPage] = useState<AdminViewPage>('orders');
     const [theme, toggleTheme] = useTheme();
     return (
-        <div className="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-200">
+        <div className="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-200 transition-colors duration-200">
             <Sidebar currentPage={page} setCurrentPage={setPage} />
             <div className="flex-1 flex flex-col overflow-hidden">
                 <Header title={PAGE_TITLES[page]} onSettingsClick={() => {}} theme={theme} toggleTheme={toggleTheme} />
                 <main className="flex-1 overflow-auto p-8">
                     {page === 'orders' && <OrderManagement />}
-                    {page !== 'orders' && <div className="text-center p-10 opacity-50">Sección en construcción...</div>}
+                    {page !== 'orders' && <div className="text-center p-10 opacity-50 dark:text-gray-400">Sección en construcción...</div>}
                 </main>
             </div>
         </div>

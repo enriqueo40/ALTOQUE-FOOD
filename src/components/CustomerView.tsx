@@ -8,7 +8,7 @@ import Chatbot from './Chatbot';
 
 // Sub-components definitions
 const Header: React.FC<{ title: string; onBack?: () => void }> = ({ title, onBack }) => (
-    <header className="p-4 flex justify-between items-center sticky top-0 bg-gray-900/90 backdrop-blur-md z-20 border-b border-gray-800">
+    <header className="p-4 flex justify-between items-center sticky top-0 bg-gray-900/90 backdrop-blur-md z-20 border-b border-gray-800 transition-colors">
         {onBack ? (
              <button onClick={onBack} className="p-2 -ml-2 text-gray-200 hover:bg-gray-800 rounded-full transition-colors" aria-label="Volver">
                 <IconArrowLeft className="h-6 w-6" />
@@ -23,7 +23,7 @@ const ScheduleModal: React.FC<{ isOpen: boolean; onClose: () => void; schedule: 
     if (!isOpen) return null;
     
     const daysOrder = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-    const todayIndex = new Date().getDay();
+    const todayIndex = new Date().getDay(); 
     const adjustedTodayIndex = todayIndex === 0 ? 6 : todayIndex - 1; 
     const todayName = daysOrder[adjustedTodayIndex];
 
@@ -382,9 +382,9 @@ const CartSummaryView: React.FC<{ cartItems: CartItem[], cartTotal: number, onUp
                 ))}
             </div>
              <div className="mt-8"><textarea value={generalComments} onChange={(e) => onGeneralCommentsChange(e.target.value)} rows={2} className="w-full p-3 bg-gray-800 border border-gray-700 rounded-xl text-white" placeholder="Comentarios generales..." /></div>
-             <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-gray-900 border-t border-gray-800 p-4 safe-bottom z-30">
+             <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-gray-900 border-t border-gray-800 p-4 safe-bottom z-30 shadow-2xl">
                 <div className="flex justify-between items-center mb-4 px-2"><span className="text-gray-400">Total</span><span className="font-bold text-2xl text-white">${cartTotal.toFixed(2)}</span></div>
-                 <button onClick={onProceedToCheckout} className="w-full bg-emerald-500 text-white font-bold py-4 rounded-xl">Continuar</button>
+                 <button onClick={onProceedToCheckout} className="w-full bg-emerald-500 text-white font-bold py-4 rounded-xl shadow-lg transition-transform active:scale-95">Continuar</button>
             </div>
         </div>
     )
@@ -406,19 +406,24 @@ const CheckoutView: React.FC<{ cartTotal: number, onPlaceOrder: (customer: Custo
     };
 
     const handleGetLocation = () => {
-        if (!navigator.geolocation) return alert("Tu navegador no soporta geolocalización.");
+        if (!navigator.geolocation) {
+            alert("Tu navegador no soporta geolocalización.");
+            return;
+        }
         setIsLocating(true);
         navigator.geolocation.getCurrentPosition(
             (pos) => {
                 const link = `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
                 setCustomer(prev => ({ ...prev, address: { ...prev.address, googleMapsLink: link } }));
                 setIsLocating(false);
+                alert("📍 Ubicación GPS capturada exitosamente.");
             },
-            () => {
+            (err) => {
+                console.error("Geo error:", err);
                 setIsLocating(false);
-                alert("Error al capturar ubicación. Por favor activa el GPS.");
+                alert("Error al capturar ubicación. Por favor asegúrate de activar el GPS y dar permisos.");
             },
-            { enableHighAccuracy: true, timeout: 10000 }
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
     };
 
@@ -430,7 +435,8 @@ const CheckoutView: React.FC<{ cartTotal: number, onPlaceOrder: (customer: Custo
         }
     };
 
-    const finalTotal = cartTotal + (isDelivery && settings.shipping.fixedCost ? Number(settings.shipping.fixedCost) : 0) + tipAmount;
+    const shippingCost = (isDelivery && settings.shipping.fixedCost) ? Number(settings.shipping.fixedCost) : 0;
+    const finalTotal = cartTotal + shippingCost + tipAmount;
 
     return (
         <form onSubmit={(e) => { e.preventDefault(); onPlaceOrder(customer, selectedPaymentMethod, tipAmount, paymentProof); }} className="p-4 space-y-6 pb-44 animate-fade-in">
@@ -442,13 +448,31 @@ const CheckoutView: React.FC<{ cartTotal: number, onPlaceOrder: (customer: Custo
 
             {isDelivery && (
                 <div className="space-y-4 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl text-white">
-                    <div className="flex justify-between items-center mb-2">
-                        <h3 className="font-bold text-lg flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full"></span> Entrega</h3>
-                        <button type="button" onClick={handleGetLocation} disabled={isLocating} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg ${customer.address.googleMapsLink ? 'bg-emerald-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
-                            {isLocating ? <div className="h-3 w-3 border-2 border-t-transparent rounded-full animate-spin"></div> : <IconLocationMarker className="h-4 w-4"/>}
-                            {customer.address.googleMapsLink ? '✓ GPS Listo' : '📍 Compartir Ubicación Exacta'}
+                    <div className="flex flex-col gap-3 mb-4">
+                        <h3 className="font-bold text-lg flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full"></span> Ubicación de Entrega</h3>
+                        
+                        {/* BOTÓN GPS REDISEÑADO PARA MÁXIMA VISIBILIDAD */}
+                        <button 
+                            type="button" 
+                            onClick={handleGetLocation} 
+                            disabled={isLocating} 
+                            className={`w-full flex items-center justify-center gap-3 px-4 py-4 rounded-xl font-bold transition-all shadow-lg active:scale-95 ${customer.address.googleMapsLink ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700 animate-pulse ring-4 ring-blue-900/30'}`}
+                        >
+                            {isLocating ? (
+                                <div className="flex items-center gap-2">
+                                    <div className="h-5 w-5 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    <span>Buscando satélite...</span>
+                                </div>
+                            ) : (
+                                <>
+                                    {customer.address.googleMapsLink ? <IconCheck className="h-6 w-6"/> : <IconLocationMarker className="h-6 w-6"/>}
+                                    <span>{customer.address.googleMapsLink ? '📍 GPS LISTO ✓' : '📍 COMPARTIR UBICACIÓN EXACTA'}</span>
+                                </>
+                            )}
                         </button>
+                        {customer.address.googleMapsLink && <p className="text-[11px] text-emerald-400 text-center font-mono bg-emerald-950/40 py-1 rounded-lg">Ubicación capturada correctamente</p>}
                     </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <input type="text" name="calle" value={customer.address.calle} onChange={handleAddressChange} className="col-span-2 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Calle" required />
                         <input type="text" name="numero" value={customer.address.numero} onChange={handleAddressChange} className="px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Número Ext" required />
@@ -480,7 +504,7 @@ const CheckoutView: React.FC<{ cartTotal: number, onPlaceOrder: (customer: Custo
                  </div>
             </div>
             
-            <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-gray-900 border-t border-gray-800 p-4 z-30 shadow-2xl">
+            <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-gray-900 border-t border-gray-800 p-4 z-30 shadow-2xl safe-bottom">
                  <div className="flex justify-between font-bold text-xl text-white mb-4 px-2"><span>Total</span><span>${finalTotal.toFixed(2)}</span></div>
                  <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-3 shadow-lg shadow-green-900/30 transition-transform active:scale-95">
                     <IconWhatsapp className="h-6 w-6" /> Realizar Pedido
@@ -533,37 +557,51 @@ export default function CustomerView() {
         if (!settings) return;
         const shipping = (orderType === OrderType.Delivery && settings.shipping.fixedCost) ? Number(settings.shipping.fixedCost) : 0;
         const finalTotal = cartTotal + shipping + tip;
+        
         try {
-            await saveOrder({ customer, items: cartItems, total: finalTotal, status: OrderStatus.Pending, orderType, paymentProof: proof || undefined, generalComments: generalComments + (tip > 0 ? ` | Propina: $${tip.toFixed(2)}` : '') });
+            await saveOrder({ 
+                customer, 
+                items: cartItems, 
+                total: finalTotal, 
+                status: OrderStatus.Pending, 
+                orderType, 
+                paymentProof: proof || undefined, 
+                generalComments: generalComments + (tip > 0 ? ` | Propina: $${tip.toFixed(2)}` : '') 
+            });
+            
             const msg = encodeURIComponent([
                 `🧾 *PEDIDO - ${settings.company.name.toUpperCase()}*`,
                 `👤 Cliente: ${customer.name}`,
                 `🏷️ Tipo: ${orderType}`,
-                orderType === OrderType.Delivery ? `🏠 Dir: ${customer.address.calle} #${customer.address.numero}` : '',
-                customer.address.googleMapsLink ? `📍 *GPS:* ${customer.address.googleMapsLink}` : '',
+                orderType === OrderType.Delivery ? `🏠 Dirección: ${customer.address.calle} #${customer.address.numero}, ${customer.address.colonia}` : '',
+                customer.address.googleMapsLink ? `📍 *UBICACIÓN GPS:* ${customer.address.googleMapsLink}` : '',
                 `-------------------`,
                 ...cartItems.map(i => `• ${i.quantity}x ${i.name}`),
                 `-------------------`,
                 `*TOTAL: $${finalTotal.toFixed(2)}*`,
                 `💳 Método: ${paymentMethod}`
             ].filter(Boolean).join('\n'));
+            
             window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${msg}`, '_blank');
             setView('confirmation');
-        } catch(e) { alert("Error guardando pedido."); }
+        } catch(e) { 
+            console.error(e);
+            alert("Error al guardar pedido en la base de datos."); 
+        }
     };
 
     if (isLoading || !settings) return <div className="h-screen bg-gray-900 flex items-center justify-center"><div className="animate-spin h-10 w-10 border-t-2 border-emerald-500 rounded-full" /></div>;
 
     return (
-        <div className="bg-gray-900 min-h-screen">
+        <div className="bg-gray-900 min-h-screen text-gray-100">
             <div className="container mx-auto max-w-md bg-gray-900 min-h-screen relative pb-24 border-x border-gray-800 shadow-2xl">
-                {view !== 'menu' && <Header title={view === 'cart' ? 'Tu carrito' : 'Finalizar'} onBack={() => setView(view === 'checkout' ? 'cart' : 'menu')} />}
+                {view !== 'menu' && <Header title={view === 'cart' ? 'Tu carrito' : 'Finalizar pedido'} onBack={() => setView(view === 'checkout' ? 'cart' : 'menu')} />}
                 {view === 'menu' && <><RestaurantHero settings={settings} tableInfo={tableInfo} orderType={orderType} setOrderType={setOrderType} /><MenuList products={allProducts} categories={allCategories} onProductClick={setSelectedProduct} cartItems={cartItems} currency={settings.company.currency.code} promotions={allPromotions} isLoading={isLoading} /></>}
                 {view === 'cart' && <CartSummaryView cartItems={cartItems} cartTotal={cartTotal} onUpdateQuantity={updateQuantity} onRemoveItem={removeFromCart} generalComments={generalComments} onGeneralCommentsChange={setGeneralComments} onProceedToCheckout={() => setView('checkout')} />}
                 {view === 'checkout' && <CheckoutView cartTotal={cartTotal} onPlaceOrder={handlePlaceOrder} settings={settings} orderType={orderType} />}
                 {view === 'confirmation' && <OrderConfirmation onNewOrder={() => { clearCart(); setView('menu'); }} settings={settings} />}
                 {selectedProduct && <ProductDetailModal product={selectedProduct} onAddToCart={(p, q, c, o) => { addToCart(p, q, c, o); setSelectedProduct(null); }} onClose={() => setSelectedProduct(null)} personalizations={allPersonalizations} promotions={allPromotions} />}
-                {view === 'menu' && itemCount > 0 && <footer className="fixed bottom-4 left-4 right-4 max-w-md mx-auto z-20"><button onClick={() => setView('cart')} className="w-full bg-emerald-500 text-white font-bold py-4 px-6 rounded-2xl flex justify-between shadow-2xl transition-transform active:scale-95"><span>Ver Pedido ({itemCount})</span><span>${cartTotal.toFixed(2)}</span></button></footer>}
+                {view === 'menu' && itemCount > 0 && <footer className="fixed bottom-4 left-4 right-4 max-w-md mx-auto z-20"><button onClick={() => setView('cart')} className="w-full bg-emerald-500 text-white font-bold py-4 px-6 rounded-2xl flex justify-between shadow-2xl transition-all transform active:scale-95"><span>Ver Pedido ({itemCount})</span><span>${cartTotal.toFixed(2)}</span></button></footer>}
                 <Chatbot />
             </div>
         </div>
