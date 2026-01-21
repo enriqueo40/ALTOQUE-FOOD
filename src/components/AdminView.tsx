@@ -79,7 +79,7 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                                         href={order.customer.address.googleMapsLink} 
                                         target="_blank" 
                                         rel="noopener noreferrer"
-                                        className="mt-4 flex items-center justify-center gap-2 w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all font-bold shadow-md shadow-blue-900/20 animate-pulse"
+                                        className="mt-4 flex items-center justify-center gap-2 w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all font-bold shadow-md shadow-blue-900/20"
                                     >
                                         <IconLocationMarker className="h-4 w-4"/>
                                         Abrir en Google Maps
