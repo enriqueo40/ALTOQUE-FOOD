@@ -472,12 +472,18 @@ const CheckoutView: React.FC<{
     };
 
     const handleGetLocation = () => {
-        if (!navigator.geolocation) return alert("Tu navegador no soporta geolocalización.");
+        if (!navigator.geolocation) {
+            console.warn("Geolocation no es soportada por este navegador.");
+            alert("Tu navegador no soporta geolocalización. Por favor, introduce tu dirección manualmente.");
+            return;
+        }
+
         setIsLocating(true);
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 const { latitude, longitude } = position.coords;
                 const link = `https://www.google.com/maps?q=${latitude},${longitude}`;
+                console.log("Ubicación obtenida:", link);
                 setCustomer(prev => ({ 
                     ...prev, 
                     address: { 
@@ -489,11 +495,19 @@ const CheckoutView: React.FC<{
                 alert("📍 Ubicación GPS capturada correctamente.");
             },
             (error) => {
-                console.error(error);
-                alert("Error al capturar ubicación. Por favor permite el acceso al GPS en tu navegador.");
+                console.error("Error al capturar ubicación GPS:", error);
                 setIsLocating(false);
+                let errorMessage = "Error al capturar tu ubicación.";
+                if (error.code === error.PERMISSION_DENIED) {
+                    errorMessage += " Por favor, concede permiso de acceso al GPS en la configuración de tu navegador.";
+                } else if (error.code === error.POSITION_UNAVAILABLE) {
+                    errorMessage += " Tu ubicación no está disponible en este momento. Intenta de nuevo o ingresa la dirección manualmente.";
+                } else if (error.code === error.TIMEOUT) {
+                    errorMessage += " La solicitud de ubicación ha tardado demasiado. Asegúrate de tener buena señal o intenta de nuevo.";
+                }
+                alert(errorMessage);
             },
-            { enableHighAccuracy: true, timeout: 10000 }
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } // Request high accuracy, fresh data
         );
     };
 
@@ -644,7 +658,7 @@ export default function CustomerView() {
             `👤 Cliente: ${customer.name}`,
             `🏷️ Tipo: ${orderType}`,
             orderType === OrderType.Delivery ? `🏠 Dirección: ${customer.address.calle} #${customer.address.numero}, ${customer.address.colonia}` : '',
-            customer.address.googleMapsLink ? `📍 *UBICACIÓN GPS:* ${customer.address.googleMapsLink}` : '',
+            customer.address.googleMapsLink ? `📍 *UBICACIÓN GPS:* ${customer.address.googleMapsLink}` : '', // Ensure link is included
             `-------------------`,
             ...cartItems.map(i => `• ${i.quantity}x ${i.name}`),
             `-------------------`,
