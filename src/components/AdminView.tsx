@@ -54,7 +54,7 @@ const Sidebar: React.FC<{ currentPage: AdminViewPage; setCurrentPage: (page: Adm
             <div className="px-6 py-6 border-t dark:border-gray-700">
                 <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 mb-1">
                     <IconWhatsapp className="h-4 w-4" />
-                    <span className="text-xs font-bold uppercase tracking-widest">Sucursal</span>
+                    <span className="text-xs font-bold uppercase tracking-widest">Soporte</span>
                 </div>
                 <p className="text-gray-800 dark:text-gray-100 font-mono font-bold text-sm tracking-tight">+{whatsappNumber}</p>
             </div>
@@ -73,8 +73,8 @@ const SettingsCard: React.FC<{ title: string; description?: string; children: Re
         </div>
         {!noActions && (
             <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-x-3">
-                <button onClick={onCancel} className="px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-600">Cancelar</button>
-                <button onClick={onSave} className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-bold hover:bg-emerald-700 shadow-md">Guardar</button>
+                <button onClick={onCancel} className="px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">Cancelar</button>
+                <button onClick={onSave} className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-bold hover:bg-emerald-700 transition-all shadow-md active:scale-95">Guardar cambios</button>
             </div>
         )}
     </div>
@@ -89,77 +89,72 @@ const BranchSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppS
     }, [settings.branch.whatsappNumber]);
 
     const handleWhatsAppSave = async () => {
-        // Limpiar el número para evitar errores en links wa.me
         const cleanPhone = tempPhone.replace(/[^\d]/g, '');
         if (!cleanPhone) {
             alert("Introduce un número válido.");
             return;
         }
         const newSettings = { ...settings, branch: { ...settings.branch, whatsappNumber: cleanPhone } };
-        setSettings(newSettings);
         try {
             await saveAppSettings(newSettings);
+            setSettings(newSettings);
             setIsEditingPhone(false);
-            alert("Número actualizado.");
+            alert("Número de WhatsApp actualizado correctamente.");
         } catch (e) {
-            alert("Error al guardar.");
+            alert("Error al guardar en la base de datos.");
         }
     };
 
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'logoUrl' | 'coverImageUrl') => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const imageUrl = reader.result as string;
-                const newSettings = {...settings, branch: {...settings.branch, [field]: imageUrl}};
-                setSettings(newSettings);
-                saveAppSettings(newSettings);
-            };
-            reader.readAsDataURL(file);
-        }
+    const handleCancelPhone = () => {
+        setTempPhone(settings.branch.whatsappNumber);
+        setIsEditingPhone(false);
     };
 
-    const inputClasses = "mt-1 block w-full px-3 py-2.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 sm:text-sm dark:text-white";
+    const inputClasses = "mt-1 block w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white transition-all";
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 max-w-4xl mx-auto">
             <SettingsCard 
                 title="Número de WhatsApp para pedidos" 
-                description="El número al que llegarán las comandas de los pedidos a domicilio"
+                description="Este es el número donde recibirás las comandas de tus clientes."
                 noActions={!isEditingPhone}
                 onSave={handleWhatsAppSave}
-                onCancel={() => { setIsEditingPhone(false); setTempPhone(settings.branch.whatsappNumber); }}
+                onCancel={handleCancelPhone}
             >
                 <div className="flex flex-col gap-3">
                     {isEditingPhone ? (
-                        <div className="space-y-2 animate-fade-in">
-                            <label className="text-xs font-bold text-gray-500 uppercase">Nuevo número (Ej: 584146945877)</label>
-                            <input 
-                                type="tel" 
-                                value={tempPhone} 
-                                onChange={e => setTempPhone(e.target.value)}
-                                className={`${inputClasses} font-mono text-lg border-2 border-emerald-500 shadow-inner`}
-                                autoFocus
-                            />
+                        <div className="space-y-3 animate-fade-in">
+                            <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Nuevo número (con código de país, ej: 58414...)</label>
+                            <div className="relative">
+                                <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 font-mono text-lg">+</span>
+                                <input 
+                                    type="tel" 
+                                    value={tempPhone} 
+                                    onChange={e => setTempPhone(e.target.value)}
+                                    className={`${inputClasses} pl-8 font-mono text-lg font-bold border-emerald-500/50 shadow-inner`}
+                                    placeholder="584146945877"
+                                    autoFocus
+                                />
+                            </div>
+                            <p className="text-[10px] text-gray-400">Tus clientes verán este número al finalizar su pedido en el menú digital.</p>
                         </div>
                     ) : (
-                        <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                            <div className="flex items-center gap-4">
+                        <div className="flex flex-col sm:flex-row justify-between items-center p-5 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                            <div className="flex items-center gap-4 mb-4 sm:mb-0">
                                 <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
                                     <IconWhatsapp className="h-6 w-6 text-green-600 dark:text-green-400" />
                                 </div>
-                                <div className="flex flex-col">
-                                    <span className="text-xs font-bold text-gray-400 uppercase">Número actual</span>
+                                <div className="flex flex-col text-left">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Número activo</span>
                                     <span className="font-mono text-xl font-bold text-gray-800 dark:text-gray-100">
-                                        +{settings.branch.whatsappNumber || "No configurado"}
+                                        +{settings.branch.whatsappNumber || "Sin configurar"}
                                     </span>
                                 </div>
                             </div>
                             <button 
                                 type="button" 
                                 onClick={() => setIsEditingPhone(true)}
-                                className="px-5 py-2.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-all shadow-sm active:scale-95"
+                                className="w-full sm:w-auto px-6 py-2.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-all active:scale-95"
                             >
                                 Cambiar número
                             </button>
@@ -169,36 +164,28 @@ const BranchSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppS
             </SettingsCard>
 
             <SettingsCard title="Datos de sucursal" onSave={onSave}>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Alias de sucursal</label>
-                <input type="text" value={settings.branch.alias} onChange={e => setSettings(p => ({...p, branch: {...p.branch, alias: e.target.value}}))} className={inputClasses} placeholder="Nombre corto de la sucursal" />
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1 mt-4">Dirección completa</label>
-                <input type="text" value={settings.branch.fullAddress} onChange={e => setSettings(p => ({...p, branch: {...p.branch, fullAddress: e.target.value}}))} className={inputClasses} />
+                <div className="grid grid-cols-1 gap-6">
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Alias de sucursal</label>
+                        <input 
+                            type="text" 
+                            value={settings.branch.alias} 
+                            onChange={e => setSettings(p => ({...p, branch: {...p.branch, alias: e.target.value}}))} 
+                            className={inputClasses}
+                            placeholder="Nombre de la sucursal"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Dirección completa</label>
+                        <input 
+                            type="text" 
+                            value={settings.branch.fullAddress} 
+                            onChange={e => setSettings(p => ({...p, branch: {...p.branch, fullAddress: e.target.value}}))} 
+                            className={inputClasses}
+                        />
+                    </div>
+                </div>
             </SettingsCard>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6 flex flex-col items-center">
-                    <div className="w-full flex justify-between items-center mb-4">
-                        <span className="font-bold">Logotipo</span>
-                        <label className="cursor-pointer bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-md text-xs font-bold hover:bg-gray-200">
-                            Subir
-                            <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, 'logoUrl')}/>
-                        </label>
-                    </div>
-                    {settings.branch.logoUrl ? <img src={settings.branch.logoUrl} className="w-24 h-24 rounded-full object-cover border-2 border-emerald-500/20" alt="Logo" /> : <div className="w-24 h-24 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-400"><IconStore className="h-10 w-10"/></div>}
-                </div>
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6 flex flex-col items-center">
-                    <div className="w-full flex justify-between items-center mb-4">
-                        <span className="font-bold">Portada</span>
-                        <label className="cursor-pointer bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-md text-xs font-bold hover:bg-gray-200">
-                            Subir
-                            <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, 'coverImageUrl')}/>
-                        </label>
-                    </div>
-                    <div className="w-full h-24 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden flex items-center justify-center">
-                        {settings.branch.coverImageUrl ? <img src={settings.branch.coverImageUrl} className="w-full h-full object-cover" alt="Portada" /> : <span className="text-gray-400 text-xs italic">Sin imagen</span>}
-                    </div>
-                </div>
-            </div>
         </div>
     );
 };
@@ -218,9 +205,9 @@ const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; initialPag
         if (settings) {
             try {
                 await saveAppSettings(settings);
-                alert("Ajustes guardados.");
+                alert("Ajustes generales guardados.");
             } catch (e) {
-                alert("Error al guardar.");
+                alert("Error al guardar ajustes.");
             }
         }
     };
@@ -237,14 +224,14 @@ const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; initialPag
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end">
             <div className="bg-white dark:bg-gray-900 h-full w-full max-w-5xl flex flex-col shadow-2xl animate-slide-in-right">
                 <header className="p-6 border-b dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800">
-                    <h2 className="text-xl font-bold">Configuración</h2>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"><IconX/></button>
+                    <h2 className="text-xl font-bold">Configuración del Sistema</h2>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"><IconX/></button>
                 </header>
                 <div className="flex-1 flex overflow-hidden">
                     <aside className="w-64 border-r dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-800/50">
                         <nav className="space-y-1">
                             {navItems.map(item => (
-                                <button key={item.id} onClick={() => setActivePage(item.id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold transition-all ${activePage === item.id ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20' : 'text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'}`}>
+                                <button key={item.id} onClick={() => setActivePage(item.id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold transition-all ${activePage === item.id ? 'bg-emerald-600 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'}`}>
                                     {item.icon} {item.name}
                                 </button>
                             ))}
@@ -268,18 +255,18 @@ const AdminView: React.FC = () => {
 
     useEffect(() => {
         getAppSettings().then(setSettings);
-        const channel = subscribeToMenuUpdates(() => {
+        subscribeToMenuUpdates(() => {
             getAppSettings().then(setSettings);
         });
         return () => { unsubscribeFromChannel(); };
     }, []);
 
     return (
-        <div className="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-200 overflow-hidden transition-colors duration-200">
+        <div className="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-200 overflow-hidden">
             <Sidebar 
                 currentPage={currentPage} 
                 setCurrentPage={setCurrentPage} 
-                whatsappNumber={settings?.branch.whatsappNumber || "Cargando..."} 
+                whatsappNumber={settings?.branch.whatsappNumber || "..."} 
             />
             <div className="flex-1 flex flex-col min-w-0">
                 <header className="h-20 bg-white dark:bg-gray-800 border-b dark:border-gray-700 flex items-center justify-between px-8 shrink-0">
@@ -293,9 +280,9 @@ const AdminView: React.FC = () => {
                         </button>
                     </div>
                 </header>
-                <main className="flex-1 overflow-auto p-8 scroll-smooth">
+                <main className="flex-1 overflow-auto p-8">
                     <div className="max-w-7xl mx-auto">
-                        <div className="text-center py-20 opacity-30 italic">Bienvenido al Panel de Administración. Selecciona una opción en el menú lateral.</div>
+                        <div className="text-center py-20 opacity-30 italic">Bienvenido al Panel de Administración.</div>
                     </div>
                 </main>
             </div>
