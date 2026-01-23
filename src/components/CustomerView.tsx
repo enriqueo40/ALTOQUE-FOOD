@@ -1,12 +1,12 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption } from '../types';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
 import { IconPlus, IconMinus, IconClock, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconCheck, IconUpload, IconReceipt } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel, updateOrder } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
-// --- Subcomponentes del Cliente ---
+// --- Subcomponentes ---
 
 const Header: React.FC<{ title: string; onBack?: () => void }> = ({ title, onBack }) => (
     <header className="p-4 flex justify-between items-center sticky top-0 bg-gray-900/90 backdrop-blur-md z-20 border-b border-gray-800">
@@ -86,7 +86,7 @@ const ProductDetailModal: React.FC<{ product: Product, onClose: () => void, onAd
     );
 };
 
-const CartSummaryView: React.FC<{ items: CartItem[], total: number, onCheckout: () => void, isDineIn: boolean }> = ({ items, total, onCheckout, isDineIn }) => (
+const CartSummaryView: React.FC<{ items: CartItem[], total: number, onCheckout: () => void, isDineIn: boolean, isSessionActive: boolean }> = ({ items, total, onCheckout, isDineIn, isSessionActive }) => (
     <div className="p-4 space-y-4 pb-40">
         <div className="flex items-center justify-between mb-2">
             <h2 className="text-xl font-bold">Resumen de Comanda</h2>
@@ -105,39 +105,65 @@ const CartSummaryView: React.FC<{ items: CartItem[], total: number, onCheckout: 
             </div>
         ))}
         <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-gray-900 border-t border-gray-800 shadow-2xl">
-             <div className="flex justify-between font-bold text-xl mb-4"><span>Total actual</span><span>${total.toFixed(2)}</span></div>
-             <button onClick={onCheckout} className="w-full bg-emerald-500 py-4 rounded-xl font-bold text-white shadow-lg shadow-emerald-500/10">
-                {isDineIn ? 'ENVIAR PEDIDO A MESA' : 'CONTINUAR AL CHECKOUT'}
+             <div className="flex justify-between font-bold text-xl mb-4"><span>Total de esta orden</span><span>${total.toFixed(2)}</span></div>
+             <button onClick={onCheckout} className="w-full bg-emerald-500 py-4 rounded-xl font-bold text-white shadow-lg shadow-emerald-500/10 active:scale-[0.98]">
+                {isDineIn ? 'ENVIAR PEDIDO A COCINA' : 'CONTINUAR AL CHECKOUT'}
              </button>
         </div>
     </div>
 );
 
-const MenuList: React.FC<{ products: Product[], categories: Category[], onProductClick: (p: Product) => void }> = ({ products, categories, onProductClick }) => (
-    <div className="p-4 space-y-8">
-        {categories.map(cat => {
-            const catProds = products.filter(p => p.categoryId === cat.id && p.available);
-            if (catProds.length === 0) return null;
-            return (
-                <div key={cat.id}>
-                    <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full"></span> {cat.name}</h3>
-                    <div className="grid gap-3">
-                        {catProds.map(p => (
-                            <div key={p.id} onClick={() => onProductClick(p)} className="bg-gray-800/50 p-3 rounded-2xl border border-gray-800 flex gap-4 hover:bg-gray-800 transition-colors cursor-pointer active:scale-[0.98]">
-                                <img src={p.imageUrl} className="w-20 h-20 rounded-xl object-cover" />
-                                <div className="flex-1 flex flex-col justify-between py-1">
-                                    <h4 className="font-bold leading-tight">{p.name}</h4>
-                                    <p className="text-xs text-gray-500 line-clamp-1">{p.description}</p>
-                                    <span className="font-bold text-emerald-400">${p.price.toFixed(2)}</span>
+const MenuList: React.FC<{ products: Product[], categories: Category[], onProductClick: (p: Product) => void }> = ({ products, categories, onProductClick }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    
+    const filteredProducts = products.filter(p => 
+        p.available && p.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    return (
+        <div className="p-4 space-y-6">
+            <div className="relative mb-6">
+                <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                <input 
+                    type="text" 
+                    placeholder="Buscar en el menú..." 
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="w-full bg-gray-800/50 border border-gray-700 rounded-2xl py-3 pl-10 pr-4 focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
+                />
+            </div>
+
+            {categories.map(cat => {
+                const catProds = filteredProducts.filter(p => p.categoryId === cat.id);
+                if (catProds.length === 0) return null;
+                return (
+                    <div key={cat.id}>
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                            <span className="bg-emerald-500 w-1.5 h-6 rounded-full"></span> {cat.name}
+                        </h3>
+                        <div className="grid gap-3">
+                            {catProds.map(p => (
+                                <div key={p.id} onClick={() => onProductClick(p)} className="bg-gray-800/40 p-3 rounded-2xl border border-gray-800/60 flex gap-4 hover:bg-gray-800 transition-colors cursor-pointer active:scale-[0.99]">
+                                    <img src={p.imageUrl} className="w-20 h-20 rounded-xl object-cover" />
+                                    <div className="flex-1 flex flex-col justify-between py-1">
+                                        <div>
+                                            <h4 className="font-bold leading-tight text-gray-100">{p.name}</h4>
+                                            <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{p.description}</p>
+                                        </div>
+                                        <span className="font-bold text-emerald-400">${p.price.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <div className="bg-gray-700/50 p-2 rounded-lg text-emerald-400"><IconPlus className="h-4 w-4"/></div>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
-                </div>
-            );
-        })}
-    </div>
-);
+                );
+            })}
+        </div>
+    );
+};
 
 const CheckoutView: React.FC<{ 
     total: number, 
@@ -179,11 +205,13 @@ const CheckoutView: React.FC<{
         }
     };
 
+    const isOrderOnly = isDineIn && !isFinalPayment;
+
     return (
         <form onSubmit={e => { e.preventDefault(); onOrder({ name, phone, address: { calle, numero, colonia, googleMapsLink: mapsLink } }, 'Efectivo', paymentProof); }} className="p-4 space-y-6 pb-44 animate-fade-in">
              <div className="space-y-4 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl">
                 <h3 className="font-bold text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full"></span> TUS DATOS</h3>
-                <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-gray-800 border-gray-700 rounded-xl p-3 outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Nombre completo" required />
+                <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-gray-800 border-gray-700 rounded-xl p-3 outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Tu nombre" required />
                 {!isDineIn && <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full bg-gray-800 border-gray-700 rounded-xl p-3 outline-none focus:ring-1 focus:ring-emerald-500" placeholder="WhatsApp (Ej: 58414...)" required />}
             </div>
 
@@ -201,12 +229,12 @@ const CheckoutView: React.FC<{
                 </div>
             )}
 
-            {isFinalPayment && (
+            {(isFinalPayment || (!isDineIn)) && (
                 <div className="space-y-4 p-5 bg-gray-800/30 border border-gray-800 rounded-2xl animate-fade-in">
-                    <h3 className="font-bold text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full"></span> PAGO FINAL</h3>
-                    <div className="p-4 bg-emerald-900/20 border border-emerald-500/30 rounded-xl">
-                        <p className="text-xs text-emerald-400 font-bold uppercase mb-2">Instrucciones de Pago</p>
-                        <p className="text-sm text-gray-300">Por favor, realiza tu pago mediante el método seleccionado y sube el comprobante aquí.</p>
+                    <h3 className="font-bold text-white flex items-center gap-2"><span className="bg-emerald-500 w-1 h-5 rounded-full"></span> PAGO {isFinalPayment && 'FINAL'}</h3>
+                    <div className="p-4 bg-emerald-900/10 border border-emerald-500/20 rounded-xl">
+                        <p className="text-[10px] text-emerald-400 font-bold uppercase mb-2">Instrucciones</p>
+                        <p className="text-xs text-gray-300">Si pagaste por transferencia o pago móvil, sube tu comprobante aquí para que validemos tu cuenta.</p>
                     </div>
                     <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-700 rounded-2xl cursor-pointer hover:bg-gray-800/50 transition-colors">
                         {paymentProof ? (
@@ -214,7 +242,7 @@ const CheckoutView: React.FC<{
                         ) : (
                             <div className="flex flex-col items-center text-gray-500">
                                 <IconUpload className="h-8 w-8 mb-2" />
-                                <span className="text-xs font-bold uppercase tracking-widest">Subir comprobante</span>
+                                <span className="text-[10px] font-bold uppercase tracking-widest">Cargar comprobante</span>
                             </div>
                         )}
                         <input type="file" className="hidden" accept="image/*" onChange={handleProofUpload} />
@@ -223,12 +251,12 @@ const CheckoutView: React.FC<{
             )}
 
             <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-gray-900 border-t border-gray-800 shadow-2xl">
-                 <div className="flex justify-between font-bold text-xl mb-4"><span>Total</span><span>${total.toFixed(2)}</span></div>
-                 <button type="submit" className={`w-full py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] ${isDineIn && !isFinalPayment ? 'bg-emerald-600' : 'bg-green-600'}`}>
-                    {isDineIn && !isFinalPayment ? (
-                        <>ENVIAR PEDIDO A MESA</>
+                 <div className="flex justify-between font-bold text-xl mb-4"><span>{isFinalPayment ? 'Total a Pagar' : 'Total'}</span><span>${total.toFixed(2)}</span></div>
+                 <button type="submit" className={`w-full py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] ${isOrderOnly ? 'bg-emerald-600' : 'bg-green-600'}`}>
+                    {isOrderOnly ? (
+                        <>ENVIAR PEDIDO A COCINA</>
                     ) : (
-                        <><IconWhatsapp className="h-6 w-6" /> NOTIFICAR PAGO POR WHATSAPP</>
+                        <><IconWhatsapp className="h-6 w-6" /> {isFinalPayment ? 'NOTIFICAR PAGO POR WHATSAPP' : 'ENVIAR PEDIDO Y PAGO'}</>
                     )}
                 </button>
             </div>
@@ -236,7 +264,7 @@ const CheckoutView: React.FC<{
     );
 };
 
-// --- Customer View Principal ---
+// --- Componente Principal ---
 
 export default function CustomerView() {
     const [view, setView] = useState<'menu' | 'cart' | 'checkout' | 'confirmation'>('menu');
@@ -244,7 +272,10 @@ export default function CustomerView() {
     const [settings, setSettings] = useState<AppSettings | null>(null);
     const [orderType, setOrderType] = useState<OrderType>(OrderType.Delivery);
     const [tableInfo, setTableInfo] = useState<{ table: string; zone: string } | null>(null);
+    
+    // Sesión de mesa
     const [activeOrderId, setActiveOrderId] = useState<string | null>(localStorage.getItem('activeOrderId'));
+    const [sessionTotal, setSessionTotal] = useState<number>(Number(localStorage.getItem('sessionTotal')) || 0);
     const [isFinalPayment, setIsFinalPayment] = useState(false);
 
     const { cartItems, addToCart, cartTotal, clearCart } = useCart();
@@ -275,14 +306,19 @@ export default function CustomerView() {
         
         try {
             if (isFinalPayment && activeOrderId) {
-                // Modo Pago Final: Actualizar el pedido existente con el comprobante
+                // Modo Pago Final
                 await updateOrder(activeOrderId, { paymentProof: proof || undefined, paymentStatus: 'paid' });
-                const msg = `💰 *PAGO FINALIZADO - MESA ${tableInfo?.table}*\n👤 Cliente: ${customer.name}\n📍 Mesa: ${tableInfo?.table} - ${tableInfo?.zone}\n💰 *Total: $${cartTotal.toFixed(2)}*\n📸 Comprobante adjunto.`;
+                const msg = `💰 *PAGO FINALIZADO - MESA ${tableInfo?.table}*\n👤 Cliente: ${customer.name}\n📍 Mesa: ${tableInfo?.table} (${tableInfo?.zone})\n💰 *Total: $${sessionTotal.toFixed(2)}*\n📸 Comprobante adjunto.`;
                 window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+                
+                // Limpiar sesión
                 localStorage.removeItem('activeOrderId');
+                localStorage.removeItem('sessionTotal');
                 setActiveOrderId(null);
+                setSessionTotal(0);
+                clearCart();
             } else {
-                // Modo Comanda: Crear nuevo pedido
+                // Modo Comanda (Normal o Mesa)
                 const newOrder: Omit<Order, 'id' | 'createdAt'> = {
                     customer,
                     items: cartItems,
@@ -293,19 +329,23 @@ export default function CustomerView() {
                     paymentProof: proof || undefined
                 };
                 
-                // Guardar en DB y obtener respuesta para el ID
-                // (Nota: SupabaseService saveOrder debería retornar el objeto insertado para obtener el ID real en producción)
-                await saveOrder(newOrder); 
+                const saved = await saveOrder(newOrder); 
                 
                 if (orderType === OrderType.DineIn) {
-                    const tempId = `ORDER-${Date.now()}`; // Mock ID para la sesión local
-                    localStorage.setItem('activeOrderId', tempId);
-                    setActiveOrderId(tempId);
+                    // Actualizar sesión acumulada
+                    const newSessionTotal = sessionTotal + cartTotal;
+                    localStorage.setItem('activeOrderId', saved.id);
+                    localStorage.setItem('sessionTotal', newSessionTotal.toString());
+                    setActiveOrderId(saved.id);
+                    setSessionTotal(newSessionTotal);
                 }
 
-                const title = orderType === OrderType.DineIn ? 'COMANDA' : 'NUEVO PEDIDO';
-                const msg = `🧾 *${title} - ${settings.company.name}*\n👤 Cliente: ${customer.name}\n📍 Entrega: ${orderType === OrderType.DineIn ? 'MESA ' + tableInfo?.table : customer.address.calle}\n----------------\n${cartItems.map(i => `• ${i.quantity}x ${i.name}`).join('\n')}\n----------------\n💰 *Total: $${cartTotal.toFixed(2)}*`;
+                const title = orderType === OrderType.DineIn ? 'COMANDA A COCINA' : 'NUEVO PEDIDO';
+                const itemsStr = cartItems.map(i => `• ${i.quantity}x ${i.name}`).join('\n');
+                const msg = `🧾 *${title} - ${settings.company.name}*\n👤 Cliente: ${customer.name}\n📍 Entrega: ${orderType === OrderType.DineIn ? 'MESA ' + tableInfo?.table : customer.address.calle}\n----------------\n${itemsStr}\n----------------\n💰 *Total orden: $${cartTotal.toFixed(2)}*`;
+                
                 window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+                clearCart();
             }
             setView('confirmation');
         } catch(e) { alert("Error al procesar el pedido."); }
@@ -316,14 +356,16 @@ export default function CustomerView() {
         setView('checkout');
     };
 
-    if (!settings) return <div className="h-screen bg-gray-900 flex items-center justify-center animate-pulse text-emerald-500">Cargando menú...</div>;
+    if (!settings) return <div className="h-screen bg-gray-900 flex items-center justify-center animate-pulse text-emerald-500">Cargando...</div>;
+
+    const currentTotalForCheckout = isFinalPayment ? sessionTotal : cartTotal;
 
     return (
-        <div className="bg-gray-900 min-h-screen text-gray-100 font-sans">
+        <div className="bg-gray-900 min-h-screen text-gray-100 font-sans selection:bg-emerald-500">
             <div className="container mx-auto max-w-md bg-gray-900 min-h-screen relative shadow-2xl border-x border-gray-800">
                 {view !== 'menu' && (
                     <Header 
-                        title={view === 'cart' ? 'COMANDA' : (isFinalPayment ? 'PAGAR CUENTA' : 'CONFIRMAR')} 
+                        title={view === 'cart' ? 'MI COMANDA' : (isFinalPayment ? 'PAGAR CUENTA' : 'CONFIRMAR')} 
                         onBack={() => { setView(view === 'checkout' ? 'cart' : 'menu'); setIsFinalPayment(false); }} 
                     />
                 )}
@@ -335,36 +377,36 @@ export default function CustomerView() {
                     </>
                 )}
                 
-                {view === 'cart' && <CartSummaryView items={cartItems} total={cartTotal} onCheckout={() => setView('checkout')} isDineIn={orderType === OrderType.DineIn} />}
+                {view === 'cart' && <CartSummaryView items={cartItems} total={cartTotal} onCheckout={() => setView('checkout')} isDineIn={orderType === OrderType.DineIn} isSessionActive={!!activeOrderId} />}
                 
-                {view === 'checkout' && <CheckoutView total={cartTotal} onOrder={handleOrder} settings={settings} orderType={orderType} isFinalPayment={isFinalPayment} />}
+                {view === 'checkout' && <CheckoutView total={currentTotalForCheckout} onOrder={handleOrder} settings={settings} orderType={orderType} isFinalPayment={isFinalPayment} />}
                 
                 {view === 'confirmation' && (
                     <div className="p-8 text-center h-[80vh] flex flex-col items-center justify-center gap-6 animate-fade-in">
                         <div className="p-5 bg-emerald-500/20 rounded-full text-emerald-500"><IconCheck className="w-16 h-16"/></div>
-                        <h2 className="text-3xl font-bold">{isFinalPayment ? '¡PAGO REPORTADO!' : '¡COMANDA ENVIADA!'}</h2>
-                        <p className="text-gray-400">
-                            {isFinalPayment ? 'Tu comprobante está en revisión. ¡Vuelve pronto!' : 'Estamos preparando tu pedido. Puedes seguir viendo el menú.'}
+                        <h2 className="text-3xl font-bold">{isFinalPayment ? '¡PAGO REPORTADO!' : '¡COMANDA EN COCINA!'}</h2>
+                        <p className="text-gray-400 text-sm leading-relaxed">
+                            {isFinalPayment ? 'Tu pago está siendo verificado. ¡Esperamos verte pronto de nuevo!' : 'Estamos preparando tu pedido. Puedes seguir agregando más cosas al menú si lo deseas.'}
                         </p>
-                        <button onClick={() => { if(!activeOrderId) clearCart(); setIsFinalPayment(false); setView('menu'); }} className="w-full bg-gray-800 py-4 rounded-xl font-bold">VOLVER AL MENÚ</button>
+                        <button onClick={() => { setIsFinalPayment(false); setView('menu'); }} className="w-full bg-gray-800 py-4 rounded-2xl font-bold text-gray-200 border border-gray-700 hover:bg-gray-700 transition-colors">VOLVER AL MENÚ</button>
                     </div>
                 )}
 
                 {selectedProduct && <ProductDetailModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onAddToCart={(p, q) => { addToCart(p, q); setSelectedProduct(null); }} />}
                 
-                {/* Footer Barra Flotante Dinámica */}
+                {/* Barra inferior flotante */}
                 {view === 'menu' && (
-                    <div className="fixed bottom-4 left-4 right-4 max-w-md mx-auto z-30 flex flex-col gap-2">
+                    <div className="fixed bottom-6 left-6 right-6 max-w-md mx-auto z-30 flex flex-col gap-3">
                         {activeOrderId && (
-                            <button onClick={handleRequestBill} className="w-full bg-gray-800/90 backdrop-blur text-white font-bold py-3 px-6 rounded-2xl flex justify-between items-center border border-emerald-500/30 shadow-xl">
-                                <span className="flex items-center gap-2"><IconReceipt className="h-5 w-5 text-emerald-400"/> MI CUENTA ACTUAL</span>
-                                <span className="bg-emerald-600 px-3 py-1 rounded-lg text-sm">${cartTotal.toFixed(2)}</span>
+                            <button onClick={handleRequestBill} className="w-full bg-gray-800/90 backdrop-blur-md text-white font-bold py-3.5 px-6 rounded-2xl flex justify-between items-center border border-emerald-500/30 shadow-2xl hover:bg-gray-700 transition-all">
+                                <span className="flex items-center gap-2 text-sm uppercase tracking-wider"><IconReceipt className="h-5 w-5 text-emerald-400"/> MI CUENTA</span>
+                                <span className="bg-emerald-600/40 text-emerald-200 px-3 py-1 rounded-lg text-xs font-mono">${sessionTotal.toFixed(2)}</span>
                             </button>
                         )}
-                        {cartItems.length > 0 && !activeOrderId && (
-                            <button onClick={() => setView('cart')} className="w-full bg-emerald-500 text-white font-bold py-4 px-6 rounded-2xl flex justify-between shadow-2xl active:scale-95 transition-transform">
-                                <span>VER COMANDA ({cartItems.length})</span>
-                                <span>${cartTotal.toFixed(2)}</span>
+                        {cartItems.length > 0 && (
+                            <button onClick={() => setView('cart')} className="w-full bg-emerald-500 text-white font-black py-4 px-6 rounded-2xl flex justify-between shadow-2xl active:scale-95 transition-transform">
+                                <span className="tracking-widest uppercase">ENVIAR A COCINA ({cartItems.length})</span>
+                                <span className="font-mono">${cartTotal.toFixed(2)}</span>
                             </button>
                         )}
                     </div>
