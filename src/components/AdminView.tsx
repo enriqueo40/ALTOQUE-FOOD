@@ -9,35 +9,20 @@ import { generateProductDescription, getAdvancedInsights } from '../services/gem
 import { getProducts, getCategories, saveProduct, deleteProduct, saveCategory, deleteCategory, getPersonalizations, savePersonalization, deletePersonalization, getPromotions, savePromotion, deletePromotion, updateProductAvailability, updatePersonalizationOptionAvailability, getZones, saveZone, deleteZone, saveZoneLayout, getAppSettings, saveAppSettings, subscribeToNewOrders, unsubscribeFromChannel, updateOrder, getActiveOrders, saveOrder } from '../services/supabaseService';
 import { IconComponent, IconHome, IconMenu, IconAvailability, IconShare, IconTutorials, IconOrders, IconAnalytics, IconSearch, IconEdit, IconPlus, IconTrash, IconSparkles, IconSend, IconMoreVertical, IconExternalLink, IconCalendar, IconChevronDown, IconX, IconReceipt, IconSettings, IconStore, IconDelivery, IconPayment, IconClock, IconTableLayout, IconPrinter, IconChevronUp, IconPencil, IconDuplicate, IconGripVertical, IconPercent, IconInfo, IconLogoutAlt, IconSun, IconMoon, IconArrowLeft, IconWhatsapp, IconQR, IconLocationMarker, IconUpload, IconCheck, IconBluetooth, IconUSB, IconToggleOff } from '../constants';
 
-const IconEye: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.432 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" className={className} />;
-
+// Fix: Added missing AdminViewPage type definition
 type AdminViewPage = 'dashboard' | 'products' | 'orders' | 'analytics' | 'messages' | 'availability' | 'share' | 'tutorials';
-type SettingsPage = 'general' | 'store-data' | 'shipping-costs' | 'payment-methods' | 'hours' | 'zones-tables' | 'printing';
 
-const PAGE_TITLES: { [key in AdminViewPage]: string } = { dashboard: 'Inicio', products: 'Menú', orders: 'Pedidos', analytics: 'Analítica', messages: 'Mensajes', availability: 'Disponibilidad', share: 'Compartir', tutorials: 'Tutoriales' };
-
-const Sidebar: React.FC<{ currentPage: AdminViewPage; setCurrentPage: (page: AdminViewPage) => void }> = ({ currentPage, setCurrentPage }) => (
-    <aside className="w-64 bg-white dark:bg-gray-800 shadow-md flex flex-col">
-        <div className="h-20 flex items-center justify-center border-b dark:border-gray-700 font-bold dark:text-white">ALTOQUE FOOD</div>
-        <nav className="flex-1 px-4 py-6 space-y-2">
-            {[ {id:'dashboard', name:'Inicio', icon:<IconHome/>}, {id:'orders', name:'Pedidos', icon:<IconOrders/>}, {id:'products', name:'Menú', icon:<IconMenu/>}, {id:'availability', name:'Disponibilidad', icon:<IconAvailability/>}, {id:'share', name:'Compartir', icon:<IconShare/>}, {id:'tutorials', name:'Tutoriales', icon:<IconTutorials/>}].map(item => (
-                <button key={item.id} onClick={() => setCurrentPage(item.id as AdminViewPage)} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg ${currentPage === item.id ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/50' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
-                    {item.icon} <span className="font-semibold">{item.name}</span>
-                </button>
-            ))}
-        </nav>
-    </aside>
-);
-
-const Header: React.FC<{ title: string; onSettingsClick: () => void; theme: 'light' | 'dark'; toggleTheme: () => void; }> = ({ title, onSettingsClick, theme, toggleTheme }) => (
-    <header className="h-20 bg-white dark:bg-gray-800 border-b dark:border-gray-700 flex items-center justify-between px-8">
-        <h2 className="text-2xl font-bold dark:text-white">{title}</h2>
-        <div className="flex items-center space-x-6">
-            <button onClick={onSettingsClick} className="flex items-center gap-2 font-medium dark:text-gray-300"><IconSettings className="h-5 w-5"/> Configuración</button>
-             <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-300">{theme === 'light' ? <IconMoon /> : <IconSun />}</button>
-        </div>
-    </header>
-);
+// Fix: Added missing PAGE_TITLES constant definition
+const PAGE_TITLES: { [key in AdminViewPage]: string } = {
+    dashboard: 'Inicio',
+    products: 'Menú',
+    orders: 'Pedidos',
+    analytics: 'Analítica',
+    messages: 'Mensajes',
+    availability: 'Disponibilidad',
+    share: 'Compartir',
+    tutorials: 'Tutoriales'
+};
 
 const OrderStatusBadge: React.FC<{status: OrderStatus}> = ({status}) => {
     const colors = { [OrderStatus.Pending]: 'bg-yellow-100 text-yellow-800', [OrderStatus.Confirmed]: 'bg-blue-100 text-blue-800', [OrderStatus.Preparing]: 'bg-indigo-100 text-indigo-800', [OrderStatus.Ready]: 'bg-purple-100 text-purple-800', [OrderStatus.Delivering]: 'bg-cyan-100 text-cyan-800', [OrderStatus.Completed]: 'bg-green-100 text-green-800', [OrderStatus.Cancelled]: 'bg-red-100 text-red-800' };
@@ -68,27 +53,23 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                             <p className="text-sm font-mono dark:text-gray-400">{order.customer.phone}</p>
                         </div>
                         <div className="space-y-2">
-                            <p className="text-xs font-bold text-gray-500 uppercase">Datos de Entrega</p>
+                            <p className="text-xs font-bold text-gray-500 uppercase">Entrega</p>
                             <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border dark:border-gray-700">
                                 <p className="text-sm font-medium dark:text-white">{order.customer.address.calle} #{order.customer.address.numero}</p>
                                 <p className="text-xs text-gray-500">{order.customer.address.colonia}</p>
                                 {order.customer.address.referencias && <p className="text-xs italic text-gray-400 mt-1">"{order.customer.address.referencias}"</p>}
                                 
-                                {/* GPS BUTTON IN ADMIN PANEL - HIGH VISIBILITY */}
-                                {order.customer.address.googleMapsLink ? (
+                                {/* BOTÓN DE GPS EN ADMIN - DISEÑO PRIORITARIO PARA REPARTIDOR */}
+                                {order.customer.address.googleMapsLink && (
                                     <a 
                                         href={order.customer.address.googleMapsLink} 
                                         target="_blank" 
                                         rel="noopener noreferrer"
-                                        className="mt-4 flex items-center justify-center gap-2 w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all font-bold shadow-lg shadow-blue-900/30"
+                                        className="mt-4 flex items-center justify-center gap-2 w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all font-bold shadow-lg shadow-blue-900/30 text-sm"
                                     >
                                         <IconLocationMarker className="h-5 w-5"/>
-                                        VER UBICACIÓN GPS EXACTA
+                                        ABRIR GPS (UBICACIÓN EXACTA)
                                     </a>
-                                ) : (
-                                    <div className="mt-4 p-2 bg-gray-100 dark:bg-gray-800 rounded border border-dashed dark:border-gray-700 text-center">
-                                        <p className="text-[10px] text-gray-500 font-medium">Ubicación GPS no disponible</p>
-                                    </div>
                                 )}
                             </div>
                         </div>
@@ -102,7 +83,7 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                                         <span className="font-bold text-emerald-600">{item.quantity}x</span>
                                         <div>
                                             <p className="font-medium text-sm dark:text-gray-200">{item.name}</p>
-                                            {item.comments && <p className="text-xs text-gray-400 italic">"{item.comments}"</p>}
+                                            {item.comments && <p className="text-xs text-orange-400 italic">"{item.comments}"</p>}
                                         </div>
                                     </div>
                                     <span className="font-bold text-sm dark:text-gray-300">${(item.price * item.quantity).toFixed(2)}</span>
@@ -135,13 +116,13 @@ const OrderManagement: React.FC = () => {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {orders.map(o => (
-                <div key={o.id} onClick={() => setSelOrder(o)} className="bg-white dark:bg-gray-800 p-4 rounded-xl border dark:border-gray-700 cursor-pointer shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 group">
-                    <div className="flex justify-between mb-2"><span className="font-bold text-xs text-gray-400 group-hover:text-emerald-500">#{o.id.slice(0,6)}</span><OrderStatusBadge status={o.status}/></div>
+                <div key={o.id} onClick={() => setSelOrder(o)} className="bg-white dark:bg-gray-800 p-4 rounded-xl border dark:border-gray-700 cursor-pointer shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 group relative">
+                    <div className="flex justify-between mb-2"><span className="font-bold text-xs text-gray-400">#{o.id.slice(0,6)}</span><OrderStatusBadge status={o.status}/></div>
                     <p className="font-bold text-lg text-gray-800 dark:text-gray-100">{o.customer.name}</p>
                     <div className="flex justify-between items-end mt-3">
                         <div>
                              <p className="text-sm text-gray-500">{o.items.length} item(s)</p>
-                             {o.customer.address.googleMapsLink && <span className="text-[10px] text-blue-500 font-bold flex items-center gap-1 mt-1"><IconLocationMarker className="h-3 w-3"/> GPS DISPONIBLE</span>}
+                             {o.customer.address.googleMapsLink && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold">📍 GPS</span>}
                         </div>
                         <p className="text-xl font-bold text-emerald-600">${o.total.toFixed(2)}</p>
                     </div>
@@ -157,9 +138,24 @@ const AdminView: React.FC = () => {
     const [theme, toggleTheme] = useTheme();
     return (
         <div className="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-200 transition-colors duration-200">
-            <Sidebar currentPage={page} setCurrentPage={setPage} />
+            <aside className="w-64 bg-white dark:bg-gray-800 shadow-md flex flex-col">
+                <div className="h-20 flex items-center justify-center border-b dark:border-gray-700 font-bold dark:text-white">ALTOQUE FOOD</div>
+                <nav className="flex-1 px-4 py-6 space-y-2">
+                    {[ {id:'dashboard', name:'Inicio', icon:<IconHome/>}, {id:'orders', name:'Pedidos', icon:<IconOrders/>}, {id:'products', name:'Menú', icon:<IconMenu/>}, {id:'availability', name:'Disponibilidad', icon:<IconAvailability/>}, {id:'share', name:'Compartir', icon:<IconShare/>}, {id:'tutorials', name:'Tutoriales', icon:<IconTutorials/>}].map(item => (
+                        <button key={item.id} onClick={() => setPage(item.id as AdminViewPage)} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg ${page === item.id ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/50' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
+                            {item.icon} <span className="font-semibold">{item.name}</span>
+                        </button>
+                    ))}
+                </nav>
+            </aside>
             <div className="flex-1 flex flex-col overflow-hidden">
-                <Header title={PAGE_TITLES[page]} onSettingsClick={() => {}} theme={theme} toggleTheme={toggleTheme} />
+                <header className="h-20 bg-white dark:bg-gray-800 border-b dark:border-gray-700 flex items-center justify-between px-8">
+                    <h2 className="text-2xl font-bold dark:text-white">{PAGE_TITLES[page]}</h2>
+                    <div className="flex items-center space-x-6">
+                        <button className="flex items-center gap-2 font-medium dark:text-gray-300"><IconSettings className="h-5 w-5"/> Configuración</button>
+                        <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-300">{theme === 'light' ? <IconMoon /> : <IconSun />}</button>
+                    </div>
+                </header>
                 <main className="flex-1 overflow-auto p-8">
                     {page === 'orders' && <OrderManagement />}
                     {page !== 'orders' && <div className="text-center p-10 opacity-50 dark:text-gray-400">Sección en construcción...</div>}
