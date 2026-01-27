@@ -95,11 +95,11 @@ const PairingAI: React.FC<{ items: CartItem[], allProducts: Product[] }> = ({ it
                 <IconSparkles className="h-5 w-5" />
             </div>
             <div className="flex-1">
-                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">RECOMENDACIÓN DEL CHEF</p>
+                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">RECOMENDACIÓN DEL CHEF (IA)</p>
                 {loading ? (
                     <div className="h-4 w-32 bg-gray-800 rounded animate-pulse"></div>
                 ) : (
-                    <p className="text-sm text-gray-200 italic leading-snug font-medium">"{suggestion}"</p>
+                    <p className="text-sm text-gray-200 italic leading-snug">"{suggestion}"</p>
                 )}
             </div>
         </div>
@@ -115,7 +115,7 @@ export default function CustomerView() {
     const [orderType, setOrderType] = useState<OrderType>(OrderType.Delivery);
     const [tableInfo, setTableInfo] = useState<{ table: string; zone: string } | null>(null);
     
-    // Gestión de Sesión de Mesa Persistente
+    // Gestión de Sesión de Mesa Persistente via LocalStorage
     const [activeOrderId, setActiveOrderId] = useState<string | null>(() => localStorage.getItem('activeOrderId'));
     const [sessionTotal, setSessionTotal] = useState<number>(() => Number(localStorage.getItem('sessionTotal')) || 0);
     const [isFinalPayment, setIsFinalPayment] = useState(false);
@@ -148,14 +148,14 @@ export default function CustomerView() {
         return () => unsubscribeFromChannel();
     }, []);
 
-    const handleOrder = async (customer: Customer, payment: PaymentMethod, proof?: string | null) => {
+    const handleOrderAction = async (customer: Customer, payment: PaymentMethod, proof?: string | null) => {
         if (!settings) return;
         
         try {
             if (isFinalPayment && activeOrderId) {
-                // FLUJO CIERRE DE CUENTA: El cliente paga el acumulado total
+                // FLUJO PAGO FINAL: Reportar cierre de cuenta acumulada
                 await updateOrder(activeOrderId, { paymentStatus: 'paid', paymentProof: proof || undefined });
-                const msg = `💰 *SOLICITUD DE CIERRE - MESA ${tableInfo?.table}*\n📍 Zona: ${tableInfo?.zone}\n👤 Cliente: ${customer.name}\n💰 *TOTAL A PAGAR: $${sessionTotal.toFixed(2)}*\n✅ Comprobante cargado en sistema.\n\n_Favor validar pago para liberar mesa._`;
+                const msg = `💰 *SOLICITUD DE CIERRE - MESA ${tableInfo?.table}*\n📍 Zona: ${tableInfo?.zone}\n👤 Cliente: ${customer.name}\n💰 *TOTAL ACUMULADO: $${sessionTotal.toFixed(2)}*\n✅ Comprobante adjunto.`;
                 window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
                 
                 // Limpiar sesión local al liquidar
@@ -165,7 +165,7 @@ export default function CustomerView() {
                 setSessionTotal(0);
                 clearCart();
             } else {
-                // FLUJO COMANDA (Ronda): Enviar pedido rápido a cocina
+                // FLUJO COMANDA (Ronda): Enviar pedido a cocina sin pagar
                 const newOrderData: Omit<Order, 'id' | 'createdAt'> = {
                     customer,
                     items: cartItems,
@@ -199,7 +199,9 @@ export default function CustomerView() {
         }
     };
 
-    if (isLoadingData || !settings) return <div className="h-screen bg-gray-900 flex items-center justify-center text-emerald-500 font-black animate-pulse tracking-widest">CARGANDO MENÚ...</div>;
+    if (isLoadingData || !settings) return <div className="h-screen bg-gray-900 flex items-center justify-center text-emerald-500 font-black animate-pulse tracking-widest uppercase text-xs">Cargando Menú Online...</div>;
+
+    const isSimpleComanda = orderType === OrderType.DineIn && !isFinalPayment;
 
     return (
         <div className="bg-gray-950 min-h-screen text-gray-100 font-sans selection:bg-emerald-500/20">
@@ -214,13 +216,13 @@ export default function CustomerView() {
                 
                 <div className="flex-1 overflow-y-auto">
                     {view === 'menu' && (
-                        <div className="animate-fade-in pb-44">
+                        <div className="animate-fade-in pb-48">
                             <RestaurantHero settings={settings} orderType={orderType} setOrderType={setOrderType} tableInfo={tableInfo} hasActiveSession={!!activeOrderId} />
                             
                             <div className="p-4 space-y-8">
                                 <div className="relative">
                                     <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 h-5 w-5" />
-                                    <input type="text" placeholder="¿Qué quieres probar hoy?" className="w-full bg-gray-800/50 border border-gray-700 rounded-2xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all placeholder-gray-600 font-bold" />
+                                    <input type="text" placeholder="Buscar productos..." className="w-full bg-gray-800/50 border border-gray-700 rounded-2xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all placeholder-gray-600 font-bold" />
                                 </div>
 
                                 {allCategories.map(cat => {
@@ -258,9 +260,7 @@ export default function CustomerView() {
                     
                     {view === 'cart' && (
                         <div className="p-5 animate-fade-in pb-48">
-                            <h2 className="text-2xl font-black mb-6">REVISAR PEDIDO</h2>
                             <PairingAI items={cartItems} allProducts={allProducts} />
-                            
                             <div className="space-y-4">
                                 {cartItems.map(i => (
                                     <div key={i.cartItemId} className="flex gap-4 bg-gray-800/40 p-4 rounded-3xl border border-gray-800/60">
@@ -299,7 +299,7 @@ export default function CustomerView() {
                         <form onSubmit={e => {
                             e.preventDefault();
                             const fd = new FormData(e.currentTarget);
-                            handleOrder({
+                            handleOrderAction({
                                 name: fd.get('name') as string,
                                 phone: fd.get('phone') as string || '',
                                 address: { colonia: '', calle: '', numero: '' }
@@ -308,13 +308,13 @@ export default function CustomerView() {
                             <div className="space-y-4 p-7 bg-gray-800/30 border border-gray-800 rounded-[2.5rem] shadow-sm">
                                 <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">DATOS CLIENTE</h3>
                                 <input name="name" type="text" className="w-full bg-gray-800 border-gray-700 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold" placeholder="¿A qué nombre la comanda?" required />
-                                {(!isSimpleComanda(orderType, isFinalPayment)) && <input name="phone" type="tel" className="w-full bg-gray-800 border-gray-700 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold" placeholder="WhatsApp para aviso" required />}
+                                {!isSimpleComanda && <input name="phone" type="tel" className="w-full bg-gray-800 border-gray-700 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold" placeholder="WhatsApp para aviso de pago" required />}
                             </div>
 
-                            {!isSimpleComanda(orderType, isFinalPayment) && (
+                            {!isSimpleComanda && (
                                 <div className="space-y-4 p-7 bg-gray-800/30 border border-gray-800 rounded-[2.5rem] shadow-sm">
                                     <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">PAGO DE CUENTA</h3>
-                                    <p className="text-[10px] text-gray-500 leading-relaxed font-bold uppercase tracking-wider">Para liquidar tu {isFinalPayment ? 'cuenta acumulada' : 'pedido'}, adjunta el comprobante.</p>
+                                    <p className="text-[10px] text-gray-500 leading-relaxed font-bold uppercase tracking-wider">Adjunta el comprobante para liquidar tu cuenta acumulada.</p>
                                     <label className="flex flex-col items-center justify-center w-full h-44 border-2 border-dashed border-gray-700 rounded-3xl cursor-pointer hover:bg-gray-800/50 overflow-hidden relative transition-all group">
                                         <div className="flex flex-col items-center text-gray-500 group-hover:text-emerald-400">
                                             <IconUpload className="h-10 w-10 mb-3 opacity-40" />
@@ -343,7 +343,7 @@ export default function CustomerView() {
                                     <span className="text-emerald-500">${(isFinalPayment ? sessionTotal : cartTotal).toFixed(2)}</span>
                                  </div>
                                  <button type="submit" className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex items-center justify-center gap-4 active:scale-95 transition-all text-xs uppercase tracking-[0.2em] shadow-2xl">
-                                    {isSimpleComanda(orderType, isFinalPayment) ? 'ENVIAR COMANDA A COCINA' : <><IconWhatsapp className="h-6 w-6" /> {isFinalPayment ? 'LIQUIDAR CUENTA FINAL' : 'NOTIFICAR PEDIDO'}</>}
+                                    {isSimpleComanda ? 'ENVIAR COMANDA A COCINA' : <><IconWhatsapp className="h-6 w-6" /> {isFinalPayment ? 'LIQUIDAR CUENTA FINAL' : 'REPORTAR PAGO'}</>}
                                 </button>
                             </div>
                         </form>
@@ -388,7 +388,7 @@ export default function CustomerView() {
                     </div>
                 )}
                 
-                {/* BOTONES FLOTANTES DE SESIÓN */}
+                {/* BOTONES FLOTANTES DE SESIÓN ACTIVA */}
                 {view === 'menu' && (
                     <div className="fixed bottom-8 left-6 right-6 max-w-md mx-auto z-40 flex flex-col gap-3">
                         {activeOrderId && (
@@ -415,8 +415,4 @@ export default function CustomerView() {
             </div>
         </div>
     );
-}
-
-function isSimpleComanda(type: OrderType, final: boolean) {
-    return type === OrderType.DineIn && !final;
 }
