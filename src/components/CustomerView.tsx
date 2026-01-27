@@ -1,9 +1,9 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, PersonalizationOption } from '../types';
+import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, PersonalizationOption, Promotion } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconCheck, IconUpload, IconReceipt, IconSparkles } from '../constants';
-import { getProducts, getCategories, getAppSettings, saveOrder, subscribeToMenuUpdates, unsubscribeFromChannel, updateOrder } from '../services/supabaseService';
+import { IconPlus, IconMinus, IconClock, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconCheck, IconDuplicate, IconUpload, IconReceipt, IconSparkles } from '../constants';
+import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel, updateOrder } from '../services/supabaseService';
 import { getPairingSuggestion } from '../services/geminiService';
 import Chatbot from './Chatbot';
 
@@ -101,6 +101,60 @@ const PairingAI: React.FC<{ items: CartItem[], allProducts: Product[] }> = ({ it
                 ) : (
                     <p className="text-sm text-gray-200 italic leading-snug">"{suggestion}"</p>
                 )}
+            </div>
+        </div>
+    );
+};
+
+const ProductDetailModal: React.FC<{
+    product: Product, 
+    onClose: () => void,
+    onAddToCart: (product: Product, quantity: number) => void
+}> = ({ product, onClose, onAddToCart }) => {
+    const [quantity, setQuantity] = useState(1);
+    const [isClosing, setIsClosing] = useState(false);
+
+    const handleClose = () => {
+        setIsClosing(true);
+        setTimeout(onClose, 300);
+    };
+
+    return (
+        <div className={`fixed inset-0 z-50 flex items-end justify-center transition-opacity duration-300 ${isClosing ? 'opacity-0' : 'opacity-100'}`}>
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={handleClose}></div>
+            <div className={`w-full max-w-md bg-gray-900 rounded-t-[2.5rem] shadow-2xl relative transform transition-transform duration-300 ${isClosing ? 'translate-y-full' : 'translate-y-0'}`}>
+                 <button onClick={handleClose} className="absolute top-6 right-6 bg-gray-800/80 p-2 rounded-full text-white z-10 backdrop-blur-md">
+                    <IconX className="h-5 w-5" />
+                </button>
+
+                <div className="h-72 w-full overflow-hidden">
+                     <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover rounded-t-[2.5rem]" />
+                     <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent"></div>
+                </div>
+
+                <div className="p-8 -mt-12 relative z-10">
+                    <h2 className="text-2xl font-black text-white mb-2">{product.name}</h2>
+                    <p className="text-gray-400 text-sm leading-relaxed mb-8">{product.description}</p>
+                    
+                    <div className="flex items-center justify-between bg-gray-800/50 p-4 rounded-2xl border border-gray-800 mb-8">
+                         <span className="text-xs font-black text-gray-500 uppercase tracking-widest">Cantidad</span>
+                         <div className="flex items-center gap-6">
+                            <button type="button" onClick={() => setQuantity(q => Math.max(1, q - 1))} className="p-2 text-gray-400 hover:text-white transition-colors"><IconMinus className="h-5 w-5"/></button>
+                            <span className="font-black text-xl text-white w-6 text-center">{quantity}</span>
+                            <button type="button" onClick={() => setQuantity(q => q + 1)} className="p-2 text-gray-400 hover:text-white transition-colors"><IconPlus className="h-5 w-5"/></button>
+                        </div>
+                    </div>
+
+                    <button 
+                        type="button"
+                        onClick={() => onAddToCart(product, quantity)}
+                        className="w-full bg-emerald-600 py-4.5 rounded-2xl font-black text-white shadow-xl shadow-emerald-500/20 active:scale-95 transition-all flex justify-between px-8 items-center"
+                    >
+                        <span className="uppercase tracking-widest text-sm">AGREGAR</span>
+                        <span className="font-mono text-lg">${(product.price * quantity).toFixed(2)}</span>
+                    </button>
+                </div>
+                <div className="h-8"></div>
             </div>
         </div>
     );
