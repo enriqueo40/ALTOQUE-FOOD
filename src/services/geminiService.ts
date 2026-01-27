@@ -2,59 +2,70 @@
 import { GoogleGenAI } from "@google/genai";
 import { ChatMessage, Order, Product, CartItem } from '../types';
 
+// Inicialización de Gemini
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+/**
+ * Genera una sugerencia de maridaje basada en el carrito actual.
+ */
 export const getPairingSuggestion = async (cartItems: CartItem[], allProducts: Product[]): Promise<string> => {
     if (cartItems.length === 0) return "";
     
     const cartNames = cartItems.map(i => i.name).join(", ");
-    const availableProducts = allProducts.map(p => `${p.name} (${p.price}$)`).join(", ");
+    const availableProducts = allProducts
+        .filter(p => p.available && !cartItems.some(ci => ci.id === p.id))
+        .map(p => `${p.name} ($${p.price})`)
+        .slice(0, 10)
+        .join(", ");
 
-    const prompt = `Actúa como un sommelier y experto gastronómico. 
-    El cliente tiene esto en su carrito: ${cartNames}.
+    const prompt = `Actúa como un sommelier y experto gastronómico chic. 
+    El cliente tiene esto en su pedido: ${cartNames}.
     Basado SOLO en estos productos disponibles en el menú: ${availableProducts}, 
-    sugiere UN solo producto adicional que combine perfectamente. 
-    Respuesta corta (máximo 12 palabras), persuasiva y chic. Ej: "Esa hamburguesa va increíble con nuestra Cerveza Artesanal helada."`;
+    sugiere UN solo producto adicional que combine perfectamente para "completar la experiencia". 
+    Respuesta muy corta (máximo 10 palabras), persuasiva y elegante. 
+    Ejemplo: "Esa hamburguesa marida increíble con nuestra Cerveza Artesanal IPA."`;
 
     try {
-        // Fix: Use gemini-3-flash-preview for basic text tasks
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: prompt,
         });
         return response.text?.trim() || "";
     } catch (error) {
+        console.error("Error en sugerencia IA:", error);
         return "";
     }
 };
 
+/**
+ * Genera descripciones de productos con IA.
+ */
 export const generateProductDescription = async (productName: string, categoryName: string, currentDescription: string): Promise<string> => {
     try {
-        const prompt = `Generate a chic, minimalist, and enticing one-sentence description for a cafe menu item.
-        Item Name: ${productName}
-        Category: ${categoryName}
-        Current Description (if any): ${currentDescription}
-        
-        Focus on fresh ingredients, taste, and experience. Keep it under 15 words.`;
+        const prompt = `Genera una descripción chic, minimalista y tentadora para un menú.
+        Nombre: ${productName}
+        Categoría: ${categoryName}
+        Actual: ${currentDescription}
+        Bajo 15 palabras.`;
 
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: prompt,
         });
 
-        return response.text?.trim() || "Failed to generate description.";
+        return response.text?.trim() || "Delicioso y preparado con ingredientes frescos.";
     } catch (error) {
-        console.error("Error generating product description:", error);
-        return "Failed to generate description.";
+        return "Una experiencia única para tu paladar.";
     }
 };
 
+/**
+ * Chatbot de atención al cliente.
+ */
 export const getChatbotResponse = async (history: ChatMessage[], newMessage: string): Promise<string> => {
-    const systemInstruction = `You are "OrdoBot", a friendly and helpful AI assistant for a chic cafe. 
-    Your personality is warm, professional, and slightly witty.
-    You can answer questions about the menu, store hours (8 AM - 8 PM daily), and general inquiries.
-    Do not answer questions unrelated to the cafe. Gently redirect the conversation back to the cafe.
-    Keep your answers concise and friendly.`;
+    const systemInstruction = `Eres "OrdoBot", un asistente amable de un restaurante chic. 
+    Tu personalidad es cálida y profesional. Responde sobre el menú y horarios.
+    No hables de temas ajenos al restaurante.`;
 
     const contents = history.map(msg => ({
         role: msg.sender === 'user' ? 'user' : 'model',
@@ -69,17 +80,19 @@ export const getChatbotResponse = async (history: ChatMessage[], newMessage: str
         });
 
         const response = await chat.sendMessage({ message: newMessage });
-        return response.text?.trim() || "I'm sorry, I couldn't process that.";
+        return response.text?.trim() || "Lo siento, ¿podrías repetir eso?";
 
     } catch (error) {
-        console.error("Error getting chatbot response:", error);
-        return "I'm having a little trouble connecting. Please try again in a moment.";
+        return "Estamos experimentando una alta demanda, por favor intenta de nuevo en un momento.";
     }
 };
 
+/**
+ * Análisis de datos para el administrador.
+ */
 export const getAdvancedInsights = async (query: string, orders: Order[]): Promise<string> => {
-    const prompt = `As a world-class restaurant business analyst, analyze the following order data based on the user's query. Provide actionable insights, identify trends, and give specific, data-driven recommendations.
-    Data: ${JSON.stringify(orders)}`;
+    const prompt = `Como analista de negocios experto, analiza estos pedidos: ${JSON.stringify(orders)}. 
+    Responde a: ${query}. Sé directo y accionable.`;
     
     try {
         const response = await ai.models.generateContent({
@@ -87,9 +100,8 @@ export const getAdvancedInsights = async (query: string, orders: Order[]): Promi
             contents: prompt,
             config: { thinkingConfig: { thinkingBudget: 32768 } }
         });
-        return response.text || "No insights could be generated at this time.";
+        return response.text || "No hay suficientes datos para el análisis.";
     } catch (error) {
-        console.error("Error getting advanced insights:", error);
-        return `An error occurred while analyzing the data.`;
+        return "Error al analizar los datos.";
     }
 };
