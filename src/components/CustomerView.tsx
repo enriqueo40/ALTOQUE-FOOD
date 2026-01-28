@@ -1,22 +1,22 @@
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, DiscountType, PromotionAppliesTo, PersonalizationOption, Schedule } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, PersonalizationOption } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconMinus, IconClock, IconShare, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconLocationMarker, IconStore, IconTag, IconCheck, IconDuplicate, IconUpload, IconReceipt, IconSparkles } from '../constants';
+import { IconPlus, IconMinus, IconClock, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconStore, IconCheck, IconDuplicate, IconUpload, IconReceipt, IconSparkles } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel, updateOrder } from '../services/supabaseService';
 import { getPairingSuggestion } from '../services/geminiService';
 import Chatbot from './Chatbot';
 
-// --- Sub-componentes Estilizados ---
+// --- Sub-componentes ---
 
 const Header: React.FC<{ title: string; onBack?: () => void }> = ({ title, onBack }) => (
-    <header className="p-4 flex justify-between items-center sticky top-0 bg-gray-900/90 backdrop-blur-md z-30 border-b border-gray-800">
+    <header className="p-4 flex justify-between items-center sticky top-0 bg-gray-900/95 backdrop-blur-md z-30 border-b border-gray-800">
         {onBack ? (
              <button onClick={onBack} className="p-2 -ml-2 text-gray-200 hover:bg-gray-800 rounded-full transition-all">
                 <IconArrowLeft className="h-6 w-6" />
             </button>
         ) : <div className="w-10 h-10" /> }
-        <h1 className="text-lg font-bold text-white uppercase tracking-tight">{title}</h1>
+        <h1 className="text-lg font-black text-white uppercase tracking-tight">{title}</h1>
         <div className="w-10 h-10" /> 
     </header>
 );
@@ -44,72 +44,23 @@ const PairingAI: React.FC<{ items: CartItem[], allProducts: Product[] }> = ({ it
     if (!suggestion && !loading) return null;
 
     return (
-        <div className="mx-0 mb-6 p-4 bg-indigo-900/20 border border-indigo-500/20 rounded-2xl flex items-start gap-3 animate-fade-in">
+        <div className="mb-6 p-4 bg-indigo-900/30 border border-indigo-500/30 rounded-2xl flex items-start gap-3 animate-fade-in shadow-lg shadow-indigo-500/10">
             <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400 shrink-0">
                 <IconSparkles className="h-5 w-5" />
             </div>
             <div className="flex-1">
-                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">RECOMENDACIÓN DEL CHEF (IA)</p>
+                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">RECOMENDACIÓN IA</p>
                 {loading ? (
-                    <div className="h-4 w-32 bg-gray-800 rounded animate-pulse"></div>
+                    <div className="h-3 w-32 bg-gray-700 rounded animate-pulse mt-1"></div>
                 ) : (
-                    <p className="text-sm text-gray-200 italic leading-snug">"{suggestion}"</p>
+                    <p className="text-sm text-gray-200 italic leading-snug font-medium">"{suggestion}"</p>
                 )}
             </div>
         </div>
     );
 };
 
-// --- Componentes de UI ---
-
-const RestaurantHero: React.FC<{ 
-    settings: AppSettings, 
-    orderType: OrderType, 
-    setOrderType: (type: OrderType) => void,
-    tableInfo: { table: string, zone: string } | null,
-    hasActiveSession: boolean,
-    sessionTotal: number
-}> = ({ settings, orderType, setOrderType, tableInfo, hasActiveSession, sessionTotal }) => (
-    <div className="relative pb-6 border-b border-gray-800">
-        <div className="h-44 w-full overflow-hidden relative">
-            {settings.branch.coverImageUrl ? <img src={settings.branch.coverImageUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900" />}
-            <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/40 to-transparent"></div>
-        </div>
-        <div className="px-6 -mt-14 flex flex-col items-center text-center relative z-10">
-            <div className="w-28 h-28 bg-gray-800 rounded-full p-1 shadow-2xl mb-3 border-4 border-gray-900 overflow-hidden">
-                {settings.branch.logoUrl ? <img src={settings.branch.logoUrl} className="w-full h-full object-cover rounded-full" /> : <div className="w-full h-full flex items-center justify-center font-bold text-emerald-500 text-2xl bg-gray-700">{settings.company.name.slice(0,2)}</div>}
-            </div>
-            
-            {hasActiveSession && tableInfo && (
-                <div className="mb-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black px-4 py-1.5 rounded-full animate-pulse shadow-lg shadow-emerald-500/20 flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
-                    CUENTA ABIERTA: ${sessionTotal.toFixed(2)}
-                </div>
-            )}
-
-            <h1 className="text-2xl font-black text-white">{settings.company.name}</h1>
-            <p className="text-[10px] text-gray-500 mb-5 uppercase tracking-widest font-bold">{settings.branch.alias}</p>
-            
-            {tableInfo ? (
-                <div className="bg-emerald-950/40 backdrop-blur border border-emerald-500/30 px-5 py-2.5 rounded-2xl flex items-center gap-3">
-                    <IconTableLayout className="h-5 w-5 text-emerald-400"/>
-                    <div className="text-left">
-                        <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">SU UBICACIÓN</p>
-                        <p className="text-sm font-black text-white">Mesa {tableInfo.table} • {tableInfo.zone}</p>
-                    </div>
-                </div>
-            ) : (
-                <div className="w-full max-w-xs bg-gray-800/50 rounded-full p-1 flex relative border border-gray-700 backdrop-blur-sm shadow-xl">
-                    <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-emerald-600 rounded-full transition-all duration-300 ${orderType === OrderType.TakeAway ? 'translate-x-full left-1' : 'left-1'}`}></div>
-                    <button onClick={() => setOrderType(OrderType.Delivery)} className={`flex-1 relative z-10 py-2 text-xs font-black transition-colors ${orderType === OrderType.Delivery ? 'text-white' : 'text-gray-500'}`}>A DOMICILIO</button>
-                    <button onClick={() => setOrderType(OrderType.TakeAway)} className={`flex-1 relative z-10 py-2 text-xs font-black transition-colors ${orderType === OrderType.TakeAway ? 'text-white' : 'text-gray-500'}`}>RECOGER</button>
-                </div>
-            )}
-        </div>
-    </div>
-);
-
-// --- Componente Principal ---
+// --- Vista Principal ---
 
 export default function CustomerView() {
     const [view, setView] = useState<'menu' | 'cart' | 'checkout' | 'confirmation'>('menu');
@@ -118,14 +69,12 @@ export default function CustomerView() {
     const [orderType, setOrderType] = useState<OrderType>(OrderType.Delivery);
     const [tableInfo, setTableInfo] = useState<{ table: string; zone: string } | null>(null);
     
-    // --- LÓGICA DE SESIÓN DE MESA ---
-    // Persistencia usando localStorage para mantener la cuenta abierta si se recarga
+    // --- SESIÓN DE MESA PERSISTENTE ---
     const [activeOrderId, setActiveOrderId] = useState<string | null>(() => localStorage.getItem('activeOrderId'));
     const [sessionTotal, setSessionTotal] = useState<number>(() => Number(localStorage.getItem('sessionTotal')) || 0);
-    // Indica si estamos en el flujo de "Cerrar cuenta" o "Enviar ronda"
     const [isFinalPayment, setIsFinalPayment] = useState(false);
 
-    const { cartItems, addToCart, removeFromCart, updateQuantity, cartTotal, clearCart } = useCart();
+    const { cartItems, addToCart, removeFromCart, updateQuantity, cartTotal, clearCart, itemCount } = useCart();
     const [allProducts, setAllProducts] = useState<Product[]>([]);
     const [allCategories, setAllCategories] = useState<Category[]>([]);
     const [isLoadingData, setIsLoadingData] = useState(true);
@@ -142,7 +91,6 @@ export default function CustomerView() {
         fetch();
         subscribeToMenuUpdates(fetch);
 
-        // Detectar mesa desde URL
         const params = new URLSearchParams(window.location.hash.split('?')[1]);
         const table = params.get('table');
         const zone = params.get('zone');
@@ -150,7 +98,6 @@ export default function CustomerView() {
             setTableInfo({ table, zone });
             setOrderType(OrderType.DineIn);
         }
-
         return () => unsubscribeFromChannel();
     }, []);
 
@@ -159,24 +106,18 @@ export default function CustomerView() {
         
         try {
             if (isFinalPayment && activeOrderId) {
-                // --- FLUJO 1: CIERRE DE CUENTA (PAGO) ---
-                // Actualizar el estado del pedido original/sesión a pagado
-                // Nota: En un backend real, aquí se actualizaría el estado de "todos" los pedidos de la mesa, o el pedido padre.
-                // Simulamos cerrando el pedido activo.
-                
-                // Enviar mensaje de cierre
-                const msg = `💰 *SOLICITUD DE CIERRE - MESA ${tableInfo?.table}*\n📍 Zona: ${tableInfo?.zone}\n👤 Cliente: ${customer.name}\n----------------\n💰 *TOTAL FINAL: $${sessionTotal.toFixed(2)}*\n💳 Método: ${payment}\n${proof ? '✅ Comprobante adjunto' : ''}`;
+                // FLUJO: CIERRE Y PAGO FINAL
+                const msg = `💰 *SOLICITUD DE CIERRE - MESA ${tableInfo?.table}*\n📍 Zona: ${tableInfo?.zone}\n👤 Cliente: ${customer.name}\n----------------\n💰 *TOTAL ACUMULADO: $${sessionTotal.toFixed(2)}*\n💳 Método: ${payment}\n${proof ? '✅ Comprobante adjunto' : ''}`;
                 window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
                 
-                // Limpiar sesión
+                // Reset total al liquidar
                 localStorage.removeItem('activeOrderId');
                 localStorage.removeItem('sessionTotal');
                 setActiveOrderId(null);
                 setSessionTotal(0);
                 clearCart();
             } else {
-                // --- FLUJO 2: ENVIAR RONDA (COMANDA) ---
-                // Crear un pedido nuevo con estado pendiente
+                // FLUJO: ENVIAR RONDA (COMANDA)
                 const newOrderData: Omit<Order, 'id' | 'createdAt'> = {
                     customer,
                     items: cartItems,
@@ -184,17 +125,14 @@ export default function CustomerView() {
                     status: OrderStatus.Pending,
                     orderType,
                     tableId: orderType === OrderType.DineIn ? `${tableInfo?.zone} - ${tableInfo?.table}` : undefined,
-                    paymentProof: undefined, // No proof for rounds
-                    branchId: 'main',
                     paymentStatus: 'pending'
                 };
                 
                 const saved = await saveOrder(newOrderData); 
                 
                 if (orderType === OrderType.DineIn) {
-                    // Actualizar sesión local
                     const newTotal = sessionTotal + cartTotal;
-                    localStorage.setItem('activeOrderId', saved.id); // Guardamos el ID del último pedido (o el primero) como referencia
+                    localStorage.setItem('activeOrderId', saved.id);
                     localStorage.setItem('sessionTotal', newTotal.toString());
                     setActiveOrderId(saved.id);
                     setSessionTotal(newTotal);
@@ -202,29 +140,28 @@ export default function CustomerView() {
 
                 const title = orderType === OrderType.DineIn ? '🔥 COMANDA A COCINA' : '🛒 NUEVO PEDIDO';
                 const itemsStr = cartItems.map(i => `• ${i.quantity}x ${i.name}`).join('\n');
-                const msg = `🧾 *${title} - ${settings.company.name}*\n👤 Cliente: ${customer.name}\n📍 Entrega: ${orderType === OrderType.DineIn ? 'MESA ' + tableInfo?.table : 'DOMICILIO'}\n----------------\n${itemsStr}\n----------------\n💰 *Subtotal ronda: $${cartTotal.toFixed(2)}*\n_(Se agrega a la cuenta)_`;
+                const msg = `🧾 *${title} - ${settings.company.name}*\n👤 Cliente: ${customer.name}\n📍 Ubicación: ${orderType === OrderType.DineIn ? 'MESA ' + tableInfo?.table : 'DOMICILIO'}\n----------------\n${itemsStr}\n----------------\n💰 *Subtotal ronda: $${cartTotal.toFixed(2)}*`;
                 
                 window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
                 clearCart();
             }
             setView('confirmation');
         } catch(e) { 
-            alert("Error al enviar. Por favor verifica tu conexión."); 
+            alert("Error al enviar. Intenta de nuevo."); 
         }
     };
 
-    if (isLoadingData || !settings) return <div className="h-screen bg-gray-900 flex items-center justify-center text-emerald-500 font-black animate-pulse tracking-widest uppercase text-xs">Cargando Menú Online...</div>;
+    if (isLoadingData || !settings) return <div className="h-screen bg-gray-900 flex items-center justify-center text-emerald-500 font-black animate-pulse uppercase tracking-[0.2em]">ALTOQUE FOOD...</div>;
 
-    // Determinar si es una "Comanda Simple" (Ronda en mesa sin pagar aún)
     const isSimpleComanda = orderType === OrderType.DineIn && !isFinalPayment;
 
     return (
-        <div className="bg-gray-950 min-h-screen text-gray-100 font-sans selection:bg-emerald-500/20">
+        <div className="bg-gray-950 min-h-screen text-gray-100 font-sans selection:bg-emerald-500/20 pb-safe">
             <div className="container mx-auto max-w-md bg-gray-900 min-h-screen relative shadow-2xl border-x border-gray-800 flex flex-col">
                 
                 {view !== 'menu' && (
                     <Header 
-                        title={view === 'cart' ? 'MI RONDA' : (isFinalPayment ? 'CERRAR CUENTA' : 'CONFIRMAR')} 
+                        title={view === 'cart' ? 'MI RONDA' : (isFinalPayment ? 'PAGAR CUENTA' : 'CONFIRMAR')} 
                         onBack={() => { setView(view === 'checkout' ? 'cart' : 'menu'); setIsFinalPayment(false); }} 
                     />
                 )}
@@ -232,12 +169,48 @@ export default function CustomerView() {
                 <div className="flex-1 overflow-y-auto">
                     {view === 'menu' && (
                         <div className="animate-fade-in pb-48">
-                            <RestaurantHero settings={settings} orderType={orderType} setOrderType={setOrderType} tableInfo={tableInfo} hasActiveSession={!!activeOrderId} sessionTotal={sessionTotal} />
-                            
-                            <div className="p-4 space-y-8">
+                            {/* Hero y Estado de Sesión */}
+                            <div className="relative pb-6 border-b border-gray-800">
+                                <div className="h-40 w-full overflow-hidden relative">
+                                    {settings.branch.coverImageUrl ? <img src={settings.branch.coverImageUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900" />}
+                                    <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/20 to-transparent"></div>
+                                </div>
+                                <div className="px-6 -mt-12 flex flex-col items-center text-center relative z-10">
+                                    <div className="w-24 h-24 bg-gray-800 rounded-full p-1 shadow-2xl mb-3 border-4 border-gray-900 overflow-hidden">
+                                        {settings.branch.logoUrl ? <img src={settings.branch.logoUrl} className="w-full h-full object-cover rounded-full" /> : <div className="w-full h-full flex items-center justify-center font-bold text-emerald-500 text-2xl bg-gray-700">{settings.company.name.slice(0,2)}</div>}
+                                    </div>
+                                    
+                                    {activeOrderId && tableInfo && (
+                                        <div className="mb-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black px-4 py-1.5 rounded-full animate-pulse shadow-lg flex items-center gap-1.5">
+                                            <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
+                                            CUENTA ABIERTA: ${sessionTotal.toFixed(2)}
+                                        </div>
+                                    )}
+
+                                    <h1 className="text-2xl font-black text-white">{settings.company.name}</h1>
+                                    
+                                    {tableInfo ? (
+                                        <div className="mt-4 bg-emerald-950/40 backdrop-blur border border-emerald-500/30 px-5 py-2.5 rounded-2xl flex items-center gap-3">
+                                            <IconTableLayout className="h-5 w-5 text-emerald-400"/>
+                                            <div className="text-left">
+                                                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest leading-none">MESA ACTIVA</p>
+                                                <p className="text-sm font-black text-white">{tableInfo.table} • {tableInfo.zone}</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="w-full max-w-xs mt-4 bg-gray-800/50 rounded-full p-1 flex relative border border-gray-700">
+                                            <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-emerald-600 rounded-full transition-all duration-300 ${orderType === OrderType.TakeAway ? 'translate-x-full left-1' : 'left-1'}`}></div>
+                                            <button onClick={() => setOrderType(OrderType.Delivery)} className={`flex-1 relative z-10 py-2 text-xs font-black transition-colors ${orderType === OrderType.Delivery ? 'text-white' : 'text-gray-500'}`}>A DOMICILIO</button>
+                                            <button onClick={() => setOrderType(OrderType.TakeAway)} className={`flex-1 relative z-10 py-2 text-xs font-black transition-colors ${orderType === OrderType.TakeAway ? 'text-white' : 'text-gray-500'}`}>RECOGER</button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="p-4 space-y-8 mt-4">
                                 <div className="relative">
                                     <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 h-5 w-5" />
-                                    <input type="text" placeholder="Buscar productos..." className="w-full bg-gray-800/50 border border-gray-700 rounded-2xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all placeholder-gray-600 font-bold" />
+                                    <input type="text" placeholder="Buscar en el menú..." className="w-full bg-gray-800/40 border border-gray-700 rounded-2xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all placeholder-gray-600 font-bold" />
                                 </div>
 
                                 {allCategories.map(cat => {
@@ -246,22 +219,22 @@ export default function CustomerView() {
                                     return (
                                         <div key={cat.id}>
                                             <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mb-4 flex items-center gap-3">
-                                                <span className="w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.4)]"></span>
+                                                <span className="w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
                                                 {cat.name}
                                             </h3>
                                             <div className="grid gap-4">
                                                 {products.map(p => (
-                                                    <div key={p.id} onClick={() => setSelectedProduct(p)} className="bg-gray-800/40 p-4 rounded-[2rem] border border-gray-800/60 flex gap-4 active:scale-[0.98] transition-all cursor-pointer hover:bg-gray-800/60 group">
-                                                        <img src={p.imageUrl} className="w-24 h-24 rounded-2xl object-cover shadow-xl group-hover:scale-105 transition-transform" alt={p.name} />
-                                                        <div className="flex-1 flex flex-col justify-between py-1">
-                                                            <div>
-                                                                <h4 className="font-bold text-gray-100 group-hover:text-emerald-400 transition-colors">{p.name}</h4>
-                                                                <p className="text-[11px] text-gray-500 line-clamp-2 mt-1 leading-relaxed">{p.description}</p>
+                                                    <div key={p.id} onClick={() => setSelectedProduct(p)} className="bg-gray-800/30 p-4 rounded-[2rem] border border-gray-800/60 flex gap-4 active:scale-[0.98] transition-all cursor-pointer hover:bg-gray-800/50 group">
+                                                        <div className="relative shrink-0">
+                                                            <img src={p.imageUrl} className="w-24 h-24 rounded-2xl object-cover shadow-xl group-hover:scale-105 transition-transform" />
+                                                            <div className="absolute -bottom-2 -right-2 bg-emerald-600 p-1.5 rounded-xl shadow-lg border-2 border-gray-900">
+                                                                <IconPlus className="h-4 w-4 text-white"/>
                                                             </div>
-                                                            <div className="flex justify-between items-center">
-                                                                <span className="font-black text-emerald-400">${p.price.toFixed(2)}</span>
-                                                                <div className="bg-gray-700/50 p-1.5 rounded-xl text-emerald-500"><IconPlus className="h-5 w-5"/></div>
-                                                            </div>
+                                                        </div>
+                                                        <div className="flex-1 flex flex-col justify-center">
+                                                            <h4 className="font-bold text-gray-100 group-hover:text-emerald-400 transition-colors leading-tight">{p.name}</h4>
+                                                            <p className="text-[11px] text-gray-500 line-clamp-2 mt-1 leading-relaxed">{p.description}</p>
+                                                            <span className="font-black text-emerald-400 mt-2 text-lg">${p.price.toFixed(2)}</span>
                                                         </div>
                                                     </div>
                                                 ))}
@@ -276,12 +249,13 @@ export default function CustomerView() {
                     {view === 'cart' && (
                         <div className="p-5 animate-fade-in pb-48">
                             <PairingAI items={cartItems} allProducts={allProducts} />
+                            
                             <div className="space-y-4">
                                 {cartItems.map(i => (
                                     <div key={i.cartItemId} className="flex gap-4 bg-gray-800/40 p-4 rounded-3xl border border-gray-800/60">
                                         <img src={i.imageUrl} className="w-20 h-20 rounded-2xl object-cover shadow-lg" />
                                         <div className="flex-1 flex flex-col justify-center">
-                                            <div className="flex justify-between items-start mb-3">
+                                            <div className="flex justify-between items-start mb-2">
                                                 <span className="font-bold text-sm text-gray-100">{i.name}</span>
                                                 <span className="font-black text-emerald-400 text-sm">${(i.price * i.quantity).toFixed(2)}</span>
                                             </div>
@@ -298,13 +272,17 @@ export default function CustomerView() {
                                 ))}
                             </div>
 
-                            <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-8 bg-gray-900/95 backdrop-blur-xl border-t border-gray-800 z-40 rounded-t-[3rem]">
+                            <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-8 bg-gray-900/98 backdrop-blur-xl border-t border-gray-800 z-40 rounded-t-[3rem] shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
                                  <div className="flex justify-between font-black text-xl mb-6">
-                                     <span className="text-gray-500 text-xs tracking-widest uppercase self-center">TOTAL RONDA</span>
-                                     <span className="text-emerald-500">${cartTotal.toFixed(2)}</span>
+                                     <span className="text-gray-500 text-[10px] tracking-[0.2em] uppercase self-center">SUBTOTAL RONDA</span>
+                                     <span className="text-emerald-500 text-2xl">${cartTotal.toFixed(2)}</span>
                                  </div>
-                                 <button disabled={cartItems.length === 0} onClick={() => { setIsFinalPayment(false); setView('checkout'); }} className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white shadow-2xl active:scale-[0.98] transition-all disabled:opacity-30 uppercase tracking-[0.2em] text-sm">
-                                    {orderType === OrderType.DineIn ? 'CONTINUAR' : 'IR A PAGAR'}
+                                 <button 
+                                    disabled={cartItems.length === 0} 
+                                    onClick={() => { setIsFinalPayment(false); setView('checkout'); }} 
+                                    className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white shadow-2xl active:scale-[0.98] transition-all disabled:opacity-30 uppercase tracking-[0.2em] text-sm"
+                                 >
+                                    {orderType === OrderType.DineIn ? 'ENVIAR A COCINA' : 'IR A PAGAR'}
                                  </button>
                             </div>
                         </div>
@@ -319,28 +297,22 @@ export default function CustomerView() {
                                 phone: fd.get('phone') as string || '',
                                 address: { colonia: '', calle: '', numero: '' }
                             } as any, 'Efectivo', (e.currentTarget.elements.namedItem('proof') as any)?.dataset.url);
-                        }} className="p-6 space-y-8 animate-fade-in pb-44">
-                            <div className="space-y-4 p-7 bg-gray-800/30 border border-gray-800 rounded-[2.5rem] shadow-sm">
-                                <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">DATOS CLIENTE</h3>
-                                <input name="name" type="text" className="w-full bg-gray-800 border-gray-700 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold" placeholder="¿A qué nombre la orden?" required />
+                        }} className="p-6 space-y-8 animate-fade-in pb-48">
+                            <div className="space-y-4 p-7 bg-gray-800/30 border border-gray-800 rounded-[2.5rem]">
+                                <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">IDENTIFICACIÓN</h3>
+                                <input name="name" type="text" className="w-full bg-gray-800 border-gray-700 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold" placeholder="¿A nombre de quién?" required />
                                 {!isSimpleComanda && <input name="phone" type="tel" className="w-full bg-gray-800 border-gray-700 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold" placeholder="WhatsApp para aviso de pago" required />}
                             </div>
 
                             {!isSimpleComanda && (
-                                <div className="space-y-4 p-7 bg-gray-800/30 border border-gray-800 rounded-[2.5rem] shadow-sm">
-                                    <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">MÉTODO DE PAGO</h3>
-                                    <p className="text-[10px] text-gray-500 leading-relaxed font-bold uppercase tracking-wider mb-2">
-                                        {isFinalPayment ? 'Adjunta comprobante para liquidar el total.' : 'Detalles de pago.'}
-                                    </p>
-                                    {/* Aquí irían los métodos de pago (Simplificado para demo) */}
-                                    <div className="p-4 bg-gray-700/30 rounded-2xl border border-gray-700">
-                                        <p className="text-xs text-gray-300 font-mono">Pago Móvil / Transferencia</p>
-                                    </div>
+                                <div className="space-y-4 p-7 bg-gray-800/30 border border-gray-800 rounded-[2.5rem]">
+                                    <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">CERRAR CUENTA Y PAGAR</h3>
+                                    <p className="text-[11px] text-gray-500 leading-relaxed font-bold uppercase tracking-wider mb-2">Adjunta tu comprobante para liquidar el total de la mesa.</p>
 
                                     <label className="flex flex-col items-center justify-center w-full h-44 border-2 border-dashed border-gray-700 rounded-3xl cursor-pointer hover:bg-gray-800/50 overflow-hidden relative transition-all group">
                                         <div className="flex flex-col items-center text-gray-500 group-hover:text-emerald-400">
                                             <IconUpload className="h-10 w-10 mb-3 opacity-40" />
-                                            <span className="text-[10px] font-black uppercase tracking-widest">Subir comprobante</span>
+                                            <span className="text-[10px] font-black uppercase tracking-widest">Subir captura</span>
                                         </div>
                                         <input name="proof" type="file" className="hidden" accept="image/*" onChange={e => {
                                             if (e.target.files?.[0]) {
@@ -359,9 +331,9 @@ export default function CustomerView() {
                                 </div>
                             )}
 
-                            <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-8 bg-gray-900/95 backdrop-blur-2xl border-t border-gray-800 z-40 rounded-t-[3rem] shadow-[0_-10px_50px_rgba(0,0,0,0.6)]">
+                            <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-8 bg-gray-900/98 backdrop-blur-2xl border-t border-gray-800 z-40 rounded-t-[3rem] shadow-[0_-10px_50px_rgba(0,0,0,0.6)]">
                                  <div className="flex justify-between font-black text-2xl mb-6">
-                                    <span className="text-gray-500 text-[10px] tracking-[0.2em] self-center uppercase">{isFinalPayment ? 'CUENTA TOTAL' : 'TOTAL ORDEN'}</span>
+                                    <span className="text-gray-500 text-[10px] tracking-[0.2em] self-center uppercase">{isFinalPayment ? 'TOTAL A PAGAR' : 'TOTAL RONDA'}</span>
                                     <span className="text-emerald-500">${(isFinalPayment ? sessionTotal : cartTotal).toFixed(2)}</span>
                                  </div>
                                  <button type="submit" className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex items-center justify-center gap-4 active:scale-95 transition-all text-xs uppercase tracking-[0.2em] shadow-2xl">
@@ -377,27 +349,31 @@ export default function CustomerView() {
                                 <IconCheck className="w-14 h-14 text-emerald-500"/>
                             </div>
                             <div className="space-y-3">
-                                <h2 className="text-4xl font-black text-white uppercase tracking-tighter">{isFinalPayment ? '¡CUENTA CERRADA!' : '¡EN COCINA!'}</h2>
+                                <h2 className="text-4xl font-black text-white uppercase tracking-tighter">{isFinalPayment ? '¡CUENTA CERRADA!' : '¡A COCINA!'}</h2>
                                 <p className="text-gray-500 text-sm leading-relaxed max-w-xs mx-auto font-medium">
-                                    {isFinalPayment ? 'Hemos recibido tu reporte de pago satisfactoriamente. ¡Gracias por visitarnos!' : 'Tu ronda ha sido enviada a cocina. Puedes seguir pidiendo más cosas desde el menú cuando gustes.'}
+                                    {isFinalPayment 
+                                        ? 'Hemos recibido tu reporte satisfactoriamente. ¡Vuelve pronto!' 
+                                        : 'Tu ronda ha sido enviada. El sistema mantendrá tu cuenta abierta para que sigas pidiendo cuando gustes.'}
                                 </p>
                             </div>
-                            <button onClick={() => { setIsFinalPayment(false); setView('menu'); }} className="w-full max-w-xs bg-gray-800 py-5 rounded-3xl font-black text-gray-200 border border-gray-700 active:scale-95 transition-all shadow-xl hover:bg-gray-700">VOLVER AL MENÚ</button>
+                            <button onClick={() => { setIsFinalPayment(false); setView('menu'); }} className="w-full max-w-xs bg-emerald-600 py-5 rounded-3xl font-black text-white shadow-xl hover:bg-emerald-500 active:scale-95 transition-all uppercase tracking-widest text-xs">
+                                {isFinalPayment ? 'NUEVO PEDIDO' : 'SEGUIR PIDIENDO'}
+                            </button>
                         </div>
                     )}
                 </div>
 
                 {selectedProduct && (
                     <div className="fixed inset-0 z-50 flex items-end justify-center p-4">
-                        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setSelectedProduct(null)}></div>
+                        <div className="absolute inset-0 bg-black/85 backdrop-blur-sm" onClick={() => setSelectedProduct(null)}></div>
                         <div className="bg-gray-900 w-full max-w-sm rounded-[3rem] overflow-hidden relative z-10 animate-fade-in-up border border-gray-800 shadow-2xl">
                             <div className="h-64 relative overflow-hidden">
                                 <img src={selectedProduct.imageUrl} className="w-full h-full object-cover" />
                                 <button onClick={() => setSelectedProduct(null)} className="absolute top-6 right-6 bg-black/40 p-2 rounded-full text-white backdrop-blur-md"><IconX/></button>
                             </div>
                             <div className="p-8">
-                                <h2 className="text-2xl font-black mb-2">{selectedProduct.name}</h2>
-                                <p className="text-gray-500 text-sm mb-8 leading-relaxed">{selectedProduct.description}</p>
+                                <h2 className="text-2xl font-black mb-2 text-white leading-tight">{selectedProduct.name}</h2>
+                                <p className="text-gray-500 text-sm mb-8 leading-relaxed font-medium">{selectedProduct.description}</p>
                                 <button 
                                     onClick={() => { addToCart(selectedProduct, 1); setSelectedProduct(null); }}
                                     className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex justify-between px-8 items-center active:scale-95 transition-all shadow-xl shadow-emerald-900/40"
@@ -413,23 +389,21 @@ export default function CustomerView() {
                 {/* --- BOTONES FLOTANTES DE SESIÓN ACTIVA --- */}
                 {view === 'menu' && (
                     <div className="fixed bottom-8 left-6 right-6 max-w-md mx-auto z-40 flex flex-col gap-3">
-                        {/* Botón de Cierre de Cuenta (Solo si hay sesión activa) */}
                         {activeOrderId && sessionTotal > 0 && (
                             <button 
                                 onClick={() => { setIsFinalPayment(true); setView('checkout'); }} 
-                                className="w-full bg-gray-800/95 backdrop-blur-md text-white font-black py-4 px-7 rounded-3xl flex justify-between items-center border border-emerald-500/30 shadow-2xl transition-all hover:bg-gray-700 active:scale-95 group"
+                                className="w-full bg-gray-800/98 backdrop-blur-md text-white font-black py-4 px-7 rounded-3xl flex justify-between items-center border border-emerald-500/40 shadow-2xl transition-all hover:bg-gray-700 active:scale-95 group"
                             >
-                                <span className="flex items-center gap-3 text-[10px] uppercase tracking-[0.2em]"><IconReceipt className="h-5 w-5 text-emerald-400 group-hover:scale-110 transition-transform"/> MI CUENTA ACUMULADA</span>
+                                <span className="flex items-center gap-3 text-[10px] uppercase tracking-[0.2em] font-black"><IconReceipt className="h-5 w-5 text-emerald-400 group-hover:scale-110 transition-transform"/> MI CUENTA</span>
                                 <span className="bg-emerald-500 px-3 py-1 rounded-xl text-xs font-mono shadow-lg shadow-emerald-500/20">${sessionTotal.toFixed(2)}</span>
                             </button>
                         )}
-                        {/* Botón de Carrito Actual (Ronda) */}
                         {cartItems.length > 0 && (
                             <button 
                                 onClick={() => setView('cart')} 
                                 className="w-full bg-emerald-600 text-white font-black py-5 px-7 rounded-3xl flex justify-between shadow-2xl active:scale-[0.98] transition-all animate-slide-up border border-emerald-500/20"
                             >
-                                <span className="tracking-[0.2em] uppercase text-[10px]">VER RONDA ({cartItems.length})</span>
+                                <span className="tracking-[0.2em] uppercase text-[10px] font-black">REVISAR RONDA ({itemCount})</span>
                                 <span className="font-black text-lg">${cartTotal.toFixed(2)}</span>
                             </button>
                         )}
