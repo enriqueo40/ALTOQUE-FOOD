@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, ShippingCostType, PaymentMethod, OrderType, Personalization, Promotion, PersonalizationOption } from '../types';
 import { useCart } from '../hooks/useCart';
 import { IconPlus, IconMinus, IconClock, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconStore, IconCheck, IconDuplicate, IconUpload, IconReceipt, IconSparkles } from '../constants';
-import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel, updateOrder } from '../services/supabaseService';
+import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import { getPairingSuggestion } from '../services/geminiService';
 import Chatbot from './Chatbot';
 
@@ -70,10 +70,15 @@ export default function CustomerView() {
     const [tableInfo, setTableInfo] = useState<{ table: string; zone: string } | null>(null);
     
     // --- LÓGICA DE SESIÓN DE MESA PERSISTENTE ---
-    // Guardamos el ID de referencia y el total acumulado en localStorage para que no se pierda al recargar
-    const [activeOrderId, setActiveOrderId] = useState<string | null>(() => localStorage.getItem('activeOrderId'));
+    // Persistimos el estado de la sesión para que no se pierda al recargar
+    const [sessionActive, setSessionActive] = useState<boolean>(() => localStorage.getItem('sessionActive') === 'true');
     const [sessionTotal, setSessionTotal] = useState<number>(() => Number(localStorage.getItem('sessionTotal')) || 0);
-    // Controla si el checkout actual es para una ronda o para pagar la cuenta completa
+    const [customerData, setCustomerData] = useState<Customer>(() => {
+        const saved = localStorage.getItem('customerData');
+        return saved ? JSON.parse(saved) : { name: '', phone: '', address: { colonia: '', calle: '', numero: '' } };
+    });
+    
+    // Controla si estamos en flujo de "Pagar Cuenta" o simplemente enviando una "Ronda"
     const [isFinalPayment, setIsFinalPayment] = useState(false);
 
     const { cartItems, addToCart, removeFromCart, updateQuantity, cartTotal, clearCart, itemCount } = useCart();
@@ -104,11 +109,18 @@ export default function CustomerView() {
         return () => unsubscribeFromChannel();
     }, []);
 
+    // Guardar datos de sesión cada vez que cambien
+    useEffect(() => {
+        localStorage.setItem('sessionActive', sessionActive.toString());
+        localStorage.setItem('sessionTotal', sessionTotal.toString());
+        localStorage.setItem('customerData', JSON.stringify(customerData));
+    }, [sessionActive, sessionTotal, customerData]);
+
     const handleOrderAction = async (customer: Customer, payment: PaymentMethod, proof?: string | null) => {
         if (!settings) return;
         
         try {
-            if (isFinalPayment && activeOrderId) {
+            if (isFinalPayment) {
                 // --- FLUJO: CIERRE Y PAGO FINAL ---
                 const msg = [
                     `💰 *SOLICITUD DE CIERRE DE CUENTA*`,
@@ -117,23 +129,24 @@ export default function CustomerView() {
                     `🪑 Mesa: ${tableInfo?.table} (${tableInfo?.zone})`,
                     `👤 Cliente: ${customer.name}`,
                     `--------------------------------`,
-                    `💵 *TOTAL PAGADO: $${sessionTotal.toFixed(2)}*`,
-                    `💳 Método: ${payment}`,
-                    proof ? `✅ Comprobante adjunto` : '',
-                    `_Favor validar pago para liberar mesa._`
+                    `💵 *TOTAL ACUMULADO: $${sessionTotal.toFixed(2)}*`,
+                    `💳 Método de Pago: ${payment}`,
+                    proof ? `📸 *COMPROBANTE ADJUNTO*` : '',
+                    `--------------------------------`,
+                    `_Por favor, confirme la recepción del pago para liberar la mesa._`
                 ].filter(Boolean).join('\n');
 
                 window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
                 
                 // Limpiar sesión local al liquidar
-                localStorage.removeItem('activeOrderId');
-                localStorage.removeItem('sessionTotal');
-                setActiveOrderId(null);
+                setSessionActive(false);
                 setSessionTotal(0);
+                localStorage.removeItem('sessionActive');
+                localStorage.removeItem('sessionTotal');
                 clearCart();
                 setView('confirmation');
             } else {
-                // --- FLUJO: ENVIAR RONDA (COMANDA) ---
+                // --- FLUJO: ENVIAR RONDA (COMANDA EN MESA) ---
                 const newOrderData: Omit<Order, 'id' | 'createdAt'> = {
                     customer,
                     items: cartItems,
@@ -144,21 +157,29 @@ export default function CustomerView() {
                     paymentStatus: 'pending'
                 };
                 
-                const saved = await saveOrder(newOrderData); 
-                
+                await saveOrder(newOrderData); 
+                setCustomerData(customer);
+
                 if (orderType === OrderType.DineIn) {
-                    // Actualizar sesión acumulada
-                    const newTotal = sessionTotal + cartTotal;
-                    localStorage.setItem('activeOrderId', saved.id);
-                    localStorage.setItem('sessionTotal', newTotal.toString());
-                    setActiveOrderId(saved.id);
-                    setSessionTotal(newTotal);
+                    setSessionActive(true);
+                    setSessionTotal(prev => prev + cartTotal);
                 }
 
                 // Notificación por WhatsApp de la ronda
                 const title = orderType === OrderType.DineIn ? '🔥 COMANDA A COCINA' : '🛒 NUEVO PEDIDO';
                 const itemsStr = cartItems.map(i => `• ${i.quantity}x ${i.name}`).join('\n');
-                const msg = `🧾 *${title} - ${settings.company.name}*\n👤 Cliente: ${customer.name}\n📍 Ubicación: ${orderType === OrderType.DineIn ? 'MESA ' + tableInfo?.table : 'DOMICILIO'}\n----------------\n${itemsStr}\n----------------\n💰 *Subtotal ronda: $${cartTotal.toFixed(2)}*\n${orderType === OrderType.DineIn ? '_(Se suma a la cuenta de la mesa)_' : ''}`;
+                const msg = [
+                    `🧾 *${title}*`,
+                    `📍 *${settings.company.name.toUpperCase()}*`,
+                    `--------------------------------`,
+                    `👤 Cliente: ${customer.name}`,
+                    `📍 Ubicación: ${orderType === OrderType.DineIn ? 'MESA ' + tableInfo?.table : 'DOMICILIO'}`,
+                    `--------------------------------`,
+                    itemsStr,
+                    `--------------------------------`,
+                    `💰 *Subtotal ronda: $${cartTotal.toFixed(2)}*`,
+                    orderType === OrderType.DineIn ? `📈 *Cuenta acumulada: $${(sessionTotal + cartTotal).toFixed(2)}*` : ''
+                ].filter(Boolean).join('\n');
                 
                 window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
                 
@@ -171,14 +192,14 @@ export default function CustomerView() {
     };
 
     if (isLoadingData || !settings) return (
-        <div className="h-screen bg-gray-900 flex flex-col items-center justify-center">
+        <div className="h-screen bg-gray-950 flex flex-col items-center justify-center">
             <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
             <p className="text-emerald-500 font-black uppercase tracking-[0.2em] animate-pulse">ALTOQUE FOOD...</p>
         </div>
     );
 
-    // Es comanda simple si está en mesa y no es el flujo de pago final
-    const isSimpleComanda = orderType === OrderType.DineIn && !isFinalPayment;
+    // Determinar si es una ronda normal de pedido en mesa
+    const isTableRound = orderType === OrderType.DineIn && !isFinalPayment;
 
     return (
         <div className="bg-gray-950 min-h-screen text-gray-100 font-sans selection:bg-emerald-500/20 pb-safe">
@@ -193,26 +214,26 @@ export default function CustomerView() {
                 
                 <div className="flex-1 overflow-y-auto">
                     {view === 'menu' && (
-                        <div className="animate-fade-in pb-48">
+                        <div className="animate-fade-in pb-56">
                             {/* Hero de Restaurante con Estado de Mesa */}
                             <div className="relative pb-6 border-b border-gray-800">
                                 <div className="h-44 w-full overflow-hidden relative">
                                     {settings.branch.coverImageUrl ? <img src={settings.branch.coverImageUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900" />}
-                                    <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/20 to-transparent"></div>
+                                    <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/40 to-transparent"></div>
                                 </div>
                                 <div className="px-6 -mt-12 flex flex-col items-center text-center relative z-10">
                                     <div className="w-24 h-24 bg-gray-800 rounded-full p-1 shadow-2xl mb-3 border-4 border-gray-900 overflow-hidden">
                                         {settings.branch.logoUrl ? <img src={settings.branch.logoUrl} className="w-full h-full object-cover rounded-full" /> : <div className="w-full h-full flex items-center justify-center font-bold text-emerald-500 text-2xl bg-gray-700">{settings.company.name.slice(0,2)}</div>}
                                     </div>
                                     
-                                    {activeOrderId && tableInfo && (
+                                    {sessionActive && tableInfo && (
                                         <div className="mb-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black px-5 py-2 rounded-full animate-pulse shadow-lg shadow-emerald-500/10 flex items-center gap-2">
                                             <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
-                                            CUENTA ABIERTA: ${sessionTotal.toFixed(2)}
+                                            SESIÓN ACTIVA • CUENTA: ${sessionTotal.toFixed(2)}
                                         </div>
                                     )}
 
-                                    <h1 className="text-2xl font-black text-white">{settings.company.name}</h1>
+                                    <h1 className="text-2xl font-black text-white leading-tight">{settings.company.name}</h1>
                                     
                                     {tableInfo ? (
                                         <div className="mt-4 bg-emerald-950/40 backdrop-blur border border-emerald-500/30 px-6 py-3 rounded-2xl flex items-center gap-3">
@@ -236,7 +257,7 @@ export default function CustomerView() {
                             <div className="p-4 space-y-8 mt-4">
                                 <div className="relative">
                                     <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 h-5 w-5" />
-                                    <input type="text" placeholder="Buscar en el menú..." className="w-full bg-gray-800/40 border border-gray-700 rounded-2xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all placeholder-gray-600 font-bold" />
+                                    <input type="text" placeholder="Buscar algo delicioso..." className="w-full bg-gray-800/40 border border-gray-700 rounded-2xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all placeholder-gray-600 font-bold" />
                                 </div>
 
                                 {allCategories.map(cat => {
@@ -300,7 +321,7 @@ export default function CustomerView() {
 
                             <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-8 bg-gray-900/98 backdrop-blur-xl border-t border-gray-800 z-40 rounded-t-[3rem] shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
                                  <div className="flex justify-between font-black text-xl mb-6">
-                                     <span className="text-gray-500 text-[10px] tracking-[0.2em] uppercase self-center">TOTAL RONDA ACTUAL</span>
+                                     <span className="text-gray-500 text-[10px] tracking-[0.2em] uppercase self-center">SUBTOTAL DE ESTA RONDA</span>
                                      <span className="text-emerald-500 text-2xl">${cartTotal.toFixed(2)}</span>
                                  </div>
                                  <button 
@@ -308,7 +329,7 @@ export default function CustomerView() {
                                     onClick={() => { setIsFinalPayment(false); setView('checkout'); }} 
                                     className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white shadow-2xl active:scale-[0.98] transition-all disabled:opacity-30 uppercase tracking-[0.2em] text-sm"
                                  >
-                                    {orderType === OrderType.DineIn ? 'ENVIAR A COCINA' : 'IR A PAGAR'}
+                                    {orderType === OrderType.DineIn ? 'PEDIR ESTA RONDA' : 'IR A PAGAR'}
                                  </button>
                             </div>
                         </div>
@@ -322,48 +343,65 @@ export default function CustomerView() {
                                 name: fd.get('name') as string,
                                 phone: fd.get('phone') as string || '',
                                 address: { colonia: '', calle: '', numero: '' }
-                            } as any, 'Efectivo', (e.currentTarget.elements.namedItem('proof') as any)?.dataset.url);
+                            } as any, fd.get('payment') as PaymentMethod || 'Efectivo', (e.currentTarget.elements.namedItem('proof') as any)?.dataset.url);
                         }} className="p-6 space-y-8 animate-fade-in pb-48">
-                            <div className="space-y-4 p-7 bg-gray-800/30 border border-gray-800 rounded-[2.5rem]">
-                                <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">DATOS CLIENTE</h3>
-                                <input name="name" type="text" className="w-full bg-gray-800 border-gray-700 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold" placeholder="¿Tu nombre?" required />
-                                {!isSimpleComanda && <input name="phone" type="tel" className="w-full bg-gray-800 border-gray-700 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold" placeholder="WhatsApp para aviso de pago" required />}
-                            </div>
-
-                            {!isSimpleComanda && (
+                            
+                            {/* Datos del Cliente: Solo se piden si es la primera vez o si no es final payment */}
+                            {(!sessionActive || !isFinalPayment) && (
                                 <div className="space-y-4 p-7 bg-gray-800/30 border border-gray-800 rounded-[2.5rem]">
-                                    <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">CIERRE Y PAGO</h3>
-                                    <p className="text-[11px] text-gray-500 leading-relaxed font-bold uppercase tracking-wider mb-2">Sube tu comprobante para liquidar la cuenta total.</p>
+                                    <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">DATOS DE IDENTIFICACIÓN</h3>
+                                    <input name="name" type="text" defaultValue={customerData.name} className="w-full bg-gray-800 border-gray-700 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold" placeholder="¿A qué nombre la orden?" required />
+                                    {orderType !== OrderType.DineIn && <input name="phone" type="tel" defaultValue={customerData.phone} className="w-full bg-gray-800 border-gray-700 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold" placeholder="WhatsApp" required />}
+                                </div>
+                            )}
 
-                                    <label className="flex flex-col items-center justify-center w-full h-44 border-2 border-dashed border-gray-700 rounded-3xl cursor-pointer hover:bg-gray-800/50 overflow-hidden relative transition-all group">
-                                        <div className="flex flex-col items-center text-gray-500 group-hover:text-emerald-400">
-                                            <IconUpload className="h-10 w-10 mb-3 opacity-40" />
-                                            <span className="text-[10px] font-black uppercase tracking-widest">Subir comprobante</span>
-                                        </div>
-                                        <input name="proof" type="file" className="hidden" accept="image/*" onChange={e => {
-                                            if (e.target.files?.[0]) {
-                                                const reader = new FileReader();
-                                                reader.onload = (re) => {
-                                                    const img = document.createElement('img');
-                                                    img.src = re.target?.result as string;
-                                                    img.className = "absolute inset-0 w-full h-full object-cover bg-gray-900";
-                                                    e.target.dataset.url = re.target?.result as string;
-                                                    e.target.parentElement?.appendChild(img);
-                                                };
-                                                reader.readAsDataURL(e.target.files[0]);
-                                            }
-                                        }} />
-                                    </label>
+                            {/* Flujo de Pago Final */}
+                            {isFinalPayment && (
+                                <div className="space-y-4 p-7 bg-gray-800/30 border border-gray-800 rounded-[2.5rem] animate-fade-in">
+                                    <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">MÉTODO DE PAGO FINAL</h3>
+                                    <p className="text-[11px] text-gray-500 leading-relaxed font-bold uppercase tracking-wider mb-2">Selecciona cómo deseas liquidar la cuenta de la mesa.</p>
+
+                                    <div className="grid grid-cols-1 gap-2">
+                                        {['Efectivo', 'Pago Móvil', 'Transferencia', 'Tarjeta'].map(m => (
+                                            <label key={m} className="flex justify-between items-center p-4 bg-gray-800/50 border border-gray-700 rounded-2xl cursor-pointer hover:border-emerald-500 transition-colors has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/5">
+                                                <span className="text-sm font-bold">{m}</span>
+                                                <input type="radio" name="payment" value={m} defaultChecked={m === 'Efectivo'} className="accent-emerald-500 h-5 w-5" />
+                                            </label>
+                                        ))}
+                                    </div>
+
+                                    <div className="pt-4">
+                                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">Adjuntar comprobante (Opcional)</p>
+                                        <label className="flex flex-col items-center justify-center w-full h-44 border-2 border-dashed border-gray-700 rounded-3xl cursor-pointer hover:bg-gray-800/50 overflow-hidden relative transition-all group">
+                                            <div className="flex flex-col items-center text-gray-500 group-hover:text-emerald-400">
+                                                <IconUpload className="h-10 w-10 mb-3 opacity-40" />
+                                                <span className="text-[10px] font-black uppercase tracking-widest">Subir captura de pago</span>
+                                            </div>
+                                            <input name="proof" type="file" className="hidden" accept="image/*" onChange={e => {
+                                                if (e.target.files?.[0]) {
+                                                    const reader = new FileReader();
+                                                    reader.onload = (re) => {
+                                                        const img = document.createElement('img');
+                                                        img.src = re.target?.result as string;
+                                                        img.className = "absolute inset-0 w-full h-full object-cover bg-gray-900";
+                                                        e.target.dataset.url = re.target?.result as string;
+                                                        e.target.parentElement?.appendChild(img);
+                                                    };
+                                                    reader.readAsDataURL(e.target.files[0]);
+                                                }
+                                            }} />
+                                        </label>
+                                    </div>
                                 </div>
                             )}
 
                             <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-8 bg-gray-900/98 backdrop-blur-2xl border-t border-gray-800 z-40 rounded-t-[3rem] shadow-[0_-10px_50px_rgba(0,0,0,0.6)]">
                                  <div className="flex justify-between font-black text-2xl mb-6">
-                                    <span className="text-gray-500 text-[10px] tracking-[0.2em] self-center uppercase">{isFinalPayment ? 'CUENTA TOTAL' : 'RONDA ACTUAL'}</span>
+                                    <span className="text-gray-500 text-[10px] tracking-[0.2em] self-center uppercase">{isFinalPayment ? 'TOTAL A LIQUIDAR' : 'TOTAL RONDA'}</span>
                                     <span className="text-emerald-500">${(isFinalPayment ? sessionTotal : cartTotal).toFixed(2)}</span>
                                  </div>
                                  <button type="submit" className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex items-center justify-center gap-4 active:scale-95 transition-all text-xs uppercase tracking-[0.2em] shadow-2xl">
-                                    {isSimpleComanda ? 'ENVIAR COMANDA A COCINA' : <><IconWhatsapp className="h-6 w-6" /> {isFinalPayment ? 'LIQUIDAR CUENTA FINAL' : 'REALIZAR PEDIDO'}</>}
+                                    {isTableRound ? 'ENVIAR RONDA A COCINA' : <><IconWhatsapp className="h-6 w-6" /> {isFinalPayment ? 'CERRAR Y PAGAR CUENTA' : 'CONFIRMAR PEDIDO'}</>}
                                 </button>
                             </div>
                         </form>
@@ -378,12 +416,12 @@ export default function CustomerView() {
                                 <h2 className="text-4xl font-black text-white uppercase tracking-tighter">{isFinalPayment ? '¡CUENTA CERRADA!' : '¡PEDIDO ENVIADO!'}</h2>
                                 <p className="text-gray-500 text-sm leading-relaxed max-w-xs mx-auto font-medium">
                                     {isFinalPayment 
-                                        ? 'Hemos recibido tu reporte satisfactoriamente. ¡Esperamos verte de nuevo pronto!' 
-                                        : 'Tu ronda ha sido enviada a cocina. El sistema mantiene tu sesión abierta para que sigas pidiendo desde el menú.'}
+                                        ? 'Hemos enviado tu reporte de pago satisfactoriamente. ¡Gracias por visitarnos!' 
+                                        : 'Tu ronda ha sido enviada a cocina. El sistema mantiene tu sesión abierta para que sigas pidiendo desde el menú cuando gustes.'}
                                 </p>
                             </div>
                             <button onClick={() => { setIsFinalPayment(false); setView('menu'); }} className="w-full max-w-xs bg-emerald-600 py-5 rounded-3xl font-black text-white shadow-xl hover:bg-emerald-500 active:scale-95 transition-all uppercase tracking-widest text-xs">
-                                {isFinalPayment ? 'NUEVO PEDIDO' : 'VOLVER AL MENÚ'}
+                                {isFinalPayment ? 'NUEVO PEDIDO' : 'CONTINUAR EN EL MENÚ'}
                             </button>
                         </div>
                     )}
@@ -416,7 +454,7 @@ export default function CustomerView() {
                 {view === 'menu' && (
                     <div className="fixed bottom-8 left-6 right-6 max-w-md mx-auto z-40 flex flex-col gap-3">
                         {/* Botón Mi Cuenta: Solo si hay una sesión iniciada */}
-                        {activeOrderId && sessionTotal > 0 && (
+                        {sessionActive && sessionTotal > 0 && (
                             <button 
                                 onClick={() => { setIsFinalPayment(true); setView('checkout'); }} 
                                 className="w-full bg-gray-800/98 backdrop-blur-md text-white font-black py-4 px-7 rounded-3xl flex justify-between items-center border border-emerald-500/40 shadow-2xl transition-all hover:bg-gray-700 active:scale-95 group"
