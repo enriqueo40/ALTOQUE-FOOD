@@ -7,15 +7,16 @@ import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizati
 import { getPairingSuggestion } from '../services/geminiService';
 import Chatbot from './Chatbot';
 
-// Sub-components definitions
+// --- Sub-componentes Estilizados ---
+
 const Header: React.FC<{ title: string; onBack?: () => void }> = ({ title, onBack }) => (
-    <header className="p-4 flex justify-between items-center sticky top-0 bg-gray-900/90 backdrop-blur-md z-20 border-b border-gray-800">
+    <header className="p-4 flex justify-between items-center sticky top-0 bg-gray-900/90 backdrop-blur-md z-30 border-b border-gray-800">
         {onBack ? (
-             <button onClick={onBack} className="p-2 -ml-2 text-gray-200 hover:bg-gray-800 rounded-full transition-colors" aria-label="Volver">
+             <button onClick={onBack} className="p-2 -ml-2 text-gray-200 hover:bg-gray-800 rounded-full transition-all">
                 <IconArrowLeft className="h-6 w-6" />
             </button>
         ) : <div className="w-10 h-10" /> }
-        <h1 className="text-lg font-bold text-white capitalize">{title}</h1>
+        <h1 className="text-lg font-bold text-white uppercase tracking-tight">{title}</h1>
         <div className="w-10 h-10" /> 
     </header>
 );
@@ -43,12 +44,12 @@ const PairingAI: React.FC<{ items: CartItem[], allProducts: Product[] }> = ({ it
     if (!suggestion && !loading) return null;
 
     return (
-        <div className="mb-6 p-4 bg-indigo-900/20 border border-indigo-500/20 rounded-2xl flex items-start gap-3 animate-fade-in">
+        <div className="mx-0 mb-6 p-4 bg-indigo-900/20 border border-indigo-500/20 rounded-2xl flex items-start gap-3 animate-fade-in">
             <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400 shrink-0">
                 <IconSparkles className="h-5 w-5" />
             </div>
             <div className="flex-1">
-                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">SUGERENCIA DEL SOMMELIER (IA)</p>
+                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">RECOMENDACIÓN DEL CHEF (IA)</p>
                 {loading ? (
                     <div className="h-4 w-32 bg-gray-800 rounded animate-pulse"></div>
                 ) : (
@@ -59,1019 +60,89 @@ const PairingAI: React.FC<{ items: CartItem[], allProducts: Product[] }> = ({ it
     );
 };
 
-const ScheduleModal: React.FC<{ isOpen: boolean; onClose: () => void; schedule: Schedule }> = ({ isOpen, onClose, schedule }) => {
-    if (!isOpen) return null;
-    
-    const daysOrder = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-    const todayIndex = new Date().getDay(); // 0 is Sunday, 1 is Monday
-    // Adjust to match array (0 = Monday in my array)
-    const adjustedTodayIndex = todayIndex === 0 ? 6 : todayIndex - 1; 
-    const todayName = daysOrder[adjustedTodayIndex];
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
-            <div className="bg-gray-900 w-full max-w-sm rounded-2xl shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[80vh] animate-fade-in-up" onClick={e => e.stopPropagation()}>
-                <div className="p-6 border-b border-gray-800 bg-gray-800/50 flex justify-between items-center">
-                    <h3 className="text-xl font-bold text-white">Horarios de Atención</h3>
-                    <button onClick={onClose} className="p-1 text-gray-400 hover:text-white"><IconX className="h-5 w-5"/></button>
-                </div>
-                <div className="p-4 overflow-y-auto">
-                    {schedule.days.map((day, index) => {
-                        const isToday = day.day === todayName;
-                        return (
-                            <div key={day.day} className={`flex justify-between items-center py-3 px-4 rounded-xl mb-2 ${isToday ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-gray-800/50 border border-gray-800'}`}>
-                                <span className={`font-medium ${isToday ? 'text-emerald-400' : 'text-gray-300'}`}>
-                                    {day.day} {isToday && <span className="text-[10px] ml-2 bg-emerald-500 text-white px-1.5 py-0.5 rounded-full align-middle">HOY</span>}
-                                </span>
-                                <div className="text-right">
-                                    {day.isOpen && day.shifts.length > 0 ? (
-                                        day.shifts.map((shift, i) => (
-                                            <div key={i} className="text-sm text-gray-200 font-mono">
-                                                {shift.start} - {shift.end}
-                                            </div>
-                                        ))
-                                    ) : (
-                                        // If it's open but no shifts, it implies 24h, otherwise closed
-                                        day.isOpen && day.shifts.length === 0 ? (
-                                            <span className="text-sm text-emerald-400 font-medium">Abierto 24h</span>
-                                        ) : (
-                                            <span className="text-sm text-rose-400 font-medium">Cerrado</span>
-                                        )
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-                <div className="p-4 border-t border-gray-800 bg-gray-900">
-                    <button onClick={onClose} className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-bold transition-colors border border-gray-700">
-                        Cerrar
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
+// --- Componentes de UI ---
 
 const RestaurantHero: React.FC<{ 
     settings: AppSettings, 
-    tableInfo: { table: string, zone: string } | null,
-    orderType: OrderType,
+    orderType: OrderType, 
     setOrderType: (type: OrderType) => void,
-    hasActiveSession: boolean
-}> = ({ settings, tableInfo, orderType, setOrderType, hasActiveSession }) => {
-    const { branch, company, shipping, schedules } = settings;
-    const [showSchedule, setShowSchedule] = useState(false);
-    const [isOpenNow, setIsOpenNow] = useState(false);
-
-    // Use the first schedule as default
-    const currentSchedule = schedules[0];
-
-    useEffect(() => {
-        // Determine if open based on schedule
-        if (!currentSchedule) return;
-        const now = new Date();
-        const daysOrder = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-        const todayName = daysOrder[now.getDay()];
-        const todaySchedule = currentSchedule.days.find(d => d.day === todayName);
-
-        if (todaySchedule && todaySchedule.isOpen) {
-            // If shifts exist, check time. If empty, it means 24h open (syncs with admin logic)
-            if (todaySchedule.shifts.length === 0) {
-                setIsOpenNow(true);
-            } else {
-                const currentTime = now.getHours() * 60 + now.getMinutes();
-                const isOpen = todaySchedule.shifts.some(shift => {
-                    const [startH, startM] = shift.start.split(':').map(Number);
-                    const [endH, endM] = shift.end.split(':').map(Number);
-                    const start = startH * 60 + startM;
-                    const end = endH * 60 + endM;
-                    return currentTime >= start && currentTime < end;
-                });
-                setIsOpenNow(isOpen);
-            }
-        } else {
-            setIsOpenNow(false);
-        }
-    }, [currentSchedule]);
-
-    const getShippingCostText = () => {
-        if (orderType === OrderType.TakeAway) return "Gratis";
-        
-        if (shipping.costType === ShippingCostType.ToBeQuoted) return "Por definir";
-        if (shipping.costType === ShippingCostType.Free) return "Gratis";
-        if (shipping.costType === ShippingCostType.Fixed) {
-             const cost = shipping.fixedCost != null ? shipping.fixedCost : 0;
-             return `$${cost.toFixed(2)}`;
-        }
-        return "Por definir";
-    };
-
-    const getTimeLabel = () => {
-        return orderType === OrderType.TakeAway ? "Tiempo recogida" : "Tiempo envío";
-    };
-
-    const getTimeText = () => {
-        if (orderType === OrderType.TakeAway) {
-             return `${shipping.pickupTime.min} min`;
-        }
-        return `${shipping.deliveryTime.min} - ${shipping.deliveryTime.max} min`;
-    };
-    
-    return (
-        <div className="relative">
-            {/* Cover Image Background */}
-            <div className="h-48 w-full overflow-hidden relative">
-                {branch.coverImageUrl ? (
-                    <img src={branch.coverImageUrl} alt="Cover" className="w-full h-full object-cover" />
-                ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900" />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent"></div>
-            </div>
-
-            <div className="px-6 relative -mt-16 flex flex-col items-center text-center pb-6 border-b border-gray-800">
-                 {/* Logo */}
-                <div className="w-28 h-28 bg-gray-800 rounded-full p-1 shadow-2xl mb-3 relative z-10">
-                     <div className="w-full h-full rounded-full overflow-hidden bg-black flex items-center justify-center">
-                        {branch.logoUrl ? 
-                            <img src={branch.logoUrl} alt={`${company.name} logo`} className="w-full h-full object-cover" />
-                            :
-                            <span className="text-2xl font-bold text-emerald-500">{company.name.substring(0,2).toUpperCase()}</span>
-                        }
-                     </div>
-                </div>
-                
-                {hasActiveSession && (
-                    <div className="mb-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black px-4 py-1.5 rounded-full animate-pulse shadow-lg shadow-emerald-500/20 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
-                        MESA CON CUENTA ABIERTA
-                    </div>
-                )}
-
-                <h1 className="text-2xl font-bold text-white mb-1">{company.name}</h1>
-                <div className="flex flex-col items-center gap-1 mb-4">
-                    <p className="text-sm text-gray-400 flex items-center gap-1">
-                        {branch.alias}
-                    </p>
-                    {currentSchedule && (
-                        <div className="flex items-center gap-2 mt-1">
-                            <span className={`w-2 h-2 rounded-full ${isOpenNow ? 'bg-emerald-500' : 'bg-rose-500'} animate-pulse`}></span>
-                            <button onClick={() => setShowSchedule(true)} className={`text-xs font-bold ${isOpenNow ? 'text-emerald-400' : 'text-rose-400'} hover:underline`}>
-                                {isOpenNow ? 'Abierto Ahora' : 'Cerrado'}
-                            </button>
-                        </div>
-                    )}
-                </div>
-
-                {tableInfo ? (
-                    <div className="w-full p-3 bg-emerald-900/30 border border-emerald-700/50 rounded-xl flex items-center justify-center gap-3 animate-fade-in">
-                        <IconTableLayout className="h-5 w-5 text-emerald-400" />
-                        <p className="font-medium text-emerald-200 text-sm">Estás en la mesa <span className="font-bold text-white">{tableInfo.table}</span> ({tableInfo.zone})</p>
-                    </div>
-                ) : (
-                    <>
-                    <div className="w-full max-w-xs bg-gray-800 rounded-full p-1 flex relative mb-4 shadow-inner">
-                        <div 
-                            className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-gray-700 rounded-full transition-transform duration-300 ease-out shadow-sm ${orderType === OrderType.TakeAway ? 'translate-x-full left-1' : 'left-1'}`}
-                        ></div>
-                        <button 
-                            onClick={() => setOrderType(OrderType.Delivery)} 
-                            className={`flex-1 relative z-10 py-2 text-sm font-medium rounded-full transition-colors duration-200 ${orderType === OrderType.Delivery ? 'text-emerald-400' : 'text-gray-400 hover:text-gray-200'}`}
-                        >
-                            A domicilio
-                        </button>
-                        <button 
-                            onClick={() => setOrderType(OrderType.TakeAway)} 
-                            className={`flex-1 relative z-10 py-2 text-sm font-medium rounded-full transition-colors duration-200 ${orderType === OrderType.TakeAway ? 'text-emerald-400' : 'text-gray-400 hover:text-gray-200'}`}
-                        >
-                            Para recoger
-                        </button>
-                    </div>
-
-                    <div className="grid grid-cols-2 divide-x divide-gray-800 w-full max-w-xs">
-                        <div className="text-center px-4">
-                            <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">{getTimeLabel()}</p>
-                            <p className="text-white font-medium">{getTimeText()}</p>
-                        </div>
-                        <div className="text-center px-4">
-                            <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">Costo envío</p>
-                            <p className="text-white font-medium">{getShippingCostText()}</p>
-                        </div>
-                    </div>
-                    </>
-                )}
-            </div>
-            
-            {/* Schedule Modal */}
-            {currentSchedule && (
-                <ScheduleModal 
-                    isOpen={showSchedule} 
-                    onClose={() => setShowSchedule(false)} 
-                    schedule={currentSchedule}
-                />
-            )}
-        </div>
-    );
-};
-
-const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price: number, promotion?: Promotion } => {
-    const now = new Date();
-    // Filter active promotions
-    const activePromotions = promotions.filter(p => {
-        if (p.startDate && new Date(p.startDate) > now) return false;
-        if (p.endDate && new Date(p.endDate) < now) return false;
-        
-        if (p.appliesTo === PromotionAppliesTo.AllProducts) return true;
-        return p.productIds.includes(product.id);
-    });
-
-    if (activePromotions.length === 0) return { price: product.price };
-
-    // Find the best discount
-    let bestPrice = product.price;
-    let bestPromo: Promotion | undefined;
-
-    activePromotions.forEach(promo => {
-        let currentPrice = product.price;
-        if (promo.discountType === DiscountType.Percentage) {
-            currentPrice = product.price * (1 - promo.discountValue / 100);
-        } else {
-            currentPrice = Math.max(0, product.price - promo.discountValue);
-        }
-
-        if (currentPrice < bestPrice) {
-            bestPrice = currentPrice;
-            bestPromo = promo;
-        }
-    });
-
-    return { price: bestPrice, promotion: bestPromo };
-};
-
-const ProductRow: React.FC<{ product: Product; quantityInCart: number; onClick: () => void; currency: string; promotions: Promotion[] }> = ({ product, quantityInCart, onClick, currency, promotions }) => {
-    const { price: discountedPrice, promotion } = getDiscountedPrice(product, promotions);
-    const hasDiscount = promotion !== undefined;
-
-    return (
-        <div onClick={onClick} className="bg-gray-800 rounded-xl p-3 flex gap-4 hover:bg-gray-750 active:scale-[0.99] transition-all cursor-pointer border border-gray-700 shadow-sm group relative overflow-hidden">
-            {hasDiscount && (
-                <div className="absolute top-0 left-0 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-br-lg z-10">
-                    -{promotion.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}
-                </div>
-            )}
-            <div className="relative h-24 w-24 flex-shrink-0">
-                <img src={product.imageUrl} alt={product.name} className="w-full h-full rounded-lg object-cover" />
-                {quantityInCart > 0 && (
-                    <div className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg ring-2 ring-gray-900">
-                        {quantityInCart}
-                    </div>
-                )}
-            </div>
-            <div className="flex-1 flex flex-col justify-between py-1">
-                <div>
-                    <h3 className="font-bold text-gray-100 leading-tight group-hover:text-emerald-400 transition-colors">{product.name}</h3>
-                    <p className="text-sm text-gray-400 line-clamp-2 mt-1 leading-snug">{product.description}</p>
-                </div>
-                <div className="flex justify-between items-end mt-2">
-                    <div className="flex flex-col">
-                        {hasDiscount && (
-                            <span className="text-xs text-gray-500 line-through">{currency} ${product.price.toFixed(2)}</span>
-                        )}
-                        <p className={`font-bold ${hasDiscount ? 'text-rose-400' : 'text-white'}`}>{currency} ${discountedPrice.toFixed(2)}</p>
-                    </div>
-                    <div className="bg-gray-700 p-1.5 rounded-full text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
-                        <IconPlus className="h-4 w-4" />
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const MenuList: React.FC<{
-    products: Product[],
-    categories: Category[],
-    onProductClick: (product: Product) => void, 
-    cartItems: CartItem[], 
-    currency: string, 
-    promotions: Promotion[]
-}> = ({ products, categories, onProductClick, cartItems, currency, promotions }) => {
-    const [searchTerm, setSearchTerm] = useState('');
-    const [activeCategory, setActiveCategory] = useState<string>('');
-    
-    // Initialize active category on load
-    useEffect(() => {
-        if (categories.length > 0 && !activeCategory) {
-            setActiveCategory(categories[0].id);
-        }
-    }, [categories, activeCategory]);
-
-    const productQuantities = useMemo(() => {
-        const quantities: { [productId: string]: number } = {};
-        cartItems.forEach(item => {
-            quantities[item.id] = (quantities[item.id] || 0) + item.quantity;
-        });
-        return quantities;
-    }, [cartItems]);
-
-    const filteredProducts = useMemo(() => {
-        return products.filter(p => 
-            p.available && 
-            p.name.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [products, searchTerm]);
-
-    const groupedProducts = useMemo(() => {
-        const standardGroups = categories
-            .map(category => ({
-                ...category,
-                products: filteredProducts.filter(p => p.categoryId === category.id)
-            }))
-            .filter(category => category.products.length > 0);
-
-        const categoryIds = new Set(categories.map(c => c.id));
-        const orphanedProducts = filteredProducts.filter(p => !categoryIds.has(p.categoryId));
-
-        if (orphanedProducts.length > 0) {
-            standardGroups.push({
-                id: 'uncategorized',
-                name: 'Otros',
-                products: orphanedProducts
-            });
-        }
-
-        return standardGroups;
-    }, [filteredProducts, categories]);
-
-    const handleCategoryClick = (categoryId: string) => {
-        setActiveCategory(categoryId);
-        const element = document.getElementById(`category-${categoryId}`);
-        if (element) {
-            const y = element.getBoundingClientRect().top + window.pageYOffset - 140; 
-            window.scrollTo({ top: y, behavior: 'smooth' });
-        }
-    };
-
-    return (
-        <div className="pb-24">
-            <div className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur shadow-lg pt-2">
-                <div className="px-4 mb-2">
-                    <div className="relative">
-                        <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-5 w-5" />
-                        <input 
-                            type="text" 
-                            placeholder="Buscar productos..." 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full bg-gray-800 text-white rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder-gray-500"
-                        />
-                    </div>
-                </div>
-                
-                <div className="flex overflow-x-auto pb-3 pt-1 px-4 gap-2 hide-scrollbar scroll-smooth">
-                    {groupedProducts.map(category => (
-                         <button 
-                            key={category.id}
-                            onClick={() => handleCategoryClick(category.id)}
-                            className={`whitespace-nowrap px-5 py-2 rounded-full text-sm font-bold transition-all duration-200 border ${
-                                activeCategory === category.id 
-                                ? 'bg-white text-gray-900 border-white shadow-glow' 
-                                : 'bg-transparent text-gray-400 border-gray-700 hover:border-gray-500'
-                            }`}
-                        >
-                            {category.name}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            <div className="px-4 mt-4 space-y-8">
-                {groupedProducts.length > 0 ? groupedProducts.map(category => (
-                    <div key={category.id} id={`category-${category.id}`} className="scroll-mt-40">
-                        <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                            {category.name}
-                            <span className="text-xs font-normal text-gray-500 bg-gray-800 px-2 py-0.5 rounded-full">{category.products.length}</span>
-                        </h2>
-                        <div className="grid gap-4">
-                            {category.products.map(product => (
-                                <ProductRow 
-                                    key={product.id} 
-                                    product={product} 
-                                    quantityInCart={productQuantities[product.id] || 0} 
-                                    onClick={() => onProductClick(product)} 
-                                    currency={currency}
-                                    promotions={promotions}
-                                />
-                            ))}
-                        </div>
-                    </div>
-                )) : (
-                    <div className="text-center py-12 text-gray-500">
-                        <p>No encontramos productos que coincidan con "{searchTerm}"</p>
-                    </div>
-                )}
-            </div>
-            <style>{`
-                .hide-scrollbar::-webkit-scrollbar {
-                    display: none;
-                }
-                .hide-scrollbar {
-                    -ms-overflow-style: none;
-                    scrollbar-width: none;
-                }
-            `}</style>
-        </div>
-    );
-};
-
-const ProductDetailModal: React.FC<{
-    product: Product, 
-    onAddToCart: (product: Product, quantity: number, comments?: string, options?: PersonalizationOption[]) => void, 
-    onClose: () => void,
-    personalizations: Personalization[],
-    promotions: Promotion[]
-}> = ({product, onAddToCart, onClose, personalizations, promotions}) => {
-    const [quantity, setQuantity] = useState(1);
-    const [comments, setComments] = useState('');
-    const [isClosing, setIsClosing] = useState(false);
-    const [selectedOptions, setSelectedOptions] = useState<{ [personalizationId: string]: PersonalizationOption[] }>({});
-
-    const handleClose = () => {
-        setIsClosing(true);
-        setTimeout(onClose, 300); // Wait for animation
-    };
-
-    const { price: basePrice, promotion } = getDiscountedPrice(product, promotions);
-
-    const handleOptionToggle = (personalization: Personalization, option: PersonalizationOption) => {
-        setSelectedOptions(prev => {
-            const currentSelection = prev[personalization.id] || [];
-            const isSelected = currentSelection.some(opt => opt.id === option.id);
-            
-            if (personalization.maxSelection === 1) {
-                return { ...prev, [personalization.id]: [option] };
-            }
-
-            if (isSelected) {
-                return { ...prev, [personalization.id]: currentSelection.filter(opt => opt.id !== option.id) };
-            } else {
-                if (personalization.maxSelection && currentSelection.length >= personalization.maxSelection) {
-                    return prev;
-                }
-                return { ...prev, [personalization.id]: [...currentSelection, option] };
-            }
-        });
-    };
-
-    const isOptionSelected = (pid: string, oid: string) => {
-        return (selectedOptions[pid] || []).some(o => o.id === oid);
-    };
-
-    let totalOptionsPrice = 0;
-    const optionGroups = Object.values(selectedOptions);
-    for (const group of optionGroups) {
-        const options = group as PersonalizationOption[];
-        for (const opt of options) {
-            totalOptionsPrice += (Number(opt.price) || 0);
-        }
-    }
-    
-    const totalPrice = (basePrice + totalOptionsPrice) * quantity;
-
-    const handleAdd = () => {
-        const flatOptions = (Object.values(selectedOptions) as PersonalizationOption[][]).reduce((acc, curr) => acc.concat(curr), []);
-        onAddToCart({ ...product, price: basePrice }, quantity, comments, flatOptions);
-    }
-
-    return (
-        <div className={`fixed inset-0 z-50 flex items-end justify-center sm:items-center transition-opacity duration-300 ${isClosing ? 'opacity-0' : 'opacity-100'}`}>
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={handleClose}></div>
-            <div className={`w-full max-w-md bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[90vh] flex flex-col relative transform transition-transform duration-300 ${isClosing ? 'translate-y-full' : 'translate-y-0'}`}>
-                 
-                 <button onClick={handleClose} className="absolute top-4 right-4 bg-black/40 hover:bg-black/60 p-2 rounded-full text-white z-10 backdrop-blur-md transition-colors">
-                    <IconX className="h-6 w-6" />
-                </button>
-
-                <div className="h-64 w-full flex-shrink-0 relative">
-                     <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover rounded-t-3xl sm:rounded-t-2xl" />
-                     <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent h-full w-full pointer-events-none"></div>
-                     {promotion && (
-                        <div className="absolute bottom-12 left-6 bg-rose-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg">
-                            ¡Oferta Especial!
-                        </div>
-                     )}
-                </div>
-
-                <div className="p-6 flex-grow overflow-y-auto -mt-12 relative z-10">
-                    <h2 className="text-3xl font-bold text-white mb-2">{product.name}</h2>
-                    <p className="text-gray-300 leading-relaxed mb-6">{product.description}</p>
-                    
-                    <div className="space-y-6">
-                        {personalizations.map(p => (
-                            <div key={p.id} className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
-                                <div className="flex justify-between items-center mb-3">
-                                    <div>
-                                        <h4 className="font-bold text-white">{p.name}</h4>
-                                    </div>
-                                    <span className="text-xs text-gray-400">
-                                        {p.maxSelection === 1 ? 'Elige 1' : `Máx ${p.maxSelection || 'ilimitado'}`}
-                                    </span>
-                                </div>
-                                <div className="space-y-2">
-                                    {p.options.filter(o => o.available).map(opt => {
-                                        const isSelected = isOptionSelected(p.id, opt.id);
-                                        return (
-                                            <div 
-                                                key={opt.id} 
-                                                onClick={() => handleOptionToggle(p, opt)}
-                                                className={`flex justify-between items-center p-3 rounded-lg cursor-pointer border transition-all ${isSelected ? 'bg-emerald-500/20 border-emerald-500 ring-1 ring-emerald-500 shadow-lg shadow-emerald-900/20' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${isSelected ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-gray-500'}`}>
-                                                        {isSelected && <IconCheck className="h-3 w-3" />}
-                                                    </div>
-                                                    <span className={`text-sm ${isSelected ? 'text-white font-medium' : 'text-gray-300'}`}>{opt.name}</span>
-                                                </div>
-                                                {opt.price > 0 && (
-                                                    <span className="text-sm text-emerald-400">+${opt.price.toFixed(2)}</span>
-                                                )}
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className="mt-6">
-                        <label className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Instrucciones especiales</label>
-                        <textarea 
-                            value={comments}
-                            onChange={(e) => setComments(e.target.value)}
-                            rows={3}
-                            className="w-full p-3 rounded-xl bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all resize-none"
-                            placeholder="Ej. Sin cebolla, salsa aparte..."
-                        />
-                    </div>
-                </div>
-
-                <div className="p-4 border-t border-gray-800 bg-gray-900 rounded-b-3xl sm:rounded-b-2xl safe-bottom">
-                    <div className="flex items-center justify-between gap-4 mb-4">
-                         <span className="text-gray-400 font-medium">Cantidad</span>
-                         <div className="flex items-center gap-6 bg-gray-800 rounded-full px-2 py-1 border border-gray-700">
-                            <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="p-2 rounded-full hover:bg-gray-700 text-white transition-colors"><IconMinus className="h-5 w-5"/></button>
-                            <span className="font-bold text-xl text-white w-6 text-center">{quantity}</span>
-                            <button onClick={() => setQuantity(q => q + 1)} className="p-2 rounded-full hover:bg-gray-700 text-white transition-colors"><IconPlus className="h-5 w-5"/></button>
-                        </div>
-                    </div>
-                    <button 
-                        onClick={handleAdd}
-                        className="w-full font-bold py-4 px-6 rounded-xl transition-all transform active:scale-[0.98] shadow-lg flex justify-between items-center bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-900/20"
-                    >
-                        <span>Agregar al pedido</span>
-                        <span>${totalPrice.toFixed(2)}</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-const CartSummaryView: React.FC<{
-    cartItems: CartItem[], 
-    cartTotal: number,
-    onUpdateQuantity: (id: string, q: number) => void, 
-    onRemoveItem: (id: string) => void,
-    generalComments: string,
-    onGeneralCommentsChange: (c: string) => void,
-    onProceedToCheckout: () => void,
-    allProducts: Product[]
-}> = ({ cartItems, cartTotal, onUpdateQuantity, onRemoveItem, generalComments, onGeneralCommentsChange, onProceedToCheckout, allProducts }) => {
-    
-    if (cartItems.length === 0) {
-        return (
-            <div className="p-8 text-center h-[calc(100vh-80px)] flex flex-col items-center justify-center text-gray-400">
-                 <div className="w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center mb-6">
-                    <IconClock className="h-10 w-10 opacity-50" />
-                 </div>
-                 <h2 className="text-2xl font-bold mb-2 text-white">Tu carrito está vacío</h2>
-                 <p className="mb-8">¿Hambre? Explora nuestro menú y encuentra algo delicioso.</p>
-                 <button onClick={() => window.history.back()} className="px-6 py-3 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-colors">Ir al Menú</button>
-            </div>
-        )
-    }
-
-    return (
-        <div className="p-4 pb-40 animate-fade-in">
-            <h2 className="text-2xl font-black mb-6 text-white">REVISAR PEDIDO</h2>
-            <PairingAI items={cartItems} allProducts={allProducts} />
-            
-            <div className="space-y-4">
-                {cartItems.map(item => {
-                    const options: PersonalizationOption[] = item.selectedOptions || [];
-                    let optionsTotal = 0;
-                    for (const o of options) {
-                        optionsTotal += Number(o.price || 0);
-                    }
-                    const itemTotal = (Number(item.price || 0) + optionsTotal) * item.quantity;
-
-                    return (
-                        <div key={item.cartItemId} className="flex gap-4 bg-gray-800/50 p-3 rounded-xl border border-gray-800">
-                            <img src={item.imageUrl} alt={item.name} className="w-20 h-20 rounded-lg object-cover"/>
-                            <div className="flex-grow flex flex-col justify-between">
-                                <div className="flex justify-between items-start">
-                                    <h3 className="font-bold text-gray-100">{item.name}</h3>
-                                    <p className="font-bold text-emerald-400">${itemTotal.toFixed(2)}</p>
-                                </div>
-                                {item.selectedOptions && item.selectedOptions.length > 0 && (
-                                    <div className="flex flex-wrap gap-1 mt-1 mb-1">
-                                        {item.selectedOptions.map((opt, idx) => (
-                                            <span key={idx} className="text-xs text-gray-400 bg-gray-700/50 px-2 py-0.5 rounded-md border border-gray-700">
-                                                {opt.name}
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
-                                {item.comments && <p className="text-xs text-gray-400 italic line-clamp-1">"{item.comments}"</p>}
-                                
-                                <div className="flex items-center justify-between mt-2">
-                                    <div className="flex items-center gap-3 bg-gray-800 rounded-lg px-1 border border-gray-700">
-                                        <button onClick={() => item.quantity > 1 ? onUpdateQuantity(item.cartItemId, item.quantity - 1) : onRemoveItem(item.cartItemId)} className="p-1.5 text-gray-300 hover:text-white"><IconMinus className="h-4 w-4"/></button>
-                                        <span className="font-bold w-4 text-center text-sm text-white">{item.quantity}</span>
-                                        <button onClick={() => onUpdateQuantity(item.cartItemId, item.quantity + 1)} className="p-1.5 text-gray-300 hover:text-white"><IconPlus className="h-4 w-4"/></button>
-                                    </div>
-                                    <button onClick={() => onRemoveItem(item.cartItemId)} className="text-gray-500 hover:text-red-400 p-2"><IconTrash className="h-5 w-5"/></button>
-                                </div>
-                            </div>
-                        </div>
-                    )
-                })}
-            </div>
-            
-             <div className="mt-8">
-                <label className="font-bold text-gray-300 block mb-2">Comentarios generales</label>
-                <textarea 
-                    value={generalComments}
-                    onChange={(e) => onGeneralCommentsChange(e.target.value)}
-                    rows={2}
-                    className="w-full p-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    placeholder="¿Algo más que debamos saber?"
-                />
-            </div>
-
-             <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-gray-900 border-t border-gray-800 shadow-2xl p-4 safe-bottom z-30 rounded-t-[3rem]">
-                <div className="flex justify-between items-center mb-4 px-2">
-                    <span className="text-gray-400 text-xs tracking-widest uppercase">Total ronda</span>
-                    <span className="font-black text-2xl text-emerald-500">${cartTotal.toFixed(2)}</span>
-                </div>
-                 <button onClick={onProceedToCheckout} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 px-6 rounded-xl shadow-lg shadow-emerald-900/20 transition-all transform active:scale-[0.98]">
-                    CONTINUAR
-                </button>
-            </div>
-        </div>
-    )
-}
-
-const CheckoutView: React.FC<{
-    cartTotal: number, 
-    onPlaceOrder: (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number, paymentProof?: string | null) => void, 
-    settings: AppSettings, 
-    orderType: OrderType,
-    isFinalPayment: boolean,
+    tableInfo: { table: string, zone: string } | null,
+    hasActiveSession: boolean,
     sessionTotal: number
-}> = ({ cartTotal, onPlaceOrder, settings, orderType, isFinalPayment, sessionTotal }) => {
-    const [customer, setCustomer] = useState<Customer>({
-        name: '', phone: '', address: { colonia: '', calle: '', numero: '', entreCalles: '', referencias: '' }
-    });
-    const [tipAmount, setTipAmount] = useState<number>(0);
-    const [paymentProof, setPaymentProof] = useState<string | null>(null);
-    
-    const isDelivery = orderType === OrderType.Delivery;
-    const isPickup = orderType === OrderType.TakeAway;
-    const isDineIn = orderType === OrderType.DineIn;
-    const isSimpleComanda = isDineIn && !isFinalPayment; // Kitchen Round
-
-    // Determine available payment methods
-    const availablePaymentMethods = isDelivery 
-        ? settings.payment.deliveryMethods 
-        : settings.payment.pickupMethods;
-
-    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>(availablePaymentMethods[0] || 'Efectivo');
-
-    const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        setCustomer(prev => ({
-            ...prev,
-            address: { ...prev.address, [name]: value }
-        }));
-    };
-
-    const handleTipSelection = (percentage: number) => {
-        const base = isFinalPayment ? sessionTotal : cartTotal;
-        setTipAmount(base * (percentage / 100));
-    };
-
-    const handleProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setPaymentProof(reader.result as string);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        onPlaceOrder(customer, selectedPaymentMethod, tipAmount, paymentProof);
-    };
-
-    const inputClasses = "w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-gray-500 transition-all font-bold text-sm";
-    const labelClasses = "text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mb-1 block";
-
-    const shippingCost: number = (isDelivery && settings.shipping.costType === ShippingCostType.Fixed) ? (Number(settings.shipping.fixedCost) || 0) : 0;
-    const displayTotal = isFinalPayment ? sessionTotal : cartTotal;
-    const finalTotal = (Number(displayTotal) || 0) + Number(shippingCost) + (Number(tipAmount) || 0);
-    
-    return (
-        <form onSubmit={handleSubmit} className="p-4 space-y-6 pb-44 animate-fade-in">
-            <div className="space-y-4 p-7 bg-gray-800/30 border border-gray-800 rounded-[2.5rem] shadow-sm">
-                <h3 className={labelClasses}>DATOS CLIENTE</h3>
-                <div>
-                    <input type="text" value={customer.name} onChange={e => setCustomer(c => ({...c, name: e.target.value}))} className={inputClasses} placeholder="¿A qué nombre la orden?" required />
-                </div>
-                 {!isSimpleComanda && (
-                    <div>
-                        <input type="tel" value={customer.phone} onChange={e => setCustomer(c => ({...c, phone: e.target.value}))} className={inputClasses} placeholder="WhatsApp para contacto" required />
-                    </div>
-                )}
-            </div>
-
-            {isDelivery && (
-                <div className="space-y-4 p-7 bg-gray-800/30 border border-gray-800 rounded-[2.5rem]">
-                    <h3 className={labelClasses}>DIRECCIÓN DE ENTREGA</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="col-span-2">
-                            <input type="text" name="calle" placeholder="Calle" value={customer.address.calle} onChange={handleAddressChange} className={inputClasses} required />
-                        </div>
-                        <div>
-                            <input type="text" name="numero" placeholder="N° Ext." value={customer.address.numero} onChange={handleAddressChange} className={inputClasses} required />
-                        </div>
-                         <div>
-                            <input type="text" name="colonia" placeholder="Colonia" value={customer.address.colonia} onChange={handleAddressChange} className={inputClasses} required />
-                        </div>
-                    </div>
-                    <div>
-                        <input type="text" name="referencias" placeholder="Referencias (Opcional)" value={customer.address.referencias} onChange={handleAddressChange} className={inputClasses} />
-                    </div>
-                </div>
-            )}
-            
-            {isPickup && (
-                 <div className="p-5 bg-emerald-900/20 border border-emerald-800/50 rounded-2xl text-center">
-                    <IconStore className="h-10 w-10 text-emerald-500 mx-auto mb-2"/>
-                    <h3 className="font-bold text-white">Recoger en Tienda</h3>
-                    <p className="text-sm text-gray-400 mt-1">No olvides pasar a recoger tu pedido.</p>
-                    <p className="text-sm text-gray-400 mt-1 font-medium">{settings.branch.fullAddress}</p>
-                </div>
-            )}
-
-            {!isSimpleComanda && settings.payment.showTipField && (
-                <div className="space-y-3 p-7 bg-gray-800/30 border border-gray-800 rounded-[2.5rem]">
-                    <h3 className={labelClasses}>PROPINA EQUIPO</h3>
-                    <div className="flex gap-2">
-                        {[10, 15, 20].map(pct => (
-                            <button 
-                                key={pct}
-                                type="button" 
-                                onClick={() => handleTipSelection(pct)}
-                                className={`flex-1 py-3 rounded-xl font-bold text-sm border transition-all ${Math.abs(tipAmount - (displayTotal * pct / 100)) < 0.1 ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-gray-800 border-gray-600 text-gray-300 hover:border-gray-500'}`}
-                            >
-                                {pct}%
-                            </button>
-                        ))}
-                        <div className="flex-1 relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
-                            <input 
-                                type="number" 
-                                placeholder="Otro" 
-                                value={tipAmount || ''}
-                                onChange={(e) => setTipAmount(parseFloat(e.target.value) || 0)}
-                                className="w-full py-3 pl-6 pr-2 bg-gray-800 border border-gray-600 rounded-xl text-white text-sm focus:border-emerald-500 outline-none font-bold"
-                            />
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {!isSimpleComanda && (
-            <div className="space-y-3 p-7 bg-gray-800/30 border border-gray-800 rounded-[2.5rem]">
-                 <h3 className={labelClasses}>MÉTODO DE PAGO</h3>
-                 <div className="space-y-2 pt-2">
-                    {availablePaymentMethods.map(method => (
-                        <div key={method}>
-                            <label className={`flex justify-between items-center p-4 rounded-xl cursor-pointer transition-all border ${selectedPaymentMethod === method ? 'bg-emerald-900/20 border-emerald-500 ring-1 ring-emerald-500 shadow-lg shadow-emerald-900/10' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}>
-                                <span className={`font-medium ${selectedPaymentMethod === method ? 'text-emerald-400' : 'text-white'}`}>{method}</span>
-                                <input type="radio" name="payment" value={method} checked={selectedPaymentMethod === method} onChange={() => {setSelectedPaymentMethod(method); setPaymentProof(null);}} className="h-5 w-5 accent-emerald-500" />
-                            </label>
-                            
-                            {(selectedPaymentMethod === method && (method === 'Pago Móvil' || method === 'Transferencia')) && (
-                                <div className="mt-2 p-4 bg-gray-700/50 rounded-xl border border-gray-600 animate-fade-in">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <h4 className="text-emerald-400 font-bold text-sm uppercase">Datos {method}</h4>
-                                        <button type="button" onClick={() => {
-                                            let text = '';
-                                            if (method === 'Pago Móvil' && settings.payment.pagoMovil) {
-                                                text = `Banco: ${settings.payment.pagoMovil.bank}\nTel: ${settings.payment.pagoMovil.phone}\nCI/RIF: ${settings.payment.pagoMovil.idNumber}`;
-                                            } else if (method === 'Transferencia' && settings.payment.transfer) {
-                                                text = `Banco: ${settings.payment.transfer.bank}\nCuenta: ${settings.payment.transfer.accountNumber}\nTitular: ${settings.payment.transfer.accountHolder}\nCI/RIF: ${settings.payment.transfer.idNumber}`;
-                                            }
-                                            navigator.clipboard.writeText(text);
-                                            alert('Datos copiados');
-                                        }} className="text-xs text-gray-400 hover:text-white flex items-center gap-1"><IconDuplicate className="h-3 w-3"/> Copiar</button>
-                                    </div>
-                                    
-                                    <div className="text-sm text-gray-200 space-y-1 font-mono mb-4">
-                                        {method === 'Pago Móvil' && settings.payment.pagoMovil && (
-                                            <>
-                                                <p><span className="text-gray-500">Banco:</span> {settings.payment.pagoMovil.bank}</p>
-                                                <p><span className="text-gray-500">Teléfono:</span> {settings.payment.pagoMovil.phone}</p>
-                                                <p><span className="text-gray-500">Cédula/RIF:</span> {settings.payment.pagoMovil.idNumber}</p>
-                                            </>
-                                        )}
-                                        {method === 'Transferencia' && settings.payment.transfer && (
-                                            <>
-                                                <p><span className="text-gray-500">Banco:</span> {settings.payment.transfer.bank}</p>
-                                                <p><span className="text-gray-500">Cuenta:</span> {settings.payment.transfer.accountNumber}</p>
-                                                <p><span className="text-gray-500">Titular:</span> {settings.payment.transfer.accountHolder}</p>
-                                                <p><span className="text-gray-500">CI/RIF:</span> {settings.payment.transfer.idNumber}</p>
-                                            </>
-                                        )}
-                                    </div>
-                                    
-                                    <div className="mt-4 border-t border-gray-700/50 pt-4">
-                                        <p className="text-xs font-bold text-gray-400 uppercase mb-2">Comprobante de pago</p>
-                                        {!paymentProof ? (
-                                            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:bg-gray-800 transition-colors bg-gray-800/30">
-                                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                                    <IconUpload className="w-8 h-8 text-gray-400 mb-2" />
-                                                    <p className="text-xs text-gray-400 font-medium">Subir captura</p>
-                                                </div>
-                                                <input type="file" className="hidden" accept="image/*" onChange={handleProofUpload} />
-                                            </label>
-                                        ) : (
-                                            <div className="relative w-full h-48 rounded-xl overflow-hidden border border-emerald-500/50 shadow-lg">
-                                                <img src={paymentProof} alt="Comprobante" className="w-full h-full object-cover" />
-                                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                                                     <button type="button" onClick={() => setPaymentProof(null)} className="bg-red-500 text-white p-3 rounded-full shadow-lg transform hover:scale-110 transition-transform">
-                                                        <IconTrash className="h-6 w-6" />
-                                                     </button>
-                                                </div>
-                                                <div className="absolute bottom-2 right-2 bg-emerald-500 text-white text-[10px] px-3 py-1 rounded-full font-bold shadow-lg flex items-center gap-1">
-                                                    <IconCheck className="h-3 w-3" /> Cargado
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                 </div>
-            </div>
-            )}
-            
-            <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-gray-900/95 backdrop-blur-xl border-t border-gray-800 shadow-2xl p-6 safe-bottom z-30 rounded-t-[3rem]">
-                <div className="space-y-2 mb-6 text-sm px-2">
-                     <div className="flex justify-between text-gray-400 font-medium">
-                        <span>Subtotal {isFinalPayment ? '(Acumulado)' : ''}</span>
-                        <span>${displayTotal.toFixed(2)}</span>
-                    </div>
-                    {isDelivery && (
-                        <div className="flex justify-between text-gray-400 font-medium">
-                            <span>Envío</span>
-                            <span>{shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : "Por cotizar"}</span>
-                        </div>
-                    )}
-                    {tipAmount > 0 && (
-                        <div className="flex justify-between text-emerald-400 font-medium">
-                            <span>Propina</span>
-                            <span>${tipAmount.toFixed(2)}</span>
-                        </div>
-                    )}
-                     <div className="flex justify-between font-black text-2xl text-white pt-2 border-t border-gray-800 mt-2">
-                        <span className="text-[10px] uppercase tracking-widest text-gray-500 self-center">{isFinalPayment ? 'TOTAL A PAGAR' : 'TOTAL RONDA'}</span>
-                        <span>${finalTotal.toFixed(2)}</span>
-                    </div>
-                </div>
-                 <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-5 px-6 rounded-2xl shadow-lg flex items-center justify-center gap-3 transition-all transform active:scale-[0.98] uppercase tracking-widest text-xs">
-                    {isSimpleComanda ? 'ENVIAR COMANDA A COCINA' : <><IconWhatsapp className="h-6 w-6" /> {isFinalPayment ? 'LIQUIDAR CUENTA FINAL' : 'REALIZAR PEDIDO'}</>}
-                </button>
-            </div>
-        </form>
-    )
-}
-
-const OrderConfirmation: React.FC<{ onNewOrder: () => void, settings: AppSettings, isFinalPayment: boolean }> = ({ onNewOrder, settings, isFinalPayment }) => (
-    <div className="p-6 text-center flex flex-col items-center justify-center h-[80vh] animate-fade-in">
-        <div className="w-28 h-28 bg-emerald-500/10 rounded-full flex items-center justify-center mb-6 border-2 border-emerald-500/20 shadow-inner">
-            <IconCheck className="w-14 h-14 text-emerald-500"/>
+}> = ({ settings, orderType, setOrderType, tableInfo, hasActiveSession, sessionTotal }) => (
+    <div className="relative pb-6 border-b border-gray-800">
+        <div className="h-44 w-full overflow-hidden relative">
+            {settings.branch.coverImageUrl ? <img src={settings.branch.coverImageUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900" />}
+            <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/40 to-transparent"></div>
         </div>
-        <h3 className="text-3xl font-black mb-3 text-white uppercase tracking-tight">{isFinalPayment ? '¡CUENTA CERRADA!' : '¡ENVIADO A COCINA!'}</h3>
-        <p className="text-gray-400 mb-8 text-sm font-medium leading-relaxed max-w-xs mx-auto">
-            {isFinalPayment 
-                ? 'Hemos recibido tu reporte de pago. ¡Gracias por visitarnos!' 
-                : 'Tu ronda ha sido enviada. Puedes seguir pidiendo más cosas desde el menú cuando gustes.'}
-        </p>
-        <button onClick={onNewOrder} className="w-full max-w-xs bg-gray-800 text-white py-5 rounded-3xl font-black text-xs uppercase tracking-widest hover:bg-gray-700 transition-colors border border-gray-700 shadow-xl">
-            VOLVER AL MENÚ
-        </button>
+        <div className="px-6 -mt-14 flex flex-col items-center text-center relative z-10">
+            <div className="w-28 h-28 bg-gray-800 rounded-full p-1 shadow-2xl mb-3 border-4 border-gray-900 overflow-hidden">
+                {settings.branch.logoUrl ? <img src={settings.branch.logoUrl} className="w-full h-full object-cover rounded-full" /> : <div className="w-full h-full flex items-center justify-center font-bold text-emerald-500 text-2xl bg-gray-700">{settings.company.name.slice(0,2)}</div>}
+            </div>
+            
+            {hasActiveSession && tableInfo && (
+                <div className="mb-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black px-4 py-1.5 rounded-full animate-pulse shadow-lg shadow-emerald-500/20 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
+                    CUENTA ABIERTA: ${sessionTotal.toFixed(2)}
+                </div>
+            )}
+
+            <h1 className="text-2xl font-black text-white">{settings.company.name}</h1>
+            <p className="text-[10px] text-gray-500 mb-5 uppercase tracking-widest font-bold">{settings.branch.alias}</p>
+            
+            {tableInfo ? (
+                <div className="bg-emerald-950/40 backdrop-blur border border-emerald-500/30 px-5 py-2.5 rounded-2xl flex items-center gap-3">
+                    <IconTableLayout className="h-5 w-5 text-emerald-400"/>
+                    <div className="text-left">
+                        <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">SU UBICACIÓN</p>
+                        <p className="text-sm font-black text-white">Mesa {tableInfo.table} • {tableInfo.zone}</p>
+                    </div>
+                </div>
+            ) : (
+                <div className="w-full max-w-xs bg-gray-800/50 rounded-full p-1 flex relative border border-gray-700 backdrop-blur-sm shadow-xl">
+                    <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-emerald-600 rounded-full transition-all duration-300 ${orderType === OrderType.TakeAway ? 'translate-x-full left-1' : 'left-1'}`}></div>
+                    <button onClick={() => setOrderType(OrderType.Delivery)} className={`flex-1 relative z-10 py-2 text-xs font-black transition-colors ${orderType === OrderType.Delivery ? 'text-white' : 'text-gray-500'}`}>A DOMICILIO</button>
+                    <button onClick={() => setOrderType(OrderType.TakeAway)} className={`flex-1 relative z-10 py-2 text-xs font-black transition-colors ${orderType === OrderType.TakeAway ? 'text-white' : 'text-gray-500'}`}>RECOGER</button>
+                </div>
+            )}
+        </div>
     </div>
 );
 
-const FooterBar: React.FC<{ itemCount: number, cartTotal: number, onViewCart: () => void, hasActiveSession: boolean, sessionTotal: number, onOpenBill: () => void }> = ({ itemCount, cartTotal, onViewCart, hasActiveSession, sessionTotal, onOpenBill }) => {
-    return (
-         <footer className="fixed bottom-6 left-6 right-6 max-w-md mx-auto z-40 flex flex-col gap-3 animate-slide-up">
-            {hasActiveSession && (
-                <button 
-                    onClick={onOpenBill} 
-                    className="w-full bg-gray-800/95 backdrop-blur-md text-white font-black py-4 px-7 rounded-3xl flex justify-between items-center border border-emerald-500/30 shadow-2xl transition-all hover:bg-gray-700 active:scale-95 group"
-                >
-                    <span className="flex items-center gap-3 text-[10px] uppercase tracking-[0.2em]"><IconReceipt className="h-5 w-5 text-emerald-400 group-hover:scale-110 transition-transform"/> MI CUENTA</span>
-                    <span className="bg-emerald-500 px-3 py-1 rounded-xl text-xs font-mono shadow-lg shadow-emerald-500/20">${sessionTotal.toFixed(2)}</span>
-                </button>
-            )}
-            
-            {itemCount > 0 && (
-                <button onClick={onViewCart} className="w-full bg-emerald-500 text-white font-black py-5 px-7 rounded-3xl flex justify-between items-center shadow-2xl shadow-emerald-900/50 hover:bg-emerald-400 transition-transform hover:-translate-y-1 active:translate-y-0 border border-emerald-400/20">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-emerald-700/50 px-3 py-1 rounded-lg text-xs font-extrabold border border-emerald-400/30">{itemCount}</div>
-                        <span className="text-[10px] uppercase tracking-[0.2em]">VER RONDA</span>
-                    </div>
-                    <span className="text-lg">${cartTotal.toFixed(2)}</span>
-                </button>
-            )}
-        </footer>
-    );
-};
+// --- Componente Principal ---
 
-// Main View Manager
 export default function CustomerView() {
     const [view, setView] = useState<'menu' | 'cart' | 'checkout' | 'confirmation'>('menu');
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-    const [generalComments, setGeneralComments] = useState('');
     const [settings, setSettings] = useState<AppSettings | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [tableInfo, setTableInfo] = useState<{ table: string; zone: string } | null>(null);
     const [orderType, setOrderType] = useState<OrderType>(OrderType.Delivery);
+    const [tableInfo, setTableInfo] = useState<{ table: string; zone: string } | null>(null);
     
-    // Session State
+    // --- LÓGICA DE SESIÓN DE MESA ---
+    // Persistencia usando localStorage para mantener la cuenta abierta si se recarga
     const [activeOrderId, setActiveOrderId] = useState<string | null>(() => localStorage.getItem('activeOrderId'));
     const [sessionTotal, setSessionTotal] = useState<number>(() => Number(localStorage.getItem('sessionTotal')) || 0);
+    // Indica si estamos en el flujo de "Cerrar cuenta" o "Enviar ronda"
     const [isFinalPayment, setIsFinalPayment] = useState(false);
 
-    const { cartItems, addToCart, removeFromCart, updateQuantity, clearCart, cartTotal, itemCount } = useCart();
-    
-    // Global data for the menu
-    const [allPromotions, setAllPromotions] = useState<Promotion[]>([]);
-    const [allPersonalizations, setAllPersonalizations] = useState<Personalization[]>([]);
+    const { cartItems, addToCart, removeFromCart, updateQuantity, cartTotal, clearCart } = useCart();
     const [allProducts, setAllProducts] = useState<Product[]>([]);
     const [allCategories, setAllCategories] = useState<Category[]>([]);
-
-    const fetchMenuData = async () => {
-        try {
-            const [appSettings, fetchedPromotions, fetchedPersonalizations, fetchedProducts, fetchedCategories] = await Promise.all([
-                getAppSettings(),
-                getPromotions(),
-                getPersonalizations(),
-                getProducts(),
-                getCategories()
-            ]);
-            setSettings(appSettings);
-            setAllPromotions(fetchedPromotions);
-            setAllPersonalizations(fetchedPersonalizations);
-            setAllProducts(fetchedProducts);
-            setAllCategories(fetchedCategories);
-        } catch (error) {
-            console.error("Failed to fetch data:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    const [isLoadingData, setIsLoadingData] = useState(true);
 
     useEffect(() => {
-        fetchMenuData();
-        subscribeToMenuUpdates(() => {
-            fetchMenuData();
-        });
+        const fetch = async () => {
+            try {
+                const [s, p, c] = await Promise.all([getAppSettings(), getProducts(), getCategories()]);
+                setSettings(s); setAllProducts(p); setAllCategories(c);
+            } finally {
+                setIsLoadingData(false);
+            }
+        };
+        fetch();
+        subscribeToMenuUpdates(fetch);
 
-        const intervalId = setInterval(() => {
-            fetchMenuData();
-        }, 30000);
-
+        // Detectar mesa desde URL
         const params = new URLSearchParams(window.location.hash.split('?')[1]);
         const table = params.get('table');
         const zone = params.get('zone');
@@ -1080,271 +151,289 @@ export default function CustomerView() {
             setOrderType(OrderType.DineIn);
         }
 
-        return () => {
-            unsubscribeFromChannel();
-            clearInterval(intervalId);
-        };
+        return () => unsubscribeFromChannel();
     }, []);
 
-    const handleProductClick = (product: Product) => {
-        setSelectedProduct(product);
-    };
-
-    const handleAddToCart = (product: Product, quantity: number, comments?: string, options: PersonalizationOption[] = []) => {
-        addToCart(product, quantity, comments, options);
-        setSelectedProduct(null);
-    };
-
-    const handlePlaceOrder = async (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number = 0, paymentProof: string | null = null) => {
+    const handleOrderAction = async (customer: Customer, payment: PaymentMethod, proof?: string | null) => {
         if (!settings) return;
-
-        if (isFinalPayment && activeOrderId) {
-            // --- CLOSING BILL LOGIC ---
-            try {
-                await updateOrder(activeOrderId, { paymentStatus: 'paid', paymentProof: paymentProof || undefined });
+        
+        try {
+            if (isFinalPayment && activeOrderId) {
+                // --- FLUJO 1: CIERRE DE CUENTA (PAGO) ---
+                // Actualizar el estado del pedido original/sesión a pagado
+                // Nota: En un backend real, aquí se actualizaría el estado de "todos" los pedidos de la mesa, o el pedido padre.
+                // Simulamos cerrando el pedido activo.
                 
-                // Construct "Close Bill" Message
-                const currency = settings.company.currency.code;
-                const msg = [
-                    `💰 *SOLICITUD DE CIERRE DE CUENTA*`,
-                    `📍 *${settings.company.name.toUpperCase()}*`,
-                    `--------------------------------`,
-                    `🪑 Mesa: ${tableInfo?.table} (${tableInfo?.zone})`,
-                    `👤 Cliente: ${customer.name}`,
-                    `--------------------------------`,
-                    `💵 *TOTAL PAGADO: ${currency} $${sessionTotal.toFixed(2)}*`,
-                    `💳 Método: ${paymentMethod}`,
-                    paymentProof ? `✅ Comprobante adjunto` : '',
-                    `_Favor validar pago para liberar mesa._`
-                ].filter(Boolean).join('\n');
-
-                const whatsappUrl = `https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`;
-                window.open(whatsappUrl, '_blank');
-
-                // Clear Session
+                // Enviar mensaje de cierre
+                const msg = `💰 *SOLICITUD DE CIERRE - MESA ${tableInfo?.table}*\n📍 Zona: ${tableInfo?.zone}\n👤 Cliente: ${customer.name}\n----------------\n💰 *TOTAL FINAL: $${sessionTotal.toFixed(2)}*\n💳 Método: ${payment}\n${proof ? '✅ Comprobante adjunto' : ''}`;
+                window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+                
+                // Limpiar sesión
                 localStorage.removeItem('activeOrderId');
                 localStorage.removeItem('sessionTotal');
                 setActiveOrderId(null);
                 setSessionTotal(0);
-                setIsFinalPayment(false);
                 clearCart();
-                setView('confirmation');
-            } catch (e) {
-                alert("Error al procesar el cierre. Intenta de nuevo.");
+            } else {
+                // --- FLUJO 2: ENVIAR RONDA (COMANDA) ---
+                // Crear un pedido nuevo con estado pendiente
+                const newOrderData: Omit<Order, 'id' | 'createdAt'> = {
+                    customer,
+                    items: cartItems,
+                    total: cartTotal,
+                    status: OrderStatus.Pending,
+                    orderType,
+                    tableId: orderType === OrderType.DineIn ? `${tableInfo?.zone} - ${tableInfo?.table}` : undefined,
+                    paymentProof: undefined, // No proof for rounds
+                    branchId: 'main',
+                    paymentStatus: 'pending'
+                };
+                
+                const saved = await saveOrder(newOrderData); 
+                
+                if (orderType === OrderType.DineIn) {
+                    // Actualizar sesión local
+                    const newTotal = sessionTotal + cartTotal;
+                    localStorage.setItem('activeOrderId', saved.id); // Guardamos el ID del último pedido (o el primero) como referencia
+                    localStorage.setItem('sessionTotal', newTotal.toString());
+                    setActiveOrderId(saved.id);
+                    setSessionTotal(newTotal);
+                }
+
+                const title = orderType === OrderType.DineIn ? '🔥 COMANDA A COCINA' : '🛒 NUEVO PEDIDO';
+                const itemsStr = cartItems.map(i => `• ${i.quantity}x ${i.name}`).join('\n');
+                const msg = `🧾 *${title} - ${settings.company.name}*\n👤 Cliente: ${customer.name}\n📍 Entrega: ${orderType === OrderType.DineIn ? 'MESA ' + tableInfo?.table : 'DOMICILIO'}\n----------------\n${itemsStr}\n----------------\n💰 *Subtotal ronda: $${cartTotal.toFixed(2)}*\n_(Se agrega a la cuenta)_`;
+                
+                window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+                clearCart();
             }
-            return;
-        }
-
-        // --- NEW ORDER / ROUND LOGIC ---
-        
-        const shippingCost = (orderType === OrderType.Delivery && settings.shipping.costType === ShippingCostType.Fixed) 
-            ? (Number(settings.shipping.fixedCost) || 0) 
-            : 0;
-
-        const roundTotal = cartTotal + shippingCost + tipAmount;
-
-        const newOrder: Omit<Order, 'id' | 'createdAt'> = {
-            customer,
-            items: cartItems,
-            total: roundTotal,
-            status: OrderStatus.Pending,
-            branchId: 'main-branch',
-            generalComments: generalComments + (tipAmount > 0 ? ` | Propina: ${settings.company.currency.code} ${tipAmount.toFixed(2)}` : ''),
-            orderType: orderType,
-            tableId: orderType === OrderType.DineIn && tableInfo ? `${tableInfo.zone} - ${tableInfo.table}` : undefined,
-            paymentProof: paymentProof || undefined,
-        };
-
-        try {
-            const savedOrder = await saveOrder(newOrder);
-            
-            // If Dine-in, update session state
-            if (orderType === OrderType.DineIn) {
-                const newTotal = sessionTotal + roundTotal;
-                localStorage.setItem('activeOrderId', savedOrder.id);
-                localStorage.setItem('sessionTotal', newTotal.toString());
-                setActiveOrderId(savedOrder.id);
-                setSessionTotal(newTotal);
-            }
-        } catch(e) {
-            console.error("Failed to save order", e);
-            alert("Hubo un error al guardar tu pedido. Por favor, intenta de nuevo.");
-            return;
-        }
-
-        // Generate WhatsApp Message for Round/Order
-        const formatOptions = (item: CartItem) => {
-            if (!item.selectedOptions || item.selectedOptions.length === 0) return '';
-            return item.selectedOptions.map(opt => `   + ${opt.name}`).join('\n');
-        };
-
-        const itemDetails = cartItems.map(item => {
-            let detail = `▪️ ${item.quantity}x ${item.name}`;
-            const optionsStr = formatOptions(item);
-            if (optionsStr) detail += `\n${optionsStr}`;
-            if (item.comments) detail += `\n   _Nota: ${item.comments}_`;
-            return detail;
-        });
-
-        const currency = settings.company.currency.code;
-        const lineSeparator = "━━━━━━━━━━━━━━━━━━━━";
-        let messageParts: string[] = [];
-
-        if (orderType === OrderType.DineIn) {
-            messageParts = [
-                `🔥 *COMANDA A COCINA (RONDA)*`,
-                `📍 *${settings.company.name.toUpperCase()}*`,
-                lineSeparator,
-                `🪑 *MESA: ${tableInfo?.table}* (${tableInfo?.zone})`,
-                `👤 Cliente: ${customer.name}`,
-                lineSeparator,
-                `🛒 *PEDIDO:*`,
-                ...itemDetails,
-                ``,
-                generalComments ? `📝 *NOTAS:* ${generalComments}` : '',
-                lineSeparator,
-                `💰 *Subtotal Ronda: ${currency} $${roundTotal.toFixed(2)}*`,
-                `_(Se sumará a la cuenta total)_`
-            ];
-        } else {
-            // Delivery/Takeaway logic (Standard)
-             messageParts = [
-                `🧾 *NUEVO PEDIDO*`,
-                `📍 *${settings.company.name.toUpperCase()}*`,
-                lineSeparator,
-                `🗓️ ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
-                `👤 ${customer.name}`,
-                `📱 ${customer.phone}`,
-                `🏷️ ${orderType === OrderType.Delivery ? 'DOMICILIO' : 'PARA LLEVAR'}`,
-                orderType === OrderType.Delivery ? `🏠 ${customer.address.calle} #${customer.address.numero}, ${customer.address.colonia}` : '',
-                orderType === OrderType.Delivery && customer.address.referencias ? `👀 Ref: ${customer.address.referencias}` : '',
-                lineSeparator,
-                `🛒 *DETALLE:*`,
-                ...itemDetails,
-                generalComments ? `\n📝 ${generalComments}` : '',
-                lineSeparator,
-                `💰 *TOTAL: ${currency} $${roundTotal.toFixed(2)}*`,
-                `💳 ${paymentMethod}`,
-                paymentProof ? `✅ Comprobante adjunto` : ''
-            ];
-        }
-
-        const whatsappMessage = encodeURIComponent(messageParts.filter(p => p !== '').join('\n'));
-        const whatsappUrl = `https://wa.me/${settings.branch.whatsappNumber}?text=${whatsappMessage}`;
-        
-        window.open(whatsappUrl, '_blank');
-        clearCart();
-        setView('confirmation');
-    };
-
-    const handleStartNewOrder = () => {
-        // If final payment was made, we already cleared session in handlePlaceOrder.
-        // If it was just a round, we go back to menu to order more.
-        setGeneralComments('');
-        setView('menu');
-        setIsFinalPayment(false);
-    };
-
-    const getHeaderTitle = () => {
-        switch(view) {
-            case 'cart': return 'Tu Ronda';
-            case 'checkout': return isFinalPayment ? 'Pagar Cuenta' : 'Confirmar Ronda';
-            case 'confirmation': return isFinalPayment ? 'Cuenta Cerrada' : 'Enviado';
-            default: return '';
+            setView('confirmation');
+        } catch(e) { 
+            alert("Error al enviar. Por favor verifica tu conexión."); 
         }
     };
-    
-    const canGoBack = view === 'cart' || view === 'checkout';
-    const handleBack = () => {
-        if (view === 'checkout') {
-            setView('cart'); 
-            setIsFinalPayment(false);
-        }
-        else if (view === 'cart') setView('menu');
-    }
-    
-    if (isLoading || !settings) {
-        return (
-            <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-gray-300">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500 mb-4"></div>
-                <p className="animate-pulse">Cargando experiencia...</p>
-            </div>
-        );
-    }
+
+    if (isLoadingData || !settings) return <div className="h-screen bg-gray-900 flex items-center justify-center text-emerald-500 font-black animate-pulse tracking-widest uppercase text-xs">Cargando Menú Online...</div>;
+
+    // Determinar si es una "Comanda Simple" (Ronda en mesa sin pagar aún)
+    const isSimpleComanda = orderType === OrderType.DineIn && !isFinalPayment;
 
     return (
-        <div className="bg-gray-900 min-h-screen font-sans text-gray-100 selection:bg-emerald-500 selection:text-white">
-            <div className="container mx-auto max-w-md bg-gray-900 min-h-screen shadow-2xl relative pb-24 border-x border-gray-800">
+        <div className="bg-gray-950 min-h-screen text-gray-100 font-sans selection:bg-emerald-500/20">
+            <div className="container mx-auto max-w-md bg-gray-900 min-h-screen relative shadow-2xl border-x border-gray-800 flex flex-col">
                 
-                {view !== 'menu' && <Header title={getHeaderTitle()} onBack={canGoBack ? handleBack : undefined} />}
-
-                {view === 'menu' && (
-                    <>
-                        <RestaurantHero 
-                            settings={settings} 
-                            tableInfo={tableInfo} 
-                            orderType={orderType}
-                            setOrderType={setOrderType}
-                            hasActiveSession={!!activeOrderId}
-                        />
-                        <MenuList 
-                            products={allProducts}
-                            categories={allCategories}
-                            onProductClick={handleProductClick} 
-                            cartItems={cartItems} 
-                            currency={settings.company.currency.code}
-                            promotions={allPromotions}
-                        />
-                    </>
-                )}
-
-                {view === 'cart' && (
-                    <CartSummaryView 
-                        cartItems={cartItems}
-                        cartTotal={cartTotal}
-                        onUpdateQuantity={updateQuantity}
-                        onRemoveItem={removeFromCart}
-                        generalComments={generalComments}
-                        onGeneralCommentsChange={setGeneralComments}
-                        onProceedToCheckout={() => setView('checkout')}
-                        allProducts={allProducts}
+                {view !== 'menu' && (
+                    <Header 
+                        title={view === 'cart' ? 'MI RONDA' : (isFinalPayment ? 'CERRAR CUENTA' : 'CONFIRMAR')} 
+                        onBack={() => { setView(view === 'checkout' ? 'cart' : 'menu'); setIsFinalPayment(false); }} 
                     />
                 )}
                 
-                {view === 'checkout' && (
-                    <CheckoutView 
-                        cartTotal={cartTotal}
-                        onPlaceOrder={handlePlaceOrder}
-                        settings={settings}
-                        orderType={orderType}
-                        isFinalPayment={isFinalPayment}
-                        sessionTotal={sessionTotal}
-                    />
-                )}
+                <div className="flex-1 overflow-y-auto">
+                    {view === 'menu' && (
+                        <div className="animate-fade-in pb-48">
+                            <RestaurantHero settings={settings} orderType={orderType} setOrderType={setOrderType} tableInfo={tableInfo} hasActiveSession={!!activeOrderId} sessionTotal={sessionTotal} />
+                            
+                            <div className="p-4 space-y-8">
+                                <div className="relative">
+                                    <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 h-5 w-5" />
+                                    <input type="text" placeholder="Buscar productos..." className="w-full bg-gray-800/50 border border-gray-700 rounded-2xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all placeholder-gray-600 font-bold" />
+                                </div>
 
-                {view === 'confirmation' && (
-                    <OrderConfirmation onNewOrder={handleStartNewOrder} settings={settings} isFinalPayment={isFinalPayment} />
-                )}
+                                {allCategories.map(cat => {
+                                    const products = allProducts.filter(p => p.categoryId === cat.id && p.available);
+                                    if (products.length === 0) return null;
+                                    return (
+                                        <div key={cat.id}>
+                                            <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mb-4 flex items-center gap-3">
+                                                <span className="w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.4)]"></span>
+                                                {cat.name}
+                                            </h3>
+                                            <div className="grid gap-4">
+                                                {products.map(p => (
+                                                    <div key={p.id} onClick={() => setSelectedProduct(p)} className="bg-gray-800/40 p-4 rounded-[2rem] border border-gray-800/60 flex gap-4 active:scale-[0.98] transition-all cursor-pointer hover:bg-gray-800/60 group">
+                                                        <img src={p.imageUrl} className="w-24 h-24 rounded-2xl object-cover shadow-xl group-hover:scale-105 transition-transform" alt={p.name} />
+                                                        <div className="flex-1 flex flex-col justify-between py-1">
+                                                            <div>
+                                                                <h4 className="font-bold text-gray-100 group-hover:text-emerald-400 transition-colors">{p.name}</h4>
+                                                                <p className="text-[11px] text-gray-500 line-clamp-2 mt-1 leading-relaxed">{p.description}</p>
+                                                            </div>
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="font-black text-emerald-400">${p.price.toFixed(2)}</span>
+                                                                <div className="bg-gray-700/50 p-1.5 rounded-xl text-emerald-500"><IconPlus className="h-5 w-5"/></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                    
+                    {view === 'cart' && (
+                        <div className="p-5 animate-fade-in pb-48">
+                            <PairingAI items={cartItems} allProducts={allProducts} />
+                            <div className="space-y-4">
+                                {cartItems.map(i => (
+                                    <div key={i.cartItemId} className="flex gap-4 bg-gray-800/40 p-4 rounded-3xl border border-gray-800/60">
+                                        <img src={i.imageUrl} className="w-20 h-20 rounded-2xl object-cover shadow-lg" />
+                                        <div className="flex-1 flex flex-col justify-center">
+                                            <div className="flex justify-between items-start mb-3">
+                                                <span className="font-bold text-sm text-gray-100">{i.name}</span>
+                                                <span className="font-black text-emerald-400 text-sm">${(i.price * i.quantity).toFixed(2)}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center bg-gray-900 rounded-xl px-2 py-1 border border-gray-800">
+                                                    <button onClick={() => updateQuantity(i.cartItemId, i.quantity - 1)} className="p-1.5 text-gray-400 hover:text-white"><IconMinus className="h-4 w-4"/></button>
+                                                    <span className="w-8 text-center text-xs font-black">{i.quantity}</span>
+                                                    <button onClick={() => updateQuantity(i.cartItemId, i.quantity + 1)} className="p-1.5 text-gray-400 hover:text-white"><IconPlus className="h-4 w-4"/></button>
+                                                </div>
+                                                <button onClick={() => removeFromCart(i.cartItemId)} className="text-rose-500/40 hover:text-rose-500 p-2"><IconTrash className="h-5 w-5"/></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-8 bg-gray-900/95 backdrop-blur-xl border-t border-gray-800 z-40 rounded-t-[3rem]">
+                                 <div className="flex justify-between font-black text-xl mb-6">
+                                     <span className="text-gray-500 text-xs tracking-widest uppercase self-center">TOTAL RONDA</span>
+                                     <span className="text-emerald-500">${cartTotal.toFixed(2)}</span>
+                                 </div>
+                                 <button disabled={cartItems.length === 0} onClick={() => { setIsFinalPayment(false); setView('checkout'); }} className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white shadow-2xl active:scale-[0.98] transition-all disabled:opacity-30 uppercase tracking-[0.2em] text-sm">
+                                    {orderType === OrderType.DineIn ? 'CONTINUAR' : 'IR A PAGAR'}
+                                 </button>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {view === 'checkout' && (
+                        <form onSubmit={e => {
+                            e.preventDefault();
+                            const fd = new FormData(e.currentTarget);
+                            handleOrderAction({
+                                name: fd.get('name') as string,
+                                phone: fd.get('phone') as string || '',
+                                address: { colonia: '', calle: '', numero: '' }
+                            } as any, 'Efectivo', (e.currentTarget.elements.namedItem('proof') as any)?.dataset.url);
+                        }} className="p-6 space-y-8 animate-fade-in pb-44">
+                            <div className="space-y-4 p-7 bg-gray-800/30 border border-gray-800 rounded-[2.5rem] shadow-sm">
+                                <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">DATOS CLIENTE</h3>
+                                <input name="name" type="text" className="w-full bg-gray-800 border-gray-700 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold" placeholder="¿A qué nombre la orden?" required />
+                                {!isSimpleComanda && <input name="phone" type="tel" className="w-full bg-gray-800 border-gray-700 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold" placeholder="WhatsApp para aviso de pago" required />}
+                            </div>
+
+                            {!isSimpleComanda && (
+                                <div className="space-y-4 p-7 bg-gray-800/30 border border-gray-800 rounded-[2.5rem] shadow-sm">
+                                    <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">MÉTODO DE PAGO</h3>
+                                    <p className="text-[10px] text-gray-500 leading-relaxed font-bold uppercase tracking-wider mb-2">
+                                        {isFinalPayment ? 'Adjunta comprobante para liquidar el total.' : 'Detalles de pago.'}
+                                    </p>
+                                    {/* Aquí irían los métodos de pago (Simplificado para demo) */}
+                                    <div className="p-4 bg-gray-700/30 rounded-2xl border border-gray-700">
+                                        <p className="text-xs text-gray-300 font-mono">Pago Móvil / Transferencia</p>
+                                    </div>
+
+                                    <label className="flex flex-col items-center justify-center w-full h-44 border-2 border-dashed border-gray-700 rounded-3xl cursor-pointer hover:bg-gray-800/50 overflow-hidden relative transition-all group">
+                                        <div className="flex flex-col items-center text-gray-500 group-hover:text-emerald-400">
+                                            <IconUpload className="h-10 w-10 mb-3 opacity-40" />
+                                            <span className="text-[10px] font-black uppercase tracking-widest">Subir comprobante</span>
+                                        </div>
+                                        <input name="proof" type="file" className="hidden" accept="image/*" onChange={e => {
+                                            if (e.target.files?.[0]) {
+                                                const reader = new FileReader();
+                                                reader.onload = (re) => {
+                                                    const img = document.createElement('img');
+                                                    img.src = re.target?.result as string;
+                                                    img.className = "absolute inset-0 w-full h-full object-cover bg-gray-900";
+                                                    e.target.dataset.url = re.target?.result as string;
+                                                    e.target.parentElement?.appendChild(img);
+                                                };
+                                                reader.readAsDataURL(e.target.files[0]);
+                                            }
+                                        }} />
+                                    </label>
+                                </div>
+                            )}
+
+                            <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-8 bg-gray-900/95 backdrop-blur-2xl border-t border-gray-800 z-40 rounded-t-[3rem] shadow-[0_-10px_50px_rgba(0,0,0,0.6)]">
+                                 <div className="flex justify-between font-black text-2xl mb-6">
+                                    <span className="text-gray-500 text-[10px] tracking-[0.2em] self-center uppercase">{isFinalPayment ? 'CUENTA TOTAL' : 'TOTAL ORDEN'}</span>
+                                    <span className="text-emerald-500">${(isFinalPayment ? sessionTotal : cartTotal).toFixed(2)}</span>
+                                 </div>
+                                 <button type="submit" className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex items-center justify-center gap-4 active:scale-95 transition-all text-xs uppercase tracking-[0.2em] shadow-2xl">
+                                    {isSimpleComanda ? 'ENVIAR COMANDA A COCINA' : <><IconWhatsapp className="h-6 w-6" /> {isFinalPayment ? 'LIQUIDAR CUENTA FINAL' : 'REALIZAR PEDIDO'}</>}
+                                </button>
+                            </div>
+                        </form>
+                    )}
+                    
+                    {view === 'confirmation' && (
+                        <div className="p-12 text-center h-full flex flex-col items-center justify-center gap-8 animate-fade-in">
+                            <div className="w-28 h-28 bg-emerald-500/10 rounded-full flex items-center justify-center border-2 border-emerald-500/20 shadow-inner">
+                                <IconCheck className="w-14 h-14 text-emerald-500"/>
+                            </div>
+                            <div className="space-y-3">
+                                <h2 className="text-4xl font-black text-white uppercase tracking-tighter">{isFinalPayment ? '¡CUENTA CERRADA!' : '¡EN COCINA!'}</h2>
+                                <p className="text-gray-500 text-sm leading-relaxed max-w-xs mx-auto font-medium">
+                                    {isFinalPayment ? 'Hemos recibido tu reporte de pago satisfactoriamente. ¡Gracias por visitarnos!' : 'Tu ronda ha sido enviada a cocina. Puedes seguir pidiendo más cosas desde el menú cuando gustes.'}
+                                </p>
+                            </div>
+                            <button onClick={() => { setIsFinalPayment(false); setView('menu'); }} className="w-full max-w-xs bg-gray-800 py-5 rounded-3xl font-black text-gray-200 border border-gray-700 active:scale-95 transition-all shadow-xl hover:bg-gray-700">VOLVER AL MENÚ</button>
+                        </div>
+                    )}
+                </div>
 
                 {selectedProduct && (
-                    <ProductDetailModal 
-                        product={selectedProduct} 
-                        onAddToCart={handleAddToCart}
-                        onClose={() => setSelectedProduct(null)}
-                        personalizations={allPersonalizations}
-                        promotions={allPromotions}
-                    />
+                    <div className="fixed inset-0 z-50 flex items-end justify-center p-4">
+                        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setSelectedProduct(null)}></div>
+                        <div className="bg-gray-900 w-full max-w-sm rounded-[3rem] overflow-hidden relative z-10 animate-fade-in-up border border-gray-800 shadow-2xl">
+                            <div className="h-64 relative overflow-hidden">
+                                <img src={selectedProduct.imageUrl} className="w-full h-full object-cover" />
+                                <button onClick={() => setSelectedProduct(null)} className="absolute top-6 right-6 bg-black/40 p-2 rounded-full text-white backdrop-blur-md"><IconX/></button>
+                            </div>
+                            <div className="p-8">
+                                <h2 className="text-2xl font-black mb-2">{selectedProduct.name}</h2>
+                                <p className="text-gray-500 text-sm mb-8 leading-relaxed">{selectedProduct.description}</p>
+                                <button 
+                                    onClick={() => { addToCart(selectedProduct, 1); setSelectedProduct(null); }}
+                                    className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex justify-between px-8 items-center active:scale-95 transition-all shadow-xl shadow-emerald-900/40"
+                                >
+                                    <span className="uppercase tracking-widest text-xs">AÑADIR A LA RONDA</span>
+                                    <span className="text-lg font-black">${selectedProduct.price.toFixed(2)}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 )}
-
+                
+                {/* --- BOTONES FLOTANTES DE SESIÓN ACTIVA --- */}
                 {view === 'menu' && (
-                    <FooterBar 
-                        itemCount={itemCount} 
-                        cartTotal={cartTotal}
-                        onViewCart={() => setView('cart')} 
-                        hasActiveSession={!!activeOrderId}
-                        sessionTotal={sessionTotal}
-                        onOpenBill={() => { setIsFinalPayment(true); setView('checkout'); }}
-                    />
+                    <div className="fixed bottom-8 left-6 right-6 max-w-md mx-auto z-40 flex flex-col gap-3">
+                        {/* Botón de Cierre de Cuenta (Solo si hay sesión activa) */}
+                        {activeOrderId && sessionTotal > 0 && (
+                            <button 
+                                onClick={() => { setIsFinalPayment(true); setView('checkout'); }} 
+                                className="w-full bg-gray-800/95 backdrop-blur-md text-white font-black py-4 px-7 rounded-3xl flex justify-between items-center border border-emerald-500/30 shadow-2xl transition-all hover:bg-gray-700 active:scale-95 group"
+                            >
+                                <span className="flex items-center gap-3 text-[10px] uppercase tracking-[0.2em]"><IconReceipt className="h-5 w-5 text-emerald-400 group-hover:scale-110 transition-transform"/> MI CUENTA ACUMULADA</span>
+                                <span className="bg-emerald-500 px-3 py-1 rounded-xl text-xs font-mono shadow-lg shadow-emerald-500/20">${sessionTotal.toFixed(2)}</span>
+                            </button>
+                        )}
+                        {/* Botón de Carrito Actual (Ronda) */}
+                        {cartItems.length > 0 && (
+                            <button 
+                                onClick={() => setView('cart')} 
+                                className="w-full bg-emerald-600 text-white font-black py-5 px-7 rounded-3xl flex justify-between shadow-2xl active:scale-[0.98] transition-all animate-slide-up border border-emerald-500/20"
+                            >
+                                <span className="tracking-[0.2em] uppercase text-[10px]">VER RONDA ({cartItems.length})</span>
+                                <span className="font-black text-lg">${cartTotal.toFixed(2)}</span>
+                            </button>
+                        )}
+                    </div>
                 )}
                 <Chatbot />
             </div>
