@@ -7,7 +7,7 @@ import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizati
 import { getPairingSuggestion } from '../services/geminiService';
 import Chatbot from './Chatbot';
 
-// --- Sub-componentes ---
+// --- Sub-componentes Estilizados ---
 
 const Header: React.FC<{ title: string; onBack?: () => void }> = ({ title, onBack }) => (
     <header className="p-4 flex justify-between items-center sticky top-0 bg-gray-900/95 backdrop-blur-md z-30 border-b border-gray-800">
@@ -60,7 +60,7 @@ const PairingAI: React.FC<{ items: CartItem[], allProducts: Product[] }> = ({ it
     );
 };
 
-// --- Vista Principal ---
+// --- Vista Principal del Cliente ---
 
 export default function CustomerView() {
     const [view, setView] = useState<'menu' | 'cart' | 'checkout' | 'confirmation'>('menu');
@@ -69,9 +69,11 @@ export default function CustomerView() {
     const [orderType, setOrderType] = useState<OrderType>(OrderType.Delivery);
     const [tableInfo, setTableInfo] = useState<{ table: string; zone: string } | null>(null);
     
-    // --- SESIÓN DE MESA PERSISTENTE ---
+    // --- LÓGICA DE SESIÓN DE MESA PERSISTENTE ---
+    // Guardamos el ID de referencia y el total acumulado en localStorage para que no se pierda al recargar
     const [activeOrderId, setActiveOrderId] = useState<string | null>(() => localStorage.getItem('activeOrderId'));
     const [sessionTotal, setSessionTotal] = useState<number>(() => Number(localStorage.getItem('sessionTotal')) || 0);
+    // Controla si el checkout actual es para una ronda o para pagar la cuenta completa
     const [isFinalPayment, setIsFinalPayment] = useState(false);
 
     const { cartItems, addToCart, removeFromCart, updateQuantity, cartTotal, clearCart, itemCount } = useCart();
@@ -91,6 +93,7 @@ export default function CustomerView() {
         fetch();
         subscribeToMenuUpdates(fetch);
 
+        // Detección de mesa por URL
         const params = new URLSearchParams(window.location.hash.split('?')[1]);
         const table = params.get('table');
         const zone = params.get('zone');
@@ -106,18 +109,31 @@ export default function CustomerView() {
         
         try {
             if (isFinalPayment && activeOrderId) {
-                // FLUJO: CIERRE Y PAGO FINAL
-                const msg = `💰 *SOLICITUD DE CIERRE - MESA ${tableInfo?.table}*\n📍 Zona: ${tableInfo?.zone}\n👤 Cliente: ${customer.name}\n----------------\n💰 *TOTAL ACUMULADO: $${sessionTotal.toFixed(2)}*\n💳 Método: ${payment}\n${proof ? '✅ Comprobante adjunto' : ''}`;
+                // --- FLUJO: CIERRE Y PAGO FINAL ---
+                const msg = [
+                    `💰 *SOLICITUD DE CIERRE DE CUENTA*`,
+                    `📍 *${settings.company.name.toUpperCase()}*`,
+                    `--------------------------------`,
+                    `🪑 Mesa: ${tableInfo?.table} (${tableInfo?.zone})`,
+                    `👤 Cliente: ${customer.name}`,
+                    `--------------------------------`,
+                    `💵 *TOTAL PAGADO: $${sessionTotal.toFixed(2)}*`,
+                    `💳 Método: ${payment}`,
+                    proof ? `✅ Comprobante adjunto` : '',
+                    `_Favor validar pago para liberar mesa._`
+                ].filter(Boolean).join('\n');
+
                 window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
                 
-                // Reset total al liquidar
+                // Limpiar sesión local al liquidar
                 localStorage.removeItem('activeOrderId');
                 localStorage.removeItem('sessionTotal');
                 setActiveOrderId(null);
                 setSessionTotal(0);
                 clearCart();
+                setView('confirmation');
             } else {
-                // FLUJO: ENVIAR RONDA (COMANDA)
+                // --- FLUJO: ENVIAR RONDA (COMANDA) ---
                 const newOrderData: Omit<Order, 'id' | 'createdAt'> = {
                     customer,
                     items: cartItems,
@@ -131,6 +147,7 @@ export default function CustomerView() {
                 const saved = await saveOrder(newOrderData); 
                 
                 if (orderType === OrderType.DineIn) {
+                    // Actualizar sesión acumulada
                     const newTotal = sessionTotal + cartTotal;
                     localStorage.setItem('activeOrderId', saved.id);
                     localStorage.setItem('sessionTotal', newTotal.toString());
@@ -138,21 +155,29 @@ export default function CustomerView() {
                     setSessionTotal(newTotal);
                 }
 
+                // Notificación por WhatsApp de la ronda
                 const title = orderType === OrderType.DineIn ? '🔥 COMANDA A COCINA' : '🛒 NUEVO PEDIDO';
                 const itemsStr = cartItems.map(i => `• ${i.quantity}x ${i.name}`).join('\n');
-                const msg = `🧾 *${title} - ${settings.company.name}*\n👤 Cliente: ${customer.name}\n📍 Ubicación: ${orderType === OrderType.DineIn ? 'MESA ' + tableInfo?.table : 'DOMICILIO'}\n----------------\n${itemsStr}\n----------------\n💰 *Subtotal ronda: $${cartTotal.toFixed(2)}*`;
+                const msg = `🧾 *${title} - ${settings.company.name}*\n👤 Cliente: ${customer.name}\n📍 Ubicación: ${orderType === OrderType.DineIn ? 'MESA ' + tableInfo?.table : 'DOMICILIO'}\n----------------\n${itemsStr}\n----------------\n💰 *Subtotal ronda: $${cartTotal.toFixed(2)}*\n${orderType === OrderType.DineIn ? '_(Se suma a la cuenta de la mesa)_' : ''}`;
                 
                 window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+                
                 clearCart();
+                setView('confirmation'); // En mesa, el botón "Seguir Pidiendo" devolverá al menú
             }
-            setView('confirmation');
         } catch(e) { 
-            alert("Error al enviar. Intenta de nuevo."); 
+            alert("Error al procesar. Intenta de nuevo."); 
         }
     };
 
-    if (isLoadingData || !settings) return <div className="h-screen bg-gray-900 flex items-center justify-center text-emerald-500 font-black animate-pulse uppercase tracking-[0.2em]">ALTOQUE FOOD...</div>;
+    if (isLoadingData || !settings) return (
+        <div className="h-screen bg-gray-900 flex flex-col items-center justify-center">
+            <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
+            <p className="text-emerald-500 font-black uppercase tracking-[0.2em] animate-pulse">ALTOQUE FOOD...</p>
+        </div>
+    );
 
+    // Es comanda simple si está en mesa y no es el flujo de pago final
     const isSimpleComanda = orderType === OrderType.DineIn && !isFinalPayment;
 
     return (
@@ -169,9 +194,9 @@ export default function CustomerView() {
                 <div className="flex-1 overflow-y-auto">
                     {view === 'menu' && (
                         <div className="animate-fade-in pb-48">
-                            {/* Hero y Estado de Sesión */}
+                            {/* Hero de Restaurante con Estado de Mesa */}
                             <div className="relative pb-6 border-b border-gray-800">
-                                <div className="h-40 w-full overflow-hidden relative">
+                                <div className="h-44 w-full overflow-hidden relative">
                                     {settings.branch.coverImageUrl ? <img src={settings.branch.coverImageUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900" />}
                                     <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/20 to-transparent"></div>
                                 </div>
@@ -181,7 +206,7 @@ export default function CustomerView() {
                                     </div>
                                     
                                     {activeOrderId && tableInfo && (
-                                        <div className="mb-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black px-4 py-1.5 rounded-full animate-pulse shadow-lg flex items-center gap-1.5">
+                                        <div className="mb-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black px-5 py-2 rounded-full animate-pulse shadow-lg shadow-emerald-500/10 flex items-center gap-2">
                                             <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
                                             CUENTA ABIERTA: ${sessionTotal.toFixed(2)}
                                         </div>
@@ -190,11 +215,11 @@ export default function CustomerView() {
                                     <h1 className="text-2xl font-black text-white">{settings.company.name}</h1>
                                     
                                     {tableInfo ? (
-                                        <div className="mt-4 bg-emerald-950/40 backdrop-blur border border-emerald-500/30 px-5 py-2.5 rounded-2xl flex items-center gap-3">
+                                        <div className="mt-4 bg-emerald-950/40 backdrop-blur border border-emerald-500/30 px-6 py-3 rounded-2xl flex items-center gap-3">
                                             <IconTableLayout className="h-5 w-5 text-emerald-400"/>
                                             <div className="text-left">
-                                                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest leading-none">MESA ACTIVA</p>
-                                                <p className="text-sm font-black text-white">{tableInfo.table} • {tableInfo.zone}</p>
+                                                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest leading-none mb-1">ATENDIENDO EN</p>
+                                                <p className="text-sm font-black text-white">Mesa {tableInfo.table} • {tableInfo.zone}</p>
                                             </div>
                                         </div>
                                     ) : (
@@ -207,6 +232,7 @@ export default function CustomerView() {
                                 </div>
                             </div>
 
+                            {/* Buscador y Categorías */}
                             <div className="p-4 space-y-8 mt-4">
                                 <div className="relative">
                                     <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 h-5 w-5" />
@@ -274,7 +300,7 @@ export default function CustomerView() {
 
                             <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-8 bg-gray-900/98 backdrop-blur-xl border-t border-gray-800 z-40 rounded-t-[3rem] shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
                                  <div className="flex justify-between font-black text-xl mb-6">
-                                     <span className="text-gray-500 text-[10px] tracking-[0.2em] uppercase self-center">SUBTOTAL RONDA</span>
+                                     <span className="text-gray-500 text-[10px] tracking-[0.2em] uppercase self-center">TOTAL RONDA ACTUAL</span>
                                      <span className="text-emerald-500 text-2xl">${cartTotal.toFixed(2)}</span>
                                  </div>
                                  <button 
@@ -299,20 +325,20 @@ export default function CustomerView() {
                             } as any, 'Efectivo', (e.currentTarget.elements.namedItem('proof') as any)?.dataset.url);
                         }} className="p-6 space-y-8 animate-fade-in pb-48">
                             <div className="space-y-4 p-7 bg-gray-800/30 border border-gray-800 rounded-[2.5rem]">
-                                <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">IDENTIFICACIÓN</h3>
-                                <input name="name" type="text" className="w-full bg-gray-800 border-gray-700 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold" placeholder="¿A nombre de quién?" required />
+                                <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">DATOS CLIENTE</h3>
+                                <input name="name" type="text" className="w-full bg-gray-800 border-gray-700 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold" placeholder="¿Tu nombre?" required />
                                 {!isSimpleComanda && <input name="phone" type="tel" className="w-full bg-gray-800 border-gray-700 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold" placeholder="WhatsApp para aviso de pago" required />}
                             </div>
 
                             {!isSimpleComanda && (
                                 <div className="space-y-4 p-7 bg-gray-800/30 border border-gray-800 rounded-[2.5rem]">
-                                    <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">CERRAR CUENTA Y PAGAR</h3>
-                                    <p className="text-[11px] text-gray-500 leading-relaxed font-bold uppercase tracking-wider mb-2">Adjunta tu comprobante para liquidar el total de la mesa.</p>
+                                    <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">CIERRE Y PAGO</h3>
+                                    <p className="text-[11px] text-gray-500 leading-relaxed font-bold uppercase tracking-wider mb-2">Sube tu comprobante para liquidar la cuenta total.</p>
 
                                     <label className="flex flex-col items-center justify-center w-full h-44 border-2 border-dashed border-gray-700 rounded-3xl cursor-pointer hover:bg-gray-800/50 overflow-hidden relative transition-all group">
                                         <div className="flex flex-col items-center text-gray-500 group-hover:text-emerald-400">
                                             <IconUpload className="h-10 w-10 mb-3 opacity-40" />
-                                            <span className="text-[10px] font-black uppercase tracking-widest">Subir captura</span>
+                                            <span className="text-[10px] font-black uppercase tracking-widest">Subir comprobante</span>
                                         </div>
                                         <input name="proof" type="file" className="hidden" accept="image/*" onChange={e => {
                                             if (e.target.files?.[0]) {
@@ -333,7 +359,7 @@ export default function CustomerView() {
 
                             <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-8 bg-gray-900/98 backdrop-blur-2xl border-t border-gray-800 z-40 rounded-t-[3rem] shadow-[0_-10px_50px_rgba(0,0,0,0.6)]">
                                  <div className="flex justify-between font-black text-2xl mb-6">
-                                    <span className="text-gray-500 text-[10px] tracking-[0.2em] self-center uppercase">{isFinalPayment ? 'TOTAL A PAGAR' : 'TOTAL RONDA'}</span>
+                                    <span className="text-gray-500 text-[10px] tracking-[0.2em] self-center uppercase">{isFinalPayment ? 'CUENTA TOTAL' : 'RONDA ACTUAL'}</span>
                                     <span className="text-emerald-500">${(isFinalPayment ? sessionTotal : cartTotal).toFixed(2)}</span>
                                  </div>
                                  <button type="submit" className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex items-center justify-center gap-4 active:scale-95 transition-all text-xs uppercase tracking-[0.2em] shadow-2xl">
@@ -349,15 +375,15 @@ export default function CustomerView() {
                                 <IconCheck className="w-14 h-14 text-emerald-500"/>
                             </div>
                             <div className="space-y-3">
-                                <h2 className="text-4xl font-black text-white uppercase tracking-tighter">{isFinalPayment ? '¡CUENTA CERRADA!' : '¡A COCINA!'}</h2>
+                                <h2 className="text-4xl font-black text-white uppercase tracking-tighter">{isFinalPayment ? '¡CUENTA CERRADA!' : '¡PEDIDO ENVIADO!'}</h2>
                                 <p className="text-gray-500 text-sm leading-relaxed max-w-xs mx-auto font-medium">
                                     {isFinalPayment 
-                                        ? 'Hemos recibido tu reporte satisfactoriamente. ¡Vuelve pronto!' 
-                                        : 'Tu ronda ha sido enviada. El sistema mantendrá tu cuenta abierta para que sigas pidiendo cuando gustes.'}
+                                        ? 'Hemos recibido tu reporte satisfactoriamente. ¡Esperamos verte de nuevo pronto!' 
+                                        : 'Tu ronda ha sido enviada a cocina. El sistema mantiene tu sesión abierta para que sigas pidiendo desde el menú.'}
                                 </p>
                             </div>
                             <button onClick={() => { setIsFinalPayment(false); setView('menu'); }} className="w-full max-w-xs bg-emerald-600 py-5 rounded-3xl font-black text-white shadow-xl hover:bg-emerald-500 active:scale-95 transition-all uppercase tracking-widest text-xs">
-                                {isFinalPayment ? 'NUEVO PEDIDO' : 'SEGUIR PIDIENDO'}
+                                {isFinalPayment ? 'NUEVO PEDIDO' : 'VOLVER AL MENÚ'}
                             </button>
                         </div>
                     )}
@@ -378,7 +404,7 @@ export default function CustomerView() {
                                     onClick={() => { addToCart(selectedProduct, 1); setSelectedProduct(null); }}
                                     className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex justify-between px-8 items-center active:scale-95 transition-all shadow-xl shadow-emerald-900/40"
                                 >
-                                    <span className="uppercase tracking-widest text-xs">AÑADIR A LA RONDA</span>
+                                    <span className="uppercase tracking-widest text-xs">AÑADIR A MI RONDA</span>
                                     <span className="text-lg font-black">${selectedProduct.price.toFixed(2)}</span>
                                 </button>
                             </div>
@@ -386,9 +412,10 @@ export default function CustomerView() {
                     </div>
                 )}
                 
-                {/* --- BOTONES FLOTANTES DE SESIÓN ACTIVA --- */}
+                {/* --- BOTONES FLOTANTES DE SESIÓN ACTIVA (Persistentes) --- */}
                 {view === 'menu' && (
                     <div className="fixed bottom-8 left-6 right-6 max-w-md mx-auto z-40 flex flex-col gap-3">
+                        {/* Botón Mi Cuenta: Solo si hay una sesión iniciada */}
                         {activeOrderId && sessionTotal > 0 && (
                             <button 
                                 onClick={() => { setIsFinalPayment(true); setView('checkout'); }} 
@@ -398,6 +425,7 @@ export default function CustomerView() {
                                 <span className="bg-emerald-500 px-3 py-1 rounded-xl text-xs font-mono shadow-lg shadow-emerald-500/20">${sessionTotal.toFixed(2)}</span>
                             </button>
                         )}
+                        {/* Botón Revisar Ronda: Solo si hay items en el carrito actual */}
                         {cartItems.length > 0 && (
                             <button 
                                 onClick={() => setView('cart')} 
