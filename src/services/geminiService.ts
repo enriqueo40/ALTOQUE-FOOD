@@ -6,24 +6,28 @@ import { ChatMessage, Order, Product, CartItem } from '../types';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 /**
- * Genera una sugerencia de maridaje basada en el carrito actual.
+ * Genera una sugerencia de maridaje basada en el consumo total de la sesión y el carrito.
  */
 export const getPairingSuggestion = async (cartItems: CartItem[], allProducts: Product[]): Promise<string> => {
-    if (cartItems.length === 0) return "";
+    // Recuperar items consumidos del localStorage para análisis completo
+    const savedConsumed = localStorage.getItem('altoque_consumed_items');
+    const consumedItems: CartItem[] = savedConsumed ? JSON.parse(savedConsumed) : [];
     
-    const cartNames = cartItems.map(i => i.name).join(", ");
+    if (cartItems.length === 0 && consumedItems.length === 0) return "";
+    
+    const allInTable = [...consumedItems, ...cartItems].map(i => i.name).join(", ");
     const availableProducts = allProducts
-        .filter(p => p.available && !cartItems.some(ci => ci.id === p.id))
+        .filter(p => p.available && ![...consumedItems, ...cartItems].some(ci => ci.id === p.id))
         .map(p => `${p.name} ($${p.price})`)
         .slice(0, 10)
         .join(", ");
 
     const prompt = `Actúa como un sommelier y experto gastronómico chic. 
-    El cliente tiene esto en su pedido: ${cartNames}.
-    Basado SOLO en estos productos disponibles en el menú: ${availableProducts}, 
-    sugiere UN solo producto adicional que combine perfectamente para "completar la experiencia". 
+    En esta mesa se está consumiendo: ${allInTable}.
+    Basado SOLO en estos productos disponibles: ${availableProducts}, 
+    sugiere UN solo producto adicional (bebida, postre o entrada) que combine perfectamente. 
     Respuesta muy corta (máximo 10 palabras), persuasiva y elegante. 
-    Ejemplo: "Esa hamburguesa marida increíble con nuestra Cerveza Artesanal IPA."`;
+    Ejemplo: "Ese postre marida increíble con nuestro Café Espresso doble."`;
 
     try {
         const response = await ai.models.generateContent({
@@ -32,7 +36,6 @@ export const getPairingSuggestion = async (cartItems: CartItem[], allProducts: P
         });
         return response.text?.trim() || "";
     } catch (error) {
-        console.error("Error en sugerencia IA:", error);
         return "";
     }
 };
