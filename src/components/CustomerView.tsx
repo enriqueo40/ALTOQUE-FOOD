@@ -7,7 +7,7 @@ import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizati
 import { getPairingSuggestion } from '../services/geminiService';
 import Chatbot from './Chatbot';
 
-// --- Sub-componentes Estilizados ---
+// --- Sub-componentes ---
 
 const Header: React.FC<{ title: string; onBack?: () => void }> = ({ title, onBack }) => (
     <header className="p-4 flex justify-between items-center sticky top-0 bg-gray-900/95 backdrop-blur-md z-30 border-b border-gray-800">
@@ -49,7 +49,7 @@ const PairingAI: React.FC<{ items: CartItem[], allProducts: Product[] }> = ({ it
                 <IconSparkles className="h-5 w-5" />
             </div>
             <div className="flex-1">
-                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">RECOMENDACIÓN IA</p>
+                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">MARIDAJE RECOMENDADO (IA)</p>
                 {loading ? (
                     <div className="h-3 w-32 bg-gray-700 rounded animate-pulse mt-1"></div>
                 ) : (
@@ -60,10 +60,10 @@ const PairingAI: React.FC<{ items: CartItem[], allProducts: Product[] }> = ({ it
     );
 };
 
-// --- Vista Principal del Cliente ---
+// --- Vista Principal ---
 
 export default function CustomerView() {
-    const [view, setView] = useState<'menu' | 'cart' | 'checkout' | 'confirmation'>('menu');
+    const [view, setView] = useState<'menu' | 'cart' | 'checkout' | 'confirmation' | 'my-account'>('menu');
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [settings, setSettings] = useState<AppSettings | null>(null);
     const [orderType, setOrderType] = useState<OrderType>(OrderType.Delivery);
@@ -71,10 +71,17 @@ export default function CustomerView() {
     
     // --- LÓGICA DE SESIÓN DE MESA PERSISTENTE ---
     const [sessionActive, setSessionActive] = useState<boolean>(() => localStorage.getItem('altoque_session_active') === 'true');
-    const [sessionTotal, setSessionTotal] = useState<number>(() => Number(localStorage.getItem('altoque_session_total')) || 0);
     const [customerName, setCustomerName] = useState<string>(() => localStorage.getItem('altoque_customer_name') || '');
-    
-    // Controla si el flujo actual es para una RONDA o para PAGAR LA CUENTA
+    const [consumedItems, setConsumedItems] = useState<CartItem[]>(() => {
+        const saved = localStorage.getItem('altoque_consumed_items');
+        return saved ? JSON.parse(saved) : [];
+    });
+
+    const sessionTotal = useMemo(() => {
+        return consumedItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    }, [consumedItems]);
+
+    // Controla si el flujo es para una RONDA o para PAGAR LA CUENTA
     const [isFinalPayment, setIsFinalPayment] = useState(false);
 
     const { cartItems, addToCart, removeFromCart, updateQuantity, cartTotal, clearCart, itemCount } = useCart();
@@ -94,7 +101,6 @@ export default function CustomerView() {
         fetch();
         subscribeToMenuUpdates(fetch);
 
-        // Detección de mesa por URL
         const params = new URLSearchParams(window.location.hash.split('?')[1]);
         const table = params.get('table');
         const zone = params.get('zone');
@@ -105,44 +111,44 @@ export default function CustomerView() {
         return () => unsubscribeFromChannel();
     }, []);
 
-    // Guardar en localStorage para persistencia
+    // Persistencia de la sesión en localStorage
     useEffect(() => {
         localStorage.setItem('altoque_session_active', sessionActive.toString());
-        localStorage.setItem('altoque_session_total', sessionTotal.toString());
         localStorage.setItem('altoque_customer_name', customerName);
-    }, [sessionActive, sessionTotal, customerName]);
+        localStorage.setItem('altoque_consumed_items', JSON.stringify(consumedItems));
+    }, [sessionActive, customerName, consumedItems]);
 
     const handleOrderAction = async (customer: Customer, payment: PaymentMethod, proof?: string | null) => {
         if (!settings) return;
         
         try {
             if (isFinalPayment) {
-                // --- FLUJO: CIERRE Y PAGO FINAL ---
+                // --- FLUJO FINAL: SOLICITAR CUENTA Y LIQUIDAR ---
                 const msg = [
-                    `💰 *SOLICITUD DE CIERRE DE CUENTA*`,
+                    `💰 *SOLICITUD DE PAGO Y CIERRE*`,
                     `📍 *${settings.company.name.toUpperCase()}*`,
                     `--------------------------------`,
                     `🪑 Mesa: ${tableInfo?.table} (${tableInfo?.zone})`,
                     `👤 Cliente: ${customer.name}`,
                     `--------------------------------`,
-                    `💵 *TOTAL ACUMULADO: $${sessionTotal.toFixed(2)}*`,
+                    `💵 *TOTAL A LIQUIDAR: $${sessionTotal.toFixed(2)}*`,
                     `💳 Método: ${payment}`,
                     proof ? `✅ Comprobante adjunto` : '',
                     `--------------------------------`,
-                    `_Favor validar pago para liberar mesa._`
+                    `_Por favor procesar el cierre para liberar la mesa._`
                 ].filter(Boolean).join('\n');
 
                 window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
                 
-                // Reiniciar sesión local al liquidar
+                // Limpiar sesión local completa
                 setSessionActive(false);
-                setSessionTotal(0);
+                setConsumedItems([]);
                 setCustomerName('');
-                localStorage.clear(); // Limpia todo para empezar de cero
+                localStorage.clear();
                 clearCart();
                 setView('confirmation');
             } else {
-                // --- FLUJO: ENVIAR RONDA (COMANDA) ---
+                // --- FLUJO DE RONDA: ENVIAR COMANDA ---
                 const newOrderData: Omit<Order, 'id' | 'createdAt'> = {
                     customer,
                     items: cartItems,
@@ -158,10 +164,9 @@ export default function CustomerView() {
 
                 if (orderType === OrderType.DineIn) {
                     setSessionActive(true);
-                    setSessionTotal(prev => prev + cartTotal);
+                    setConsumedItems(prev => [...prev, ...cartItems]);
                 }
 
-                // Notificación por WhatsApp de la nueva ronda
                 const title = orderType === OrderType.DineIn ? '🔥 NUEVA RONDA - MESA ' + tableInfo?.table : '🛒 NUEVO PEDIDO';
                 const itemsStr = cartItems.map(i => `• ${i.quantity}x ${i.name}`).join('\n');
                 const msg = [
@@ -173,8 +178,8 @@ export default function CustomerView() {
                     `--------------------------------`,
                     itemsStr,
                     `--------------------------------`,
-                    `💰 Ronda actual: $${cartTotal.toFixed(2)}`,
-                    orderType === OrderType.DineIn ? `📈 *Cuenta acumulada: $${(sessionTotal + cartTotal).toFixed(2)}*` : ''
+                    `💰 Ronda: $${cartTotal.toFixed(2)}`,
+                    orderType === OrderType.DineIn ? `📈 *Total Acumulado: $${(sessionTotal + cartTotal).toFixed(2)}*` : ''
                 ].filter(Boolean).join('\n');
                 
                 window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
@@ -183,14 +188,14 @@ export default function CustomerView() {
                 setView('confirmation');
             }
         } catch(e) { 
-            alert("Error al procesar la solicitud."); 
+            alert("Error al procesar. Intenta de nuevo."); 
         }
     };
 
     if (isLoadingData || !settings) return (
         <div className="h-screen bg-gray-950 flex flex-col items-center justify-center">
-            <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
-            <p className="text-emerald-500 font-black uppercase tracking-widest text-xs animate-pulse">Cargando Experiencia...</p>
+            <div className="w-10 h-10 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
+            <p className="text-emerald-500 font-black text-[10px] uppercase tracking-widest animate-pulse">Iniciando sesión...</p>
         </div>
     );
 
@@ -202,15 +207,14 @@ export default function CustomerView() {
                 
                 {view !== 'menu' && (
                     <Header 
-                        title={view === 'cart' ? 'MI RONDA' : (isFinalPayment ? 'PAGAR CUENTA' : 'CONFIRMAR')} 
-                        onBack={() => { setView(view === 'checkout' ? 'cart' : 'menu'); setIsFinalPayment(false); }} 
+                        title={view === 'cart' ? 'MI RONDA' : view === 'my-account' ? 'RESUMEN CUENTA' : (isFinalPayment ? 'PAGAR CUENTA' : 'CONFIRMAR')} 
+                        onBack={() => { setView('menu'); setIsFinalPayment(false); }} 
                     />
                 )}
                 
                 <div className="flex-1 overflow-y-auto">
                     {view === 'menu' && (
                         <div className="animate-fade-in pb-48">
-                            {/* Hero y Estado de Sesión */}
                             <div className="relative pb-6 border-b border-gray-800">
                                 <div className="h-44 w-full overflow-hidden relative">
                                     {settings.branch.coverImageUrl ? <img src={settings.branch.coverImageUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900" />}
@@ -222,9 +226,9 @@ export default function CustomerView() {
                                     </div>
                                     
                                     {sessionActive && tableInfo && (
-                                        <div className="mb-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black px-5 py-2 rounded-full animate-pulse shadow-lg flex items-center gap-2">
-                                            <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
-                                            CUENTA ABIERTA: ${sessionTotal.toFixed(2)}
+                                        <div onClick={() => setView('my-account')} className="mb-4 bg-emerald-500 text-white text-[10px] font-black px-5 py-2 rounded-full shadow-lg shadow-emerald-500/20 flex items-center gap-2 cursor-pointer active:scale-95 transition-all">
+                                            <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping"></span>
+                                            CUENTA ACTIVA: ${sessionTotal.toFixed(2)}
                                         </div>
                                     )}
 
@@ -234,8 +238,8 @@ export default function CustomerView() {
                                         <div className="mt-4 bg-emerald-950/40 backdrop-blur border border-emerald-500/30 px-6 py-3 rounded-2xl flex items-center gap-3">
                                             <IconTableLayout className="h-5 w-5 text-emerald-400"/>
                                             <div className="text-left">
-                                                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest leading-none mb-1 text-xs">ATENDIENDO EN MESA</p>
-                                                <p className="text-sm font-black text-white">{tableInfo.table} • {tableInfo.zone}</p>
+                                                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest leading-none mb-1">MESA {tableInfo.table}</p>
+                                                <p className="text-xs font-bold text-gray-400">{tableInfo.zone}</p>
                                             </div>
                                         </div>
                                     ) : (
@@ -251,7 +255,7 @@ export default function CustomerView() {
                             <div className="p-4 space-y-8 mt-4">
                                 <div className="relative">
                                     <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 h-5 w-5" />
-                                    <input type="text" placeholder="¿Qué se te antoja hoy?" className="w-full bg-gray-800/40 border border-gray-700 rounded-2xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all placeholder-gray-600 font-bold" />
+                                    <input type="text" placeholder="¿Qué vas a pedir hoy?" className="w-full bg-gray-800/40 border border-gray-700 rounded-2xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all placeholder-gray-600 font-bold" />
                                 </div>
 
                                 {allCategories.map(cat => {
@@ -260,7 +264,7 @@ export default function CustomerView() {
                                     return (
                                         <div key={cat.id}>
                                             <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mb-4 flex items-center gap-3">
-                                                <span className="w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
+                                                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
                                                 {cat.name}
                                             </h3>
                                             <div className="grid gap-4">
@@ -315,15 +319,48 @@ export default function CustomerView() {
 
                             <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-8 bg-gray-900/98 backdrop-blur-xl border-t border-gray-800 z-40 rounded-t-[3rem] shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
                                  <div className="flex justify-between font-black text-xl mb-6">
-                                     <span className="text-gray-500 text-[10px] tracking-[0.2em] uppercase self-center">SUBTOTAL RONDA</span>
-                                     <span className="text-emerald-500 text-2xl">${cartTotal.toFixed(2)}</span>
+                                     <span className="text-gray-500 text-[10px] tracking-[0.2em] uppercase self-center">TOTAL RONDA ACTUAL</span>
+                                     <span className="text-emerald-400 text-2xl">${cartTotal.toFixed(2)}</span>
                                  </div>
                                  <button 
                                     disabled={cartItems.length === 0} 
                                     onClick={() => { setIsFinalPayment(false); setView('checkout'); }} 
                                     className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white shadow-2xl active:scale-[0.98] transition-all disabled:opacity-30 uppercase tracking-[0.2em] text-sm"
                                  >
-                                    {orderType === OrderType.DineIn ? 'CONTINUAR A RONDA' : 'IR A PAGAR'}
+                                    {orderType === OrderType.DineIn ? 'ENVIAR RONDA A COCINA' : 'IR A PAGAR'}
+                                 </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {view === 'my-account' && (
+                        <div className="p-6 animate-fade-in pb-48">
+                            <div className="bg-gray-800/30 p-6 rounded-[2.5rem] border border-gray-800 mb-6">
+                                <h3 className="text-xs font-black text-emerald-500 uppercase tracking-widest mb-6">PEDIDOS REALIZADOS</h3>
+                                <div className="space-y-4">
+                                    {consumedItems.map((item, idx) => (
+                                        <div key={idx} className="flex justify-between items-center text-sm">
+                                            <div className="flex gap-3">
+                                                <span className="font-black text-gray-500">{item.quantity}x</span>
+                                                <span className="font-bold text-gray-200">{item.name}</span>
+                                            </div>
+                                            <span className="font-black text-emerald-400">${(item.price * item.quantity).toFixed(2)}</span>
+                                        </div>
+                                    ))}
+                                    {consumedItems.length === 0 && <p className="text-center text-gray-500 py-10 italic">Aún no has pedido nada.</p>}
+                                </div>
+                            </div>
+                            
+                            <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-8 bg-gray-900/98 backdrop-blur-xl border-t border-gray-800 z-40 rounded-t-[3rem] shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+                                 <div className="flex justify-between font-black text-xl mb-6">
+                                     <span className="text-gray-500 text-[10px] tracking-[0.2em] uppercase self-center">TOTAL ACUMULADO</span>
+                                     <span className="text-emerald-400 text-2xl">${sessionTotal.toFixed(2)}</span>
+                                 </div>
+                                 <button 
+                                    onClick={() => { setIsFinalPayment(true); setView('checkout'); }} 
+                                    className="w-full bg-white text-gray-900 py-5 rounded-2xl font-black shadow-2xl active:scale-[0.98] transition-all uppercase tracking-[0.2em] text-sm"
+                                 >
+                                    PEDIR LA CUENTA / PAGAR
                                  </button>
                             </div>
                         </div>
@@ -343,16 +380,16 @@ export default function CustomerView() {
                             
                             {(!sessionActive || !customerName) && (
                                 <div className="space-y-4 p-7 bg-gray-800/30 border border-gray-800 rounded-[2.5rem]">
-                                    <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">IDENTIFICACIÓN</h3>
-                                    <input name="name" type="text" defaultValue={customerName} className="w-full bg-gray-800 border-gray-700 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold" placeholder="¿A qué nombre la cuenta?" required />
-                                    {orderType !== OrderType.DineIn && <input name="phone" type="tel" className="w-full bg-gray-800 border-gray-700 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold" placeholder="WhatsApp para aviso" required />}
+                                    <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">¿A NOMBRE DE QUIÉN?</h3>
+                                    <input name="name" type="text" defaultValue={customerName} className="w-full bg-gray-800 border-gray-700 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold" placeholder="Escribe tu nombre" required />
+                                    {orderType !== OrderType.DineIn && <input name="phone" type="tel" className="w-full bg-gray-800 border-gray-700 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold" placeholder="WhatsApp" required />}
                                 </div>
                             )}
 
                             {isFinalPayment && (
                                 <div className="space-y-6 animate-fade-in">
                                     <div className="space-y-4 p-7 bg-gray-800/30 border border-gray-800 rounded-[2.5rem]">
-                                        <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">FORMA DE PAGO FINAL</h3>
+                                        <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">FORMA DE PAGO</h3>
                                         <div className="grid grid-cols-1 gap-2">
                                             {['Efectivo', 'Pago Móvil', 'Transferencia'].map(m => (
                                                 <label key={m} className="flex justify-between items-center p-4 bg-gray-800/50 border border-gray-700 rounded-2xl cursor-pointer hover:border-emerald-500 transition-colors has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/5">
@@ -408,8 +445,8 @@ export default function CustomerView() {
                                 <h2 className="text-4xl font-black text-white uppercase tracking-tighter">{isFinalPayment ? '¡CUENTA CERRADA!' : '¡A COCINA!'}</h2>
                                 <p className="text-gray-500 text-sm leading-relaxed max-w-xs mx-auto font-medium">
                                     {isFinalPayment 
-                                        ? 'Hemos enviado tu solicitud de cierre satisfactoriamente. ¡Vuelve pronto!' 
-                                        : 'Tu ronda ha sido enviada a cocina. El sistema mantiene tu sesión abierta para que sigas pidiendo desde el menú.'}
+                                        ? 'Hemos enviado tu reporte de pago. ¡Gracias por elegirnos!' 
+                                        : 'Tu ronda ha sido enviada. Mantendremos tu sesión abierta para que sigas pidiendo cuando quieras.'}
                                 </p>
                             </div>
                             <button onClick={() => { setIsFinalPayment(false); setView('menu'); }} className="w-full max-w-xs bg-emerald-600 py-5 rounded-3xl font-black text-white shadow-xl hover:bg-emerald-500 active:scale-95 transition-all uppercase tracking-widest text-xs">
@@ -445,23 +482,23 @@ export default function CustomerView() {
                 {/* --- BOTONES FLOTANTES DE SESIÓN ACTIVA --- */}
                 {view === 'menu' && (
                     <div className="fixed bottom-8 left-6 right-6 max-w-md mx-auto z-40 flex flex-col gap-3">
-                        {/* Botón Mi Cuenta (Sesión Persistente) */}
+                        {/* Botón Mi Cuenta (Píldora elegante) */}
                         {sessionActive && sessionTotal > 0 && (
                             <button 
-                                onClick={() => { setIsFinalPayment(true); setView('checkout'); }} 
+                                onClick={() => setView('my-account')} 
                                 className="w-full bg-gray-800/98 backdrop-blur-md text-white font-black py-4 px-7 rounded-3xl flex justify-between items-center border border-emerald-500/40 shadow-2xl transition-all hover:bg-gray-700 active:scale-95 group"
                             >
                                 <span className="flex items-center gap-3 text-[10px] uppercase tracking-[0.2em] font-black"><IconReceipt className="h-5 w-5 text-emerald-400 group-hover:scale-110 transition-transform"/> MI CUENTA ACUMULADA</span>
                                 <span className="bg-emerald-500 px-3 py-1 rounded-xl text-xs font-mono shadow-lg shadow-emerald-500/20">${sessionTotal.toFixed(2)}</span>
                             </button>
                         )}
-                        {/* Botón de la Ronda Actual */}
+                        {/* Botón Ronda Actual */}
                         {cartItems.length > 0 && (
                             <button 
                                 onClick={() => setView('cart')} 
                                 className="w-full bg-emerald-600 text-white font-black py-5 px-7 rounded-3xl flex justify-between shadow-2xl active:scale-[0.98] transition-all animate-slide-up border border-emerald-500/20"
                             >
-                                <span className="tracking-[0.2em] uppercase text-[10px] font-black">VER RONDA ACTUAL ({itemCount})</span>
+                                <span className="tracking-[0.2em] uppercase text-[10px] font-black">REVISAR RONDA ({itemCount})</span>
                                 <span className="font-black text-lg">${cartTotal.toFixed(2)}</span>
                             </button>
                         )}
