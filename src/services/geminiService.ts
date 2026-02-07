@@ -19,24 +19,27 @@ export const getPairingSuggestion = async (cartItems: CartItem[], allProducts: P
     const availableProducts = allProducts
         .filter(p => p.available && ![...consumedItems, ...cartItems].some(ci => ci.id === p.id))
         .map(p => `${p.name} ($${p.price})`)
-        .slice(0, 10)
+        .slice(0, 15)
         .join(", ");
+
+    if (!availableProducts) return "";
 
     const prompt = `Actúa como un sommelier y experto gastronómico chic. 
     En esta mesa se está consumiendo: ${allInTable}.
     Basado SOLO en estos productos disponibles: ${availableProducts}, 
     sugiere UN solo producto adicional (bebida, postre o entrada) que combine perfectamente. 
-    Respuesta muy corta (máximo 10 palabras), persuasiva y elegante. 
-    Ejemplo: "Ese postre marida increíble con nuestro Café Espresso doble."`;
+    La respuesta debe ser muy corta (máximo 12 palabras), persuasiva y elegante. 
+    Ejemplo: "Para realzar sabores, nuestro Espresso Intenso es ideal."`;
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
+            model: 'gemini-flash-latest', // Usamos un modelo rápido para baja latencia
             contents: prompt,
         });
         return response.text?.trim() || "";
     } catch (error) {
-        return "";
+        console.error("Error getting pairing suggestion:", error);
+        return ""; // Falla silenciosamente para no interrumpir la experiencia
     }
 };
 
@@ -95,7 +98,7 @@ export const getChatbotResponse = async (history: ChatMessage[], newMessage: str
  */
 export const getAdvancedInsights = async (query: string, orders: Order[]): Promise<string> => {
     const prompt = `Como analista de negocios experto, analiza estos pedidos: ${JSON.stringify(orders)}. 
-    Responde a: ${query}. Sé directo y accionable.`;
+    Responde a: "${query}". Sé directo, da insights accionables y estructura con markdown.`;
     
     try {
         const response = await ai.models.generateContent({
