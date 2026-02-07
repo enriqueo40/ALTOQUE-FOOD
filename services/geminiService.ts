@@ -1,15 +1,17 @@
 
 import { GoogleGenAI } from "@google/genai";
-// FIX: Add CartItem to type imports for getPairingSuggestion
 import { ChatMessage, Order, Product, CartItem } from '../types';
 
 // Fix: Always use process.env.API_KEY directly in the GoogleGenAI constructor
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-// FIX: Add and export missing getPairingSuggestion function for CustomerView
+
+/**
+ * Genera una sugerencia de maridaje basada en el consumo total de la sesión y el carrito.
+ */
 export const getPairingSuggestion = async (cartItems: CartItem[], allProducts: Product[]): Promise<string> => {
-    // This logic might depend on session storage which is fine for client-side execution.
-    const savedConsumed = typeof window !== 'undefined' ? localStorage.getItem('altoque_consumed_items') : null;
+    // Recuperar items consumidos del localStorage para análisis completo
+    const savedConsumed = localStorage.getItem('altoque_consumed_items');
     const consumedItems: CartItem[] = savedConsumed ? JSON.parse(savedConsumed) : [];
     
     if (cartItems.length === 0 && consumedItems.length === 0) return "";
@@ -32,14 +34,13 @@ export const getPairingSuggestion = async (cartItems: CartItem[], allProducts: P
 
     try {
         const response = await ai.models.generateContent({
-            // FIX: Use recommended model for basic text generation to avoid deprecated models.
-            model: 'gemini-3-flash-preview',
+            model: 'gemini-flash-latest', // Usamos un modelo rápido para baja latencia
             contents: prompt,
         });
         return response.text?.trim() || "";
     } catch (error) {
         console.error("Error getting pairing suggestion:", error);
-        return ""; // Fail silently to not interrupt the user experience.
+        return ""; // Falla silenciosamente para no interrumpir la experiencia
     }
 };
 
