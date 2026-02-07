@@ -47,6 +47,8 @@ export interface Address {
     numero: string;
     entreCalles?: string;
     referencias?: string;
+    // FIX: Add googleMapsLink to Address type to support geolocation functionality in CustomerView.
+    googleMapsLink?: string;
 }
 
 export interface Customer {
