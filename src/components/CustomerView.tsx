@@ -27,7 +27,11 @@ const PairingAI: React.FC<{ items: CartItem[], allProducts: Product[] }> = ({ it
 
     useEffect(() => {
         let isMounted = true;
-        if (items.length > 0 || (localStorage.getItem('altoque_consumed_items') || '[]') !== '[]' ) {
+        // Check both current cart and persisted items for suggestion
+        const consumedItemsRaw = localStorage.getItem('altoque_consumed_items');
+        const hasConsumedItems = consumedItemsRaw && JSON.parse(consumedItemsRaw).length > 0;
+
+        if (items.length > 0 || hasConsumedItems) {
             setLoading(true);
             getPairingSuggestion(items, allProducts).then(res => {
                 if (isMounted) {
@@ -135,8 +139,13 @@ export default function CustomerView() {
     useEffect(() => {
         if (tableInfo) {
             localStorage.setItem('altoque_table_info', JSON.stringify(tableInfo));
+            setOrderType(OrderType.DineIn); // Force DineIn when table info is set
         } else {
             localStorage.removeItem('altoque_table_info');
+            // Revert to default if table session ends
+            if (orderType === OrderType.DineIn) {
+                setOrderType(OrderType.Delivery);
+            }
         }
     }, [tableInfo]);
 
@@ -166,7 +175,6 @@ export default function CustomerView() {
         if (table && zone) {
             const newInfo = { table, zone };
             setTableInfo(newInfo);
-            setOrderType(OrderType.DineIn);
         }
 
         return () => unsubscribeFromChannel();
@@ -210,7 +218,7 @@ export default function CustomerView() {
                 
                 if (orderType === OrderType.DineIn) {
                     setSessionItems(prev => [...prev, ...cartItems]);
-                    setCustomerName(customer.name);
+                    setCustomerName(customer.name); // Persist customer name for the session
                 }
 
                 const itemsStr = cartItems.map(i => `• ${i.quantity}x ${i.name}`).join('\n');
@@ -380,7 +388,7 @@ export default function CustomerView() {
                                     className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex justify-between px-8 items-center active:scale-95 transition-all shadow-xl shadow-emerald-900/40 hover:bg-emerald-500"
                                 >
                                     <span className="uppercase tracking-widest text-[10px]">AÑADIR A LA RONDA</span>
-                                    <span className="text-xl font-black">${selectedProduct.price.toFixed(2)}</span>
+                                    <span className="text-xl font-black">${getDiscountedPrice(selectedProduct, allPromotions).price.toFixed(2)}</span>
                                 </button>
                             </div>
                         </div>
@@ -389,7 +397,7 @@ export default function CustomerView() {
                 
                 {view === 'menu' && (
                     <div className="fixed bottom-6 left-4 right-4 max-w-md mx-auto z-40 flex flex-col gap-3">
-                        {sessionItems.length > 0 && isTableSession && (
+                        {isTableSession && sessionItems.length > 0 && (
                             <button 
                                 onClick={() => setView('account')} 
                                 className="w-full bg-gray-800/90 backdrop-blur-xl text-white font-black py-4 px-6 rounded-2xl flex justify-between items-center border border-emerald-500/30 shadow-2xl transition-transform active:scale-95 group"
