@@ -1,13 +1,79 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, PaymentMethod, OrderType, Personalization, Promotion, PersonalizationOption, Schedule, ShippingCostType } from '../types';
+import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, PaymentMethod, OrderType, Personalization, Promotion, PersonalizationOption, Schedule, ShippingCostType, DaySchedule } from '../types';
 import { useCart } from '../hooks/useCart';
 import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconStore, IconCheck, IconUpload, IconReceipt, IconSparkles, IconClock, IconLocationMarker } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import { getPairingSuggestion } from '../services/geminiService';
 import Chatbot from './Chatbot';
 
+// --- Helpers de Horario ---
+const getStoreStatus = (schedules: Schedule[]): { isOpen: boolean; message: string } => {
+    if (!schedules || schedules.length === 0) {
+        return { isOpen: true, message: 'Abierto' }; // Default a abierto si no hay horario
+    }
+    const mainSchedule = schedules[0]; // Usar el primer horario como principal
+    const now = new Date();
+    const dayOfWeek = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][now.getDay()];
+    const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+
+    const todaySchedule = mainSchedule.days.find(d => d.day === dayOfWeek);
+
+    if (!todaySchedule || !todaySchedule.isOpen) {
+        return { isOpen: false, message: 'Cerrado Ahora' };
+    }
+
+    if (todaySchedule.shifts.length === 0) {
+        return { isOpen: true, message: 'Abierto Ahora' }; // 24 horas
+    }
+
+    for (const shift of todaySchedule.shifts) {
+        if (currentTime >= shift.start && currentTime < shift.end) {
+            return { isOpen: true, message: `Abierto Ahora` };
+        }
+    }
+
+    return { isOpen: false, message: 'Cerrado Ahora' };
+};
+
+
 // --- Sub-componentes ---
+
+const ScheduleModal: React.FC<{ isOpen: boolean; onClose: () => void; schedules: Schedule[] }> = ({ isOpen, onClose, schedules }) => {
+    if (!isOpen || !schedules || schedules.length === 0) return null;
+    
+    const mainSchedule = schedules[0];
+    const daysOrder: DaySchedule['day'][] = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+    const sortedDays = mainSchedule.days.sort((a, b) => daysOrder.indexOf(a.day) - daysOrder.indexOf(b.day));
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={onClose}>
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm p-6 animate-fade-in" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2"><IconClock className="h-5 w-5 text-emerald-400"/> Nuestros Horarios</h3>
+                    <button onClick={onClose} className="text-gray-500 hover:text-white"><IconX/></button>
+                </div>
+                <div className="space-y-3">
+                    {sortedDays.map(day => (
+                        <div key={day.day} className="flex justify-between items-center text-sm border-b border-gray-800 pb-3 last:border-0">
+                            <span className="font-semibold text-gray-300">{day.day}</span>
+                            <div className="text-right">
+                                {!day.isOpen || day.shifts.length === 0 ? (
+                                    <span className="text-rose-400 font-medium">Cerrado</span>
+                                ) : (
+                                    day.shifts.map((shift, index) => (
+                                        <span key={index} className="block text-gray-400 font-mono">{shift.start} - {shift.end}</span>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 const Header: React.FC<{ title: string; onBack?: () => void }> = ({ title, onBack }) => (
     <header className="p-4 flex justify-between items-center sticky top-0 bg-gray-900/95 backdrop-blur-md z-30 border-b border-gray-800 shadow-sm">
@@ -101,6 +167,7 @@ export default function CustomerView() {
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [settings, setSettings] = useState<AppSettings | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
     
     // --- ESTADO PERSISTENTE DE MESA ---
     const [tableInfo, setTableInfo] = useState<{ table: string; zone: string } | null>(() => {
@@ -270,6 +337,7 @@ export default function CustomerView() {
         ? 'Tu ronda ha sido enviada a cocina. Puedes seguir pidiendo más cosas desde este mismo menú.'
         : `Tu pedido para ${orderType === OrderType.Delivery ? 'domicilio' : 'recoger'} ha sido enviado. Recibirás una confirmación por WhatsApp en breve.`;
     const confirmationButtonText = isFinalClosing ? 'INICIAR NUEVO PEDIDO' : isTableSession ? 'SEGUIR PIDIENDO' : 'HACER OTRO PEDIDO';
+    const storeStatus = getStoreStatus(settings.schedules);
 
     return (
         <div className="bg-gray-950 min-h-screen text-gray-100 font-sans selection:bg-emerald-500/20 pb-safe">
@@ -300,6 +368,23 @@ export default function CustomerView() {
                                     <div className="w-24 h-24 bg-gray-800 rounded-full p-1 shadow-2xl mb-3 border-4 border-gray-900 overflow-hidden">
                                         {settings.branch.logoUrl ? <img src={settings.branch.logoUrl} className="w-full h-full object-cover rounded-full" /> : <div className="w-full h-full flex items-center justify-center font-bold text-emerald-500 text-2xl bg-gray-700">{settings.company.name.slice(0,2)}</div>}
                                     </div>
+                                    <h2 className="text-3xl font-black text-white">{settings.company.name}</h2>
+                                    <p className="text-sm text-gray-400 mb-4">{settings.branch.alias}</p>
+
+                                    <div className="flex flex-col gap-2 items-center mb-4">
+                                        <div className="flex items-center gap-2 text-xs">
+                                            <span className={`w-2 h-2 rounded-full ${storeStatus.isOpen ? 'bg-emerald-500' : 'bg-gray-500'}`}></span>
+                                            <span className={storeStatus.isOpen ? 'text-emerald-400 font-semibold' : 'text-gray-400 font-medium'}>{storeStatus.message}</span>
+                                            <button onClick={() => setIsScheduleModalOpen(true)} className="text-gray-400 underline decoration-dotted text-[10px] hover:text-white">Ver horarios</button>
+                                        </div>
+                                        {settings.branch.googleMapsLink && (
+                                            <a href={settings.branch.googleMapsLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white">
+                                                <IconLocationMarker className="h-3 w-3" />
+                                                <span>{settings.branch.fullAddress}</span>
+                                            </a>
+                                        )}
+                                    </div>
+
                                     
                                     {isTableSession ? (
                                         <div className="mb-4 flex flex-col items-center gap-2">
@@ -381,7 +466,7 @@ export default function CustomerView() {
                     
                     {view === 'cart' && ( <div className="p-5 animate-fade-in"> <PairingAI items={cartItems} allProducts={allProducts} isTableSession={isTableSession}/> <h2 className="text-xl font-black text-white mb-6 uppercase tracking-tight">{isTableSession ? 'Tu Ronda Actual' : 'Resumen de tu Pedido'}</h2> <div className="space-y-4"> {cartItems.map(i => ( <div key={i.cartItemId} className="flex gap-4 bg-gray-800/40 p-4 rounded-3xl border border-gray-800/60"> <img src={i.imageUrl} className="w-20 h-20 rounded-2xl object-cover shadow-lg" /> <div className="flex-1 flex flex-col justify-center"> <div className="flex justify-between items-start mb-2"> <span className="font-bold text-sm text-gray-100">{i.name}</span> <span className="font-black text-emerald-400 text-sm">${(i.price * i.quantity).toFixed(2)}</span> </div> <div className="flex items-center justify-between"> <div className="flex items-center bg-gray-900 rounded-xl px-2 py-1 border border-gray-800"> <button onClick={() => updateQuantity(i.cartItemId, i.quantity - 1)} className="p-1.5 text-gray-400 hover:text-white"><IconMinus className="h-4 w-4"/></button> <span className="w-8 text-center text-xs font-black">{i.quantity}</span> <button onClick={() => updateQuantity(i.cartItemId, i.quantity + 1)} className="p-1.5 text-gray-400 hover:text-white"><IconPlus className="h-4 w-4"/></button> </div> <button onClick={() => removeFromCart(i.cartItemId)} className="text-rose-500/40 hover:text-rose-500 p-2"><IconTrash className="h-5 w-5"/></button> </div> </div> </div> ))} </div> <div className="mt-8 pt-6 border-t border-gray-800"> <div className="flex justify-between font-black text-xl mb-6"> <span className="text-gray-500 text-[10px] tracking-[0.2em] uppercase self-center">{isTableSession ? 'TOTAL RONDA' : 'TOTAL'}</span> <span className="text-emerald-400 text-3xl">${cartTotal.toFixed(2)}</span> </div> <button disabled={cartItems.length === 0} onClick={() => { setIsFinalClosing(false); setView('checkout'); }} className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white shadow-2xl active:scale-[0.98] transition-all disabled:opacity-30 uppercase tracking-[0.2em] text-sm"> {isTableSession ? 'ENVIAR A COCINA' : 'IR A PAGAR'} </button> </div> </div> )}
                     {view === 'account' && isTableSession && ( <div className="p-6 animate-fade-in"> <div className="bg-gray-800/30 p-7 rounded-[2.5rem] border border-gray-800 mb-6 shadow-xl"> <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-8 flex items-center gap-3"> <IconReceipt className="h-4 w-4"/> TU CUENTA ACUMULADA </h3> <div className="space-y-4"> {sessionItems.map((item, idx) => ( <div key={idx} className="flex justify-between items-start text-sm border-b border-gray-700/50 pb-3 last:border-0"> <div className="flex gap-4"> <span className="font-black text-gray-500 bg-gray-800 h-6 w-6 flex items-center justify-center rounded-lg text-[10px]">{item.quantity}</span> <span className="font-bold text-gray-300">{item.name}</span> </div> <span className="font-bold text-white">${(item.price * item.quantity).toFixed(2)}</span> </div> ))} {sessionItems.length === 0 && <p className="text-center text-gray-500 py-4 italic">Aún no has pedido nada.</p>} </div> <div className="mt-6 pt-6 border-t border-gray-700/50 flex justify-between items-center"> <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">TOTAL A PAGAR</span> <span className="text-2xl font-black text-white">${sessionTotal.toFixed(2)}</span> </div> </div> <button onClick={() => { setIsFinalClosing(true); setView('checkout'); }} className="w-full bg-white text-gray-900 py-5 rounded-2xl font-black shadow-2xl active:scale-[0.98] transition-all uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-3"> <IconCheck className="h-5 w-5"/> PEDIR LA CUENTA / PAGAR </button> </div> )}
-                    {view === 'checkout' && ( <form onSubmit={e => { e.preventDefault(); const fd = new FormData(e.currentTarget); const name = fd.get('name') as string || (isTableSession ? customerName : ''); const tip = parseFloat(fd.get('tip') as string) || 0; const payment = (fd.get('payment') as PaymentMethod) || 'Efectivo'; const proof = (e.currentTarget.elements.namedItem('proof') as any)?.dataset.url; handleOrderAction({ name, phone: fd.get('phone') as string || '', address: { colonia: '', calle: '', numero: '' } } as any, payment, tip, proof); }} className="p-6 space-y-6 animate-fade-in"> {(!customerName || !isTableSession) && ( <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]"> <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">DATOS</h3> <input name="name" type="text" defaultValue={customerName} className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="¿A nombre de quién?" required /> {!isTableSession && <input name="phone" type="tel" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="WhatsApp de contacto" required />} </div> )} {isFinalClosing && isTableSession && ( <> {settings.payment.showTipField && ( <div className="p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]"> <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-4">PROPINA (OPCIONAL)</h3> <input name="tip" type="number" min="0" step="any" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="Monto de propina" /> </div> )} <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]"> <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">MÉTODO DE PAGO FINAL</h3> <div className="grid grid-cols-1 gap-2"> {['Efectivo', 'Pago Móvil', 'Transferencia', 'Zelle'].map(m => ( <label key={m} className="flex justify-between items-center p-4 bg-gray-800/50 border border-gray-700 rounded-xl cursor-pointer hover:border-emerald-500 transition-all has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10"> <span className="text-sm font-bold text-gray-300">{m}</span> <input type="radio" name="payment" value={m} defaultChecked={m === 'Efectivo'} className="accent-emerald-500 h-5 w-5" /> </label> ))} </div> </div> <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]"> <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">COMPROBANTE (SI APLICA)</h3> <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-700 rounded-2xl cursor-pointer hover:bg-gray-800/50 transition-all group relative overflow-hidden"> <div className="flex flex-col items-center text-gray-500 group-hover:text-emerald-400"> <IconUpload className="h-8 w-8 mb-2 opacity-50" /> <span className="text-[10px] font-black uppercase tracking-widest">Subir Imagen</span> </div> <input name="proof" type="file" className="hidden" accept="image/*" onChange={e => { if (e.target.files?.[0]) { const reader = new FileReader(); reader.onload = (re) => { const img = document.createElement('img'); img.src = re.target?.result as string; img.className = "absolute inset-0 w-full h-full object-cover bg-gray-900"; e.target.dataset.url = re.target?.result as string; e.target.parentElement?.appendChild(img); }; reader.readAsDataURL(e.target.files[0]); } }} /> </label> </div> </> )} <div className="pt-4"> <div className="flex justify-between font-black text-2xl mb-6 px-2"> <span className="text-gray-500 text-[10px] tracking-[0.3em] self-center uppercase">{isTableSession ? (isFinalClosing ? 'TOTAL A PAGAR' : 'TOTAL RONDA') : 'TOTAL DEL PEDIDO'}</span> <span className="text-emerald-400 text-3xl font-black">${(isTableSession && isFinalClosing ? sessionTotal : cartTotal).toFixed(2)}</span> </div> <button type="submit" className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex items-center justify-center gap-4 active:scale-95 transition-all text-xs uppercase tracking-[0.2em] shadow-2xl shadow-emerald-900/30 hover:bg-emerald-500"> <IconWhatsapp className="h-5 w-5" /> {isTableSession ? (isFinalClosing ? 'CERRAR MESA Y PAGAR' : 'ENVIAR RONDA A COCINA') : 'ENVIAR PEDIDO'} </button> </div> </form> )}
+                    {view === 'checkout' && ( <form onSubmit={e => { e.preventDefault(); const fd = new FormData(e.currentTarget); const name = fd.get('name') as string || (isTableSession ? customerName : ''); const tip = parseFloat(fd.get('tip') as string) || 0; const payment = (fd.get('payment') as PaymentMethod) || 'Efectivo'; const proof = (e.currentTarget.elements.namedItem('proof') as any)?.dataset.url; handleOrderAction({ name, phone: fd.get('phone') as string || '', address: { colonia: '', calle: '', numero: '' } } as any, payment, tip, proof); }} className="p-6 space-y-6 animate-fade-in"> {(!customerName || !isTableSession) && ( <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]"> <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">DATOS</h3> <input name="name" type="text" defaultValue={customerName} className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="¿A nombre de quién?" required /> {!isTableSession && <input name="phone" type="tel" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="WhatsApp de contacto" required />} </div> )} {!isTableSession && ( <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]"> <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">MÉTODO DE PAGO</h3> <div className="grid grid-cols-1 gap-2"> {(orderType === OrderType.Delivery ? settings.payment.deliveryMethods : settings.payment.pickupMethods).map(m => ( <label key={m} className="flex justify-between items-center p-4 bg-gray-800/50 border border-gray-700 rounded-xl cursor-pointer hover:border-emerald-500 transition-all has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10"> <span className="text-sm font-bold text-gray-300">{m}</span> <input type="radio" name="payment" value={m} defaultChecked={m === (orderType === OrderType.Delivery ? settings.payment.deliveryMethods[0] : settings.payment.pickupMethods[0])} className="accent-emerald-500 h-5 w-5" /> </label> ))} </div> </div> )} {isFinalClosing && isTableSession && ( <> {settings.payment.showTipField && ( <div className="p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]"> <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-4">PROPINA (OPCIONAL)</h3> <input name="tip" type="number" min="0" step="any" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="Monto de propina" /> </div> )} <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]"> <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">MÉTODO DE PAGO FINAL</h3> <div className="grid grid-cols-1 gap-2"> {['Efectivo', 'Pago Móvil', 'Transferencia', 'Zelle'].map(m => ( <label key={m} className="flex justify-between items-center p-4 bg-gray-800/50 border border-gray-700 rounded-xl cursor-pointer hover:border-emerald-500 transition-all has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10"> <span className="text-sm font-bold text-gray-300">{m}</span> <input type="radio" name="payment" value={m} defaultChecked={m === 'Efectivo'} className="accent-emerald-500 h-5 w-5" /> </label> ))} </div> </div> </> )} {(isFinalClosing || !isTableSession) && ( <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]"> <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">COMPROBANTE (SI APLICA)</h3> <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-700 rounded-2xl cursor-pointer hover:bg-gray-800/50 transition-all group relative overflow-hidden"> <div className="flex flex-col items-center text-gray-500 group-hover:text-emerald-400"> <IconUpload className="h-8 w-8 mb-2 opacity-50" /> <span className="text-[10px] font-black uppercase tracking-widest">Subir Imagen</span> </div> <input name="proof" type="file" className="hidden" accept="image/*" onChange={e => { if (e.target.files?.[0]) { const reader = new FileReader(); reader.onload = (re) => { const img = document.createElement('img'); img.src = re.target?.result as string; img.className = "absolute inset-0 w-full h-full object-cover bg-gray-900"; e.target.dataset.url = re.target?.result as string; e.target.parentElement?.appendChild(img); }; reader.readAsDataURL(e.target.files[0]); } }} /> </label> </div> )} <div className="pt-4"> <div className="flex justify-between font-black text-2xl mb-6 px-2"> <span className="text-gray-500 text-[10px] tracking-[0.3em] self-center uppercase">{isTableSession ? (isFinalClosing ? 'TOTAL A PAGAR' : 'TOTAL RONDA') : 'TOTAL DEL PEDIDO'}</span> <span className="text-emerald-400 text-3xl font-black">${(isTableSession && isFinalClosing ? sessionTotal : cartTotal).toFixed(2)}</span> </div> <button type="submit" className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex items-center justify-center gap-4 active:scale-95 transition-all text-xs uppercase tracking-[0.2em] shadow-2xl shadow-emerald-900/30 hover:bg-emerald-500"> <IconWhatsapp className="h-5 w-5" /> {isTableSession ? (isFinalClosing ? 'CERRAR MESA Y PAGAR' : 'ENVIAR RONDA A COCINA') : 'ENVIAR PEDIDO'} </button> </div> </form> )}
                 </div>
 
                 {selectedProduct && (
@@ -440,6 +525,7 @@ export default function CustomerView() {
                     </div>
                 )}
                 <Chatbot />
+                <ScheduleModal isOpen={isScheduleModalOpen} onClose={() => setIsScheduleModalOpen(false)} schedules={settings.schedules} />
             </div>
         </div>
     );
