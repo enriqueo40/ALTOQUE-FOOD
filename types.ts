@@ -47,6 +47,8 @@ export interface Address {
     numero: string;
     entreCalles?: string;
     referencias?: string;
+    // Fix: Add googleMapsLink property to Address interface
+    googleMapsLink?: string;
 }
 
 export interface Customer {
