@@ -19,8 +19,25 @@ const getClient = (): SupabaseClient => {
 // --- Settings Functions ---
 export const getAppSettings = async (): Promise<AppSettings> => {
     const { data, error } = await getClient().from('app_settings').select('settings').eq('id', 1).single();
-    if (!error && data?.settings) return { ...JSON.parse(JSON.stringify(INITIAL_SETTINGS)), ...data.settings };
-    return JSON.parse(JSON.stringify(INITIAL_SETTINGS));
+    
+    // Deep merge manual para la sección de pagos para evitar que falten propiedades
+    const baseSettings = JSON.parse(JSON.stringify(INITIAL_SETTINGS));
+    
+    if (!error && data?.settings) {
+        const dbSettings = data.settings;
+        return {
+            ...baseSettings,
+            ...dbSettings,
+            payment: {
+                ...baseSettings.payment,
+                ...(dbSettings.payment || {}),
+                pagoMovil: { ...baseSettings.payment.pagoMovil, ...(dbSettings.payment?.pagoMovil || {}) },
+                transfer: { ...baseSettings.payment.transfer, ...(dbSettings.payment?.transfer || {}) },
+                zelle: { ...baseSettings.payment.zelle, ...(dbSettings.payment?.zelle || {}) },
+            }
+        };
+    }
+    return baseSettings;
 };
 
 export const saveAppSettings = async (settings: AppSettings): Promise<void> => {
@@ -33,7 +50,6 @@ export const getCategories = async (): Promise<Category[]> => {
     return data || [];
 };
 
-// Fix: Added missing saveCategory function
 export const saveCategory = async (category: Omit<Category, 'id' | 'created_at'> & { id?: string }): Promise<Category> => {
     const { id, ...categoryData } = category;
     const { data, error } = await getClient().from('categories').upsert({ id, ...categoryData }).select().single();
@@ -41,7 +57,6 @@ export const saveCategory = async (category: Omit<Category, 'id' | 'created_at'>
     return data;
 };
 
-// Fix: Added missing deleteCategory function
 export const deleteCategory = async (categoryId: string): Promise<void> => {
     const { error } = await getClient().from('categories').delete().eq('id', categoryId);
     if (error) throw error;
@@ -53,7 +68,6 @@ export const getProducts = async (): Promise<Product[]> => {
     return data || [];
 };
 
-// Fix: Added missing saveProduct function
 export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & { id?: string }): Promise<Product> => {
     const { id, ...productData } = product;
     const { data, error } = await getClient().from('products').upsert({ id, ...productData }).select().single();
@@ -61,14 +75,12 @@ export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & 
     return data;
 };
 
-// Fix: Added missing updateProductAvailability function
 export const updateProductAvailability = async (productId: string, available: boolean): Promise<Product> => {
     const { data, error } = await getClient().from('products').update({ available }).eq('id', productId).select().single();
     if (error || !data) throw new Error("Could not update product availability.");
     return data;
 };
 
-// Fix: Added missing deleteProduct function
 export const deleteProduct = async (productId: string): Promise<void> => {
     const { error } = await getClient().from('products').delete().eq('id', productId);
     if (error) throw error;
@@ -86,14 +98,12 @@ export const getPersonalizations = async (): Promise<Personalization[]> => {
     })) || []) as Personalization[];
 };
 
-// Fix: Added missing updatePersonalizationOptionAvailability function
 export const updatePersonalizationOptionAvailability = async (optionId: string, available: boolean): Promise<PersonalizationOption> => {
     const { data, error } = await getClient().from('personalization_options').update({ available }).eq('id', optionId).select().single();
     if (error || !data) throw new Error("Could not update option availability.");
     return data;
 };
 
-// Fix: Added missing savePersonalization function
 export const savePersonalization = async (personalization: Omit<Personalization, 'id' | 'created_at'> & { id?: string }): Promise<Personalization> => {
     const { options, ...personalizationData } = personalization;
     const { data: savedP, error } = await getClient().from('personalizations').upsert({
@@ -109,7 +119,6 @@ export const savePersonalization = async (personalization: Omit<Personalization,
     return (await getPersonalizations()).find(p => p.id === savedP.id)!;
 };
 
-// Fix: Added missing deletePersonalization function
 export const deletePersonalization = async (personalizationId: string): Promise<void> => {
     const { error } = await getClient().from('personalizations').delete().eq('id', personalizationId);
     if (error) throw error;
@@ -130,7 +139,6 @@ export const getPromotions = async (): Promise<Promotion[]> => {
     })) || [];
 };
 
-// Fix: Added missing savePromotion function
 export const savePromotion = async (promotion: Omit<Promotion, 'id' | 'created_at'> & { id?: string }): Promise<Promotion> => {
     const { productIds, ...promoData } = promotion;
     const { data: savedPromo, error: promoError } = await getClient().from('promotions').upsert({
@@ -146,7 +154,6 @@ export const savePromotion = async (promotion: Omit<Promotion, 'id' | 'created_a
     return { ...promotion, id: savedPromo.id };
 };
 
-// Fix: Added missing deletePromotion function
 export const deletePromotion = async (promotionId: string): Promise<void> => {
     const { error } = await getClient().from('promotions').delete().eq('id', promotionId);
     if (error) throw error;
@@ -158,7 +165,6 @@ export const getZones = async (): Promise<Zone[]> => {
     return data || [];
 };
 
-// Fix: Added missing saveZone function
 export const saveZone = async (zone: Pick<Zone, 'name' | 'rows' | 'cols'> & { id?: string }): Promise<Zone> => {
     const { id, ...zoneData } = zone;
     const { data, error } = await getClient().from('zones').upsert({ id, ...zoneData }).select('*, tables(*)').single();
@@ -166,13 +172,11 @@ export const saveZone = async (zone: Pick<Zone, 'name' | 'rows' | 'cols'> & { id
     return data as Zone;
 };
 
-// Fix: Added missing deleteZone function
 export const deleteZone = async (zoneId: string): Promise<void> => {
     const { error } = await getClient().from('zones').delete().eq('id', zoneId);
     if (error) throw error;
 };
 
-// Fix: Added missing saveZoneLayout function
 export const saveZoneLayout = async (zone: Zone): Promise<void> => {
     const { tables, ...zoneData } = zone;
     await getClient().from('zones').update({ name: zoneData.name, rows: zoneData.rows, cols: zoneData.cols }).eq('id', zoneData.id);
@@ -217,7 +221,6 @@ export const getActiveOrders = async (): Promise<Order[]> => {
     })) as Order[];
 };
 
-// Fix: Added missing subscribeToNewOrders function
 export const subscribeToNewOrders = (onInsert: (o: Order) => void, onUpdate?: (o: Order) => void) => {
     const client = getClient();
     if (ordersChannel) client.removeChannel(ordersChannel);
