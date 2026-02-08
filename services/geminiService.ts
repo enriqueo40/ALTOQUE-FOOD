@@ -1,10 +1,48 @@
 
 import { GoogleGenAI } from "@google/genai";
-import { ChatMessage, Order, Product } from '../types';
+import { ChatMessage, Order, Product, CartItem } from '../types';
 
 // Fix: Always use process.env.API_KEY directly in the GoogleGenAI constructor
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+/**
+ * Genera una sugerencia de maridaje basada en el consumo total de la sesión y el carrito.
+ */
+export const getPairingSuggestion = async (cartItems: CartItem[], allProducts: Product[]): Promise<string> => {
+    // Recuperar items consumidos del localStorage para análisis completo
+    const savedConsumed = typeof window !== 'undefined' ? localStorage.getItem('altoque_consumed_items') : null;
+    const consumedItems: CartItem[] = savedConsumed ? JSON.parse(savedConsumed) : [];
+    
+    if (cartItems.length === 0 && consumedItems.length === 0) return "";
+    
+    const allInTable = [...consumedItems, ...cartItems].map(i => i.name).join(", ");
+    const availableProducts = allProducts
+        .filter(p => p.available && ![...consumedItems, ...cartItems].some(ci => ci.id === p.id))
+        .map(p => `${p.name} ($${p.price})`)
+        .slice(0, 15)
+        .join(", ");
+
+    if (!availableProducts) return "";
+
+    const prompt = `Actúa como un sommelier y experto gastronómico chic. 
+    En esta mesa se está consumiendo: ${allInTable}.
+    Basado SOLO en estos productos disponibles: ${availableProducts}, 
+    sugiere UN solo producto adicional (bebida, postre o entrada) que combine perfectamente. 
+    La respuesta debe ser muy corta (máximo 12 palabras), persuasiva y elegante. 
+    Ejemplo: "Para realzar sabores, nuestro Espresso Intenso es ideal."`;
+
+    try {
+        // Fix: Use gemini-3-flash-preview for basic text generation tasks as per guidelines
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview', // Usamos un modelo rápido para baja latencia
+            contents: prompt,
+        });
+        return response.text?.trim() || "";
+    } catch (error) {
+        console.error("Error getting pairing suggestion:", error);
+        return ""; // Falla silenciosamente para no interrumpir la experiencia
+    }
+};
 
 export const generateProductDescription = async (productName: string, categoryName: string, currentDescription: string): Promise<string> => {
     try {
