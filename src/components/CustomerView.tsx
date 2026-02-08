@@ -27,7 +27,7 @@ const PairingAI: React.FC<{ items: CartItem[], allProducts: Product[] }> = ({ it
 
     useEffect(() => {
         let isMounted = true;
-        if (items.length > 0 || (localStorage.getItem('altoque_consumed_items') || '[]') !== '[]' ) {
+        if (items.length > 0) {
             setLoading(true);
             getPairingSuggestion(items, allProducts).then(res => {
                 if (isMounted) {
