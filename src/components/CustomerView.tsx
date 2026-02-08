@@ -121,7 +121,7 @@ export default function CustomerView() {
             const reader = new FileReader();
             reader.onload = (res) => {
                 setPaymentProof(res.target?.result as string);
-                alert("Captura de pago cargada correctamente.");
+                alert("Comprobante cargado con éxito.");
             };
             reader.readAsDataURL(file);
         }
@@ -137,14 +137,12 @@ export default function CustomerView() {
 
         try {
             if (isFinalClosing && isTableSession) {
-                // CIERRE DE CUENTA
                 const msg = [
-                    `💰 *SOLICITUD DE CIERRE DE CUENTA*`,
+                    `💰 *SOLICITUD DE CUENTA*`,
                     `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
                     `🪑 Mesa: ${tableInfo?.table} (${tableInfo?.zone})`, `👤 Cliente: ${name}`, `--------------------------------`,
-                    `💵 *TOTAL A PAGAR: $${sessionTotal.toFixed(2)}*`, `💳 Método: ${selectedPayment}`,
-                    paymentProof ? `✅ COMPROBANTE CARGADO (Se enviará ahora)` : `❌ Sin comprobante adjunto`, 
-                    `_Cliente solicita la cuenta para retirarse._`
+                    `💵 *TOTAL: $${sessionTotal.toFixed(2)}*`, `💳 Pago: ${selectedPayment}`,
+                    paymentProof ? `✅ Comprobante adjunto` : '', `_Favor confirmar para liberar mesa._`
                 ].filter(Boolean).join('\n');
 
                 window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
@@ -159,29 +157,26 @@ export default function CustomerView() {
                 setView('confirmation');
 
             } else {
-                // ENVIAR RONDA / PEDIDO
                 const itemsStr = cartItems.map(i => `• ${i.quantity}x ${i.name}`).join('\n');
                 let msg: string;
                 
                 if (isTableSession) {
                     msg = [
-                        `🧾 *🔥 NUEVA RONDA A COCINA*`,
+                        `🧾 *🔥 NUEVA RONDA*`,
                         `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
                         `🪑 MESA: ${tableInfo!.table} (${tableInfo!.zone})`, `👤 Cliente: ${name}`, `--------------------------------`, itemsStr, `--------------------------------`,
-                        `💰 Ronda Actual: $${cartTotal.toFixed(2)}`,
-                        (sessionItems.length > 0) ? `📈 *Total Acumulado Mesa: $${(sessionTotal + cartTotal).toFixed(2)}*` : '',
-                        paymentProof ? `✅ Comprobante de pago cargado` : ''
+                        `💰 Ronda: $${cartTotal.toFixed(2)}`,
+                        (sessionItems.length > 0) ? `📈 *Acumulado: $${(sessionTotal + cartTotal).toFixed(2)}*` : '',
                     ].filter(Boolean).join('\n');
-                    
                     setSessionItems(prev => [...prev, ...cartItems]);
                 } else {
                     msg = [
-                        `🧾 *NUEVO PEDIDO (${orderType.toUpperCase()})*`, `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
+                        `🧾 *PEDIDO (${orderType.toUpperCase()})*`, `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
                         `👤 Cliente: ${name}`, `📱 Tel: ${phone}`,
                         orderType === OrderType.Delivery ? `🏠 Dir: ${fd.get('calle')} #${fd.get('numero')}, ${fd.get('colonia')}` : '',
                         `--------------------------------`, itemsStr, `--------------------------------`,
-                        `💰 Total: $${cartTotal.toFixed(2)}`, `💳 Método: ${selectedPayment}`,
-                        paymentProof ? `✅ Comprobante de pago cargado` : ''
+                        `💰 Total: $${cartTotal.toFixed(2)}`, `💳 Pago: ${selectedPayment}`,
+                        paymentProof ? `✅ Captura cargada.` : ''
                     ].filter(Boolean).join('\n');
                 }
 
@@ -191,14 +186,14 @@ export default function CustomerView() {
                 setView('confirmation');
             }
         } catch(e) {
-            alert("Error al procesar el pedido.");
+            alert("Error al procesar.");
         }
     };
 
     if (isLoading || !settings) return (
         <div className="h-screen bg-gray-950 flex flex-col items-center justify-center">
             <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
-            <p className="text-emerald-500 font-black uppercase tracking-widest text-xs">Cargando experiencia...</p>
+            <p className="text-emerald-500 font-black uppercase tracking-widest text-xs">Cargando...</p>
         </div>
     );
 
@@ -208,7 +203,7 @@ export default function CustomerView() {
                 
                 {view !== 'menu' && (
                     <Header 
-                        title={view === 'cart' ? 'MI RONDA ACTUAL' : view === 'account' ? 'MI CUENTA ACUMULADA' : 'CONFIRMAR'} 
+                        title={view === 'cart' ? 'MI RONDA' : view === 'account' ? 'MI CUENTA' : 'CONFIRMAR'} 
                         onBack={() => setView('menu')} 
                     />
                 )}
@@ -218,21 +213,12 @@ export default function CustomerView() {
                         <div className="animate-fade-in">
                             <div className="relative pt-12 pb-8 flex flex-col items-center text-center">
                                 <div className="w-24 h-24 bg-black rounded-full flex items-center justify-center border-4 border-gray-800 mb-4 overflow-hidden shadow-2xl">
-                                    {settings.branch.logoUrl ? <img src={settings.branch.logoUrl} className="w-full h-full object-cover" /> : <span className="text-emerald-500 font-bold text-2xl">AN</span>}
+                                    {settings.branch.logoUrl ? <img src={settings.branch.logoUrl} className="w-full h-full object-cover" /> : <span className="text-emerald-500 font-bold text-2xl">A</span>}
                                 </div>
                                 <h1 className="text-2xl font-black text-white uppercase tracking-tight">{settings.company.name}</h1>
                                 <p className="text-xs text-gray-400 font-medium mt-1">{settings.branch.alias}</p>
-                                <div className="flex items-center gap-2 mt-2">
-                                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                                    <span className="text-emerald-500 text-[10px] font-bold uppercase tracking-widest">Abierto Ahora</span>
-                                </div>
-
-                                {!isTableSession ? (
-                                    <div className="w-[85%] bg-gray-800/40 rounded-xl p-1 flex mt-6 border border-gray-700">
-                                        <button onClick={() => setOrderType(OrderType.Delivery)} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${orderType === OrderType.Delivery ? 'bg-gray-700 text-emerald-400' : 'text-gray-500'}`}>A domicilio</button>
-                                        <button onClick={() => setOrderType(OrderType.TakeAway)} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${orderType === OrderType.TakeAway ? 'bg-gray-700 text-emerald-400' : 'text-gray-500'}`}>Para recoger</button>
-                                    </div>
-                                ) : (
+                                
+                                {isTableSession && (
                                     <div className="mt-6 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-6 py-2 rounded-full text-[10px] font-black tracking-widest flex items-center gap-2 uppercase">
                                         <IconTableLayout className="h-3 w-3"/> MESA {tableInfo!.table} • {tableInfo!.zone}
                                     </div>
@@ -245,19 +231,16 @@ export default function CustomerView() {
                                     if (products.length === 0) return null;
                                     return (
                                         <div key={cat.id}>
-                                            <h3 className="text-lg font-black text-white uppercase tracking-tighter mb-4 flex items-center gap-2"> {cat.name} </h3>
+                                            <h3 className="text-lg font-black text-white uppercase tracking-tighter mb-4"> {cat.name} </h3>
                                             <div className="grid gap-3">
                                                 {products.map(p => {
                                                     const { price: displayPrice } = getDiscountedPrice(p, allPromotions);
                                                     return (
-                                                        <div key={p.id} onClick={() => setSelectedProduct(p)} className="bg-[#1e293b]/50 p-3 rounded-2xl border border-gray-800/60 flex gap-4 transition-all cursor-pointer relative overflow-hidden group">
-                                                            <div className="relative shrink-0">
-                                                                <img src={p.imageUrl} className="w-24 h-24 rounded-xl object-cover shadow-lg" />
-                                                            </div>
+                                                        <div key={p.id} onClick={() => setSelectedProduct(p)} className="bg-[#1e293b]/50 p-3 rounded-2xl border border-gray-800/60 flex gap-4 transition-all cursor-pointer relative group">
+                                                            <img src={p.imageUrl} className="w-20 h-20 rounded-xl object-cover shadow-lg" />
                                                             <div className="flex-1 flex flex-col justify-center">
-                                                                <h4 className="font-bold text-gray-100 group-hover:text-emerald-400 transition-colors leading-snug">{p.name}</h4>
-                                                                <p className="text-[11px] text-gray-500 line-clamp-2 mt-1 leading-relaxed">{p.description}</p>
-                                                                <span className="font-black text-emerald-400 text-base mt-2">MXN ${displayPrice.toFixed(2)}</span>
+                                                                <h4 className="font-bold text-gray-100 group-hover:text-emerald-400 transition-colors">{p.name}</h4>
+                                                                <span className="font-black text-emerald-400 text-sm mt-1">${displayPrice.toFixed(2)}</span>
                                                             </div>
                                                             <div className="absolute bottom-3 right-3 bg-gray-800 p-1.5 rounded-lg text-emerald-400 border border-gray-700"> <IconPlus className="h-4 w-4" /> </div>
                                                         </div>
@@ -274,30 +257,33 @@ export default function CustomerView() {
                     {view === 'confirmation' && (
                         <div className="p-12 text-center h-full flex flex-col items-center justify-center gap-8 animate-fade-in min-h-[60vh]">
                             <IconCheck className="w-20 h-20 text-emerald-500 bg-emerald-500/10 p-4 rounded-full border border-emerald-500/30"/>
-                            <h2 className="text-3xl font-black text-white uppercase tracking-tighter">¡LISTO!</h2>
-                            <p className="text-gray-500 text-sm leading-relaxed max-w-xs mx-auto font-medium"> Hemos enviado tu pedido. Revisa tu WhatsApp para finalizar la comunicación. </p>
-                            <button onClick={() => setView('menu')} className="w-full max-w-xs bg-gray-800 text-white py-4 rounded-xl font-bold uppercase tracking-widest text-xs border border-gray-700"> VOLVER AL MENÚ </button>
+                            <h2 className="text-3xl font-black text-white uppercase tracking-tighter">¡ENVIADO!</h2>
+                            <p className="text-gray-500 text-sm leading-relaxed max-w-xs mx-auto font-medium"> Tu solicitud ha sido enviada vía WhatsApp con éxito. </p>
+                            <button onClick={() => setView('menu')} className="w-full max-w-xs bg-emerald-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-2xl"> REGRESAR AL MENÚ </button>
                         </div>
                     )}
                     
                     {view === 'checkout' && ( 
                         <form onSubmit={handleOrderAction} className="p-6 space-y-6 animate-fade-in"> 
                             
+                            {/* Datos Cliente */}
                             <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]">
-                                <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">TUS DATOS</h3>
+                                <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">MIS DATOS</h3>
                                 <input name="name" type="text" defaultValue={customerName} className="w-full bg-gray-800 border-none rounded-xl p-4 text-sm font-bold text-white outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Nombre completo" required />
-                                {!isTableSession && <input name="phone" type="tel" className="w-full bg-gray-800 border-none rounded-xl p-4 text-sm font-bold text-white outline-none focus:ring-1 focus:ring-emerald-500" placeholder="WhatsApp" required />}
+                                {!isTableSession && <input name="phone" type="tel" className="w-full bg-gray-800 border-none rounded-xl p-4 text-sm font-bold text-white outline-none focus:ring-1 focus:ring-emerald-500" placeholder="WhatsApp (ej. 0414...)" required />}
                             </div>
 
+                            {/* Dirección para Delivery */}
                             {!isTableSession && orderType === OrderType.Delivery && (
                                 <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]">
-                                    <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">DIRECCIÓN DE ENTREGA</h3>
+                                    <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">DIRECCIÓN</h3>
                                     <input name="calle" className="w-full bg-gray-800 border-none rounded-xl p-4 text-sm font-bold text-white outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Calle y Avenida" required />
                                     <input name="numero" className="w-full bg-gray-800 border-none rounded-xl p-4 text-sm font-bold text-white outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Nro Casa / Apto" required />
-                                    <input name="colonia" className="w-full bg-gray-800 border-none rounded-xl p-4 text-sm font-bold text-white outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Colonia / Sector" required />
+                                    <input name="colonia" className="w-full bg-gray-800 border-none rounded-xl p-4 text-sm font-bold text-white outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Sector" required />
                                 </div>
                             )}
 
+                            {/* MÉTODO DE PAGO Y DESPLIEGUE DINÁMICO */}
                             <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem] relative">
                                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0f172a] px-6 py-2 border border-gray-800 rounded-full z-10 shadow-lg">
                                     <h3 className="text-[10px] font-black text-white uppercase tracking-[0.3em]">CONFIRMAR</h3>
@@ -312,35 +298,36 @@ export default function CustomerView() {
                                     ))}
                                 </div>
 
+                                {/* ESTE ES EL BLOQUE QUE SE DESPLIEGA AL SELECCIONAR UN MÉTODO BANCARIO */}
                                 {selectedPayment !== 'Efectivo' && (
                                     <div className="mt-4 p-5 bg-gray-900 rounded-3xl border border-emerald-500/30 space-y-4 animate-fade-in shadow-2xl">
                                         <div className="text-center">
-                                            <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-4">DATOS PARA TU PAGO</p>
+                                            <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-4">TRANSFERIR A:</p>
                                             
                                             {selectedPayment === 'Pago Móvil' && settings.payment.pagoMovil && (
                                                 <div className="space-y-2 text-xs">
-                                                    <div className="flex justify-between text-gray-400 border-b border-gray-800 pb-1"><span>Banco:</span><span className="font-bold text-white uppercase">{settings.payment.pagoMovil.bank || 'Solicitar'}</span></div>
-                                                    <div className="flex justify-between text-gray-400 border-b border-gray-800 pb-1"><span>Teléfono:</span><span className="font-bold text-white font-mono">{settings.payment.pagoMovil.phone || 'Pendiente'}</span></div>
-                                                    <div className="flex justify-between text-gray-400"><span>Cédula/RIF:</span><span className="font-bold text-white uppercase">{settings.payment.pagoMovil.idNumber || 'Pendiente'}</span></div>
+                                                    <div className="flex justify-between text-gray-400 border-b border-gray-800 pb-1"><span>Banco:</span><span className="font-bold text-white uppercase">{settings.payment.pagoMovil.bank || 'Configurar en Admin'}</span></div>
+                                                    <div className="flex justify-between text-gray-400 border-b border-gray-800 pb-1"><span>Teléfono:</span><span className="font-bold text-white font-mono">{settings.payment.pagoMovil.phone || '0000-0000000'}</span></div>
+                                                    <div className="flex justify-between text-gray-400"><span>RIF/CI:</span><span className="font-bold text-white uppercase">{settings.payment.pagoMovil.idNumber || 'V-00000000'}</span></div>
                                                 </div>
                                             )}
 
                                             {selectedPayment === 'Transferencia' && settings.payment.transfer && (
                                                 <div className="space-y-2 text-xs">
-                                                    <div className="flex justify-between text-gray-400 border-b border-gray-800 pb-1"><span>Banco:</span><span className="font-bold text-white uppercase">{settings.payment.transfer.bank || 'Solicitar'}</span></div>
+                                                    <div className="flex justify-between text-gray-400 border-b border-gray-800 pb-1"><span>Banco:</span><span className="font-bold text-white uppercase">{settings.payment.transfer.bank || 'Configurar en Admin'}</span></div>
                                                     <div className="flex flex-col items-start text-gray-400 border-b border-gray-800 pb-1">
                                                         <span>Cuenta:</span>
-                                                        <span className="font-mono text-white text-[10px] mt-1 break-all w-full text-left">{settings.payment.transfer.accountNumber || 'Solicitar'}</span>
+                                                        <span className="font-mono text-white text-[10px] mt-1 break-all w-full text-left">{settings.payment.transfer.accountNumber || '0105...'}</span>
                                                     </div>
-                                                    <div className="flex justify-between text-gray-400 border-b border-gray-800 pb-1"><span>Titular:</span><span className="font-bold text-white uppercase">{settings.payment.transfer.accountHolder || 'Solicitar'}</span></div>
-                                                    <div className="flex justify-between text-gray-400"><span>Cédula/RIF:</span><span className="font-bold text-white uppercase">{settings.payment.transfer.idNumber || 'Solicitar'}</span></div>
+                                                    <div className="flex justify-between text-gray-400 border-b border-gray-800 pb-1"><span>Titular:</span><span className="font-bold text-white uppercase">{settings.payment.transfer.accountHolder || 'NOMBRE'}</span></div>
+                                                    <div className="flex justify-between text-gray-400"><span>RIF/CI:</span><span className="font-bold text-white uppercase">{settings.payment.transfer.idNumber || 'V-00000000'}</span></div>
                                                 </div>
                                             )}
 
                                             {selectedPayment === 'Zelle' && settings.payment.zelle && (
                                                 <div className="space-y-2 text-xs">
-                                                    <div className="flex justify-between text-gray-400 border-b border-gray-800 pb-1"><span>Correo:</span><span className="font-bold text-white font-mono">{settings.payment.zelle.email || 'Solicitar'}</span></div>
-                                                    <div className="flex justify-between text-gray-400"><span>Titular:</span><span className="font-bold text-white uppercase">{settings.payment.zelle.holder || 'Solicitar'}</span></div>
+                                                    <div className="flex justify-between text-gray-400 border-b border-gray-800 pb-1"><span>Correo:</span><span className="font-bold text-white font-mono">{settings.payment.zelle.email || 'pagos@empresa.com'}</span></div>
+                                                    <div className="flex justify-between text-gray-400"><span>Titular:</span><span className="font-bold text-white uppercase">{settings.payment.zelle.holder || 'NOMBRE'}</span></div>
                                                 </div>
                                             )}
                                         </div>
@@ -348,14 +335,14 @@ export default function CustomerView() {
                                         <div className="pt-4">
                                             <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-emerald-500/20 rounded-2xl cursor-pointer hover:bg-emerald-500/5 transition-all group overflow-hidden bg-gray-800/50">
                                                 {paymentProof ? (
-                                                    <div className="flex flex-col items-center gap-2 animate-pulse">
-                                                        <div className="bg-emerald-500/20 p-2 rounded-full"><IconCheck className="h-6 w-6 text-emerald-500"/></div>
-                                                        <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">¡CAPTURA LISTA!</span>
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <div className="bg-emerald-500/20 p-2 rounded-full animate-bounce"><IconCheck className="h-6 w-6 text-emerald-500"/></div>
+                                                        <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">¡IMAGEN LISTA!</span>
                                                     </div>
                                                 ) : (
-                                                    <div className="flex flex-col items-center text-gray-500 group-hover:text-emerald-400 transition-colors">
+                                                    <div className="flex flex-col items-center text-gray-500 group-hover:text-emerald-400 transition-colors text-center">
                                                         <IconUpload className="h-8 w-8 mb-2 opacity-50" />
-                                                        <span className="text-[9px] font-black uppercase tracking-widest text-center">PEGAR CAPTURA DE PAGO</span>
+                                                        <span className="text-[9px] font-black uppercase tracking-widest">SUBIR CAPTURA DE PAGO</span>
                                                     </div>
                                                 )}
                                                 <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
@@ -370,7 +357,7 @@ export default function CustomerView() {
                                     <span className="text-gray-500 text-[10px] tracking-[0.4em] uppercase self-center">TOTAL RONDA</span>
                                     <span className="text-emerald-400 text-4xl font-black">${(isFinalClosing ? sessionTotal : cartTotal).toFixed(2)}</span>
                                 </div>
-                                <button type="submit" className="w-full bg-[#10b981] hover:bg-[#059669] py-5 rounded-2xl font-black text-white flex items-center justify-center gap-4 active:scale-95 transition-all text-xs uppercase tracking-[0.2em] shadow-[0_10px_40px_-10px_rgba(16,185,129,0.5)] border-t border-white/10">
+                                <button type="submit" className="w-full bg-[#10b981] hover:bg-[#059669] py-5 rounded-2xl font-black text-white flex items-center justify-center gap-4 active:scale-95 transition-all text-xs uppercase tracking-[0.2em] shadow-2xl border-t border-white/10">
                                     <IconWhatsapp className="h-5 w-5" /> REALIZAR PEDIDO
                                 </button>
                             </div>
