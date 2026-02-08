@@ -51,12 +51,8 @@ const Sidebar: React.FC<{ currentPage: AdminViewPage; setCurrentPage: (page: Adm
                     </button>
                 ))}
             </nav>
-            <div className="px-6 py-6 border-t dark:border-gray-700">
-                <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 mb-1">
-                    <IconWhatsapp className="h-4 w-4" />
-                    <span className="text-xs font-bold uppercase tracking-widest">Soporte</span>
-                </div>
-                <p className="text-gray-800 dark:text-gray-100 font-mono font-bold text-sm tracking-tight">+{whatsappNumber}</p>
+            <div className="px-6 py-6 border-t dark:border-gray-700 text-xs text-gray-500 font-bold uppercase tracking-widest">
+                Support: +{whatsappNumber}
             </div>
         </aside>
     );
@@ -85,56 +81,26 @@ const PaymentSettingsView: React.FC<{ onSave: () => Promise<void>; settings: App
     
     return (
         <div className="space-y-6 max-w-4xl mx-auto">
-            <SettingsCard title="Configuración de Pago Móvil" description="Datos para que tus clientes realicen la transferencia." onSave={onSave}>
+            <SettingsCard title="Pago Móvil" onSave={onSave}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Banco</label>
-                        <input type="text" value={settings.payment.pagoMovil?.bank || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, pagoMovil: {...p.payment.pagoMovil, bank: e.target.value} as any}}))} className={inputClasses} placeholder="Ej. Banesco"/>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Teléfono</label>
-                        <input type="text" value={settings.payment.pagoMovil?.phone || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, pagoMovil: {...p.payment.pagoMovil, phone: e.target.value} as any}}))} className={inputClasses} placeholder="Ej. 04141234567"/>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Cédula / RIF</label>
-                        <input type="text" value={settings.payment.pagoMovil?.idNumber || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, pagoMovil: {...p.payment.pagoMovil, idNumber: e.target.value} as any}}))} className={inputClasses} placeholder="Ej. V-12345678"/>
-                    </div>
+                    <input type="text" value={settings.payment.pagoMovil?.bank || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, pagoMovil: {...p.payment.pagoMovil, bank: e.target.value} as any}}))} className={inputClasses} placeholder="Banco"/>
+                    <input type="text" value={settings.payment.pagoMovil?.phone || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, pagoMovil: {...p.payment.pagoMovil, phone: e.target.value} as any}}))} className={inputClasses} placeholder="Teléfono"/>
+                    <input type="text" value={settings.payment.pagoMovil?.idNumber || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, pagoMovil: {...p.payment.pagoMovil, idNumber: e.target.value} as any}}))} className={inputClasses} placeholder="Cédula/RIF"/>
                 </div>
             </SettingsCard>
 
-            <SettingsCard title="Transferencia Bancaria" description="Datos de tu cuenta bancaria nacional." onSave={onSave}>
+            <SettingsCard title="Transferencia" onSave={onSave}>
                 <div className="space-y-4">
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Banco</label>
-                        <input type="text" value={settings.payment.transfer?.bank || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, bank: e.target.value} as any}}))} className={inputClasses} placeholder="Ej. Mercantil"/>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Número de Cuenta</label>
-                        <input type="text" value={settings.payment.transfer?.accountNumber || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, accountNumber: e.target.value} as any}}))} className={inputClasses} placeholder="0105..."/>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Titular</label>
-                            <input type="text" value={settings.payment.transfer?.accountHolder || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, accountHolder: e.target.value} as any}}))} className={inputClasses} placeholder="Nombre del titular"/>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Cédula / RIF</label>
-                            <input type="text" value={settings.payment.transfer?.idNumber || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, idNumber: e.target.value} as any}}))} className={inputClasses} placeholder="V-12345678"/>
-                        </div>
-                    </div>
+                    <input type="text" value={settings.payment.transfer?.bank || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, bank: e.target.value} as any}}))} className={inputClasses} placeholder="Banco"/>
+                    <input type="text" value={settings.payment.transfer?.accountNumber || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, accountNumber: e.target.value} as any}}))} className={inputClasses} placeholder="Número de Cuenta"/>
+                    <input type="text" value={settings.payment.transfer?.accountHolder || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, accountHolder: e.target.value} as any}}))} className={inputClasses} placeholder="Nombre del Titular"/>
                 </div>
             </SettingsCard>
 
-            <SettingsCard title="Zelle" description="Correo asociado a tu cuenta Zelle." onSave={onSave}>
+            <SettingsCard title="Zelle" onSave={onSave}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Correo Electrónico</label>
-                        <input type="email" value={settings.payment.zelle?.email || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, zelle: {...p.payment.zelle, email: e.target.value} as any}}))} className={inputClasses} placeholder="pagos@tuempresa.com"/>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Titular de la cuenta</label>
-                        <input type="text" value={settings.payment.zelle?.holder || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, zelle: {...p.payment.zelle, holder: e.target.value} as any}}))} className={inputClasses} placeholder="Nombre del titular"/>
-                    </div>
+                    <input type="email" value={settings.payment.zelle?.email || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, zelle: {...p.payment.zelle, email: e.target.value} as any}}))} className={inputClasses} placeholder="Correo Zelle"/>
+                    <input type="text" value={settings.payment.zelle?.holder || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, zelle: {...p.payment.zelle, holder: e.target.value} as any}}))} className={inputClasses} placeholder="Titular"/>
                 </div>
             </SettingsCard>
         </div>
@@ -155,9 +121,9 @@ const AdminView: React.FC = () => {
         if (settings) {
             try {
                 await saveAppSettings(settings);
-                alert("Ajustes guardados correctamente.");
+                alert("Guardado correctamente.");
             } catch (e) {
-                alert("Error al guardar ajustes.");
+                alert("Error al guardar.");
             }
         }
     };
@@ -165,33 +131,31 @@ const AdminView: React.FC = () => {
     if (!settings) return null;
 
     return (
-        <div className="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-200 overflow-hidden">
+        <div className="flex h-screen bg-gray-100 dark:bg-gray-900 overflow-hidden">
             <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} whatsappNumber={settings.branch.whatsappNumber} />
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-w-0">
                 <header className="h-20 bg-white dark:bg-gray-800 border-b dark:border-gray-700 flex items-center justify-between px-8 shrink-0">
-                    <h2 className="text-2xl font-bold uppercase tracking-tight">{PAGE_TITLES[currentPage]}</h2>
-                    <div className="flex items-center space-x-6">
+                    <h2 className="text-xl font-bold uppercase tracking-tight">{PAGE_TITLES[currentPage]}</h2>
+                    <div className="flex items-center space-x-4">
                         <button onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-2 font-bold text-gray-500 hover:text-emerald-600 transition-colors">
                             <IconSettings className="h-5 w-5"/> Configuración
                         </button>
-                        <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                            {theme === 'light' ? <IconMoon className="h-5 w-5" /> : <IconSun className="h-5 w-5" />}
+                        <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
+                            {theme === 'light' ? <IconMoon /> : <IconSun />}
                         </button>
                     </div>
                 </header>
-                <main className="flex-1 overflow-auto p-8">
-                     {currentPage === 'dashboard' && <div className="p-10 text-center text-gray-400">Panel de control principal</div>}
-                     {currentPage === 'orders' && <OrderManagement onSettingsClick={() => setIsSettingsOpen(true)} />}
-                     {currentPage === 'products' && <MenuManagement />}
-                     {/* ... otras vistas ... */}
+                <main className="flex-1 overflow-auto p-8 bg-gray-50 dark:bg-gray-900">
+                    {currentPage === 'dashboard' && <div className="p-10 text-center text-gray-400">Panel administrativo activo.</div>}
+                    {currentPage === 'orders' && <div className="p-10 text-center text-gray-400 font-bold uppercase">Gestión de Pedidos</div>}
                 </main>
             </div>
             
             {isSettingsOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end">
                     <div className="bg-white dark:bg-gray-900 h-full w-full max-w-4xl flex flex-col shadow-2xl animate-slide-in-right">
-                        <header className="p-6 border-b dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800">
-                            <h2 className="text-xl font-bold">Configuración</h2>
+                        <header className="p-6 border-b dark:border-gray-700 flex justify-between items-center">
+                            <h2 className="text-xl font-bold">Configuración de Pagos</h2>
                             <button onClick={() => setIsSettingsOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"><IconX/></button>
                         </header>
                         <div className="flex-1 p-8 overflow-y-auto">
@@ -205,7 +169,3 @@ const AdminView: React.FC = () => {
 };
 
 export default AdminView;
-
-// (Componentes placeholder para que compile)
-const MenuManagement = () => <div className="p-4">Gestión de Menú</div>;
-const OrderManagement = ({onSettingsClick}: any) => <div className="p-4">Gestión de Pedidos</div>;
