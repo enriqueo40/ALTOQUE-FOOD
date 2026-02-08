@@ -80,6 +80,67 @@ const SettingsCard: React.FC<{ title: string; description?: string; children: Re
     </div>
 );
 
+const PaymentSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
+    const inputClasses = "mt-1 block w-full px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white transition-all sm:text-sm";
+    
+    return (
+        <div className="space-y-6 max-w-4xl mx-auto">
+            <SettingsCard title="Configuración de Pago Móvil" description="Datos para que tus clientes realicen la transferencia." onSave={onSave}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Banco</label>
+                        <input type="text" value={settings.payment.pagoMovil?.bank || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, pagoMovil: {...p.payment.pagoMovil, bank: e.target.value} as any}}))} className={inputClasses} placeholder="Ej. Banesco"/>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Teléfono</label>
+                        <input type="text" value={settings.payment.pagoMovil?.phone || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, pagoMovil: {...p.payment.pagoMovil, phone: e.target.value} as any}}))} className={inputClasses} placeholder="Ej. 04141234567"/>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Cédula / RIF</label>
+                        <input type="text" value={settings.payment.pagoMovil?.idNumber || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, pagoMovil: {...p.payment.pagoMovil, idNumber: e.target.value} as any}}))} className={inputClasses} placeholder="Ej. V-12345678"/>
+                    </div>
+                </div>
+            </SettingsCard>
+
+            <SettingsCard title="Transferencia Bancaria" description="Datos de tu cuenta bancaria nacional." onSave={onSave}>
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Banco</label>
+                        <input type="text" value={settings.payment.transfer?.bank || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, bank: e.target.value} as any}}))} className={inputClasses} placeholder="Ej. Mercantil"/>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Número de Cuenta</label>
+                        <input type="text" value={settings.payment.transfer?.accountNumber || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, accountNumber: e.target.value} as any}}))} className={inputClasses} placeholder="0105..."/>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Titular</label>
+                            <input type="text" value={settings.payment.transfer?.accountHolder || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, accountHolder: e.target.value} as any}}))} className={inputClasses} placeholder="Nombre del titular"/>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Cédula / RIF</label>
+                            <input type="text" value={settings.payment.transfer?.idNumber || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, transfer: {...p.payment.transfer, idNumber: e.target.value} as any}}))} className={inputClasses} placeholder="V-12345678"/>
+                        </div>
+                    </div>
+                </div>
+            </SettingsCard>
+
+            <SettingsCard title="Zelle" description="Correo asociado a tu cuenta Zelle." onSave={onSave}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Correo Electrónico</label>
+                        <input type="email" value={settings.payment.zelle?.email || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, zelle: {...p.payment.zelle, email: e.target.value} as any}}))} className={inputClasses} placeholder="pagos@tuempresa.com"/>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Titular de la cuenta</label>
+                        <input type="text" value={settings.payment.zelle?.holder || ''} onChange={e => setSettings(p => ({...p, payment: {...p.payment, zelle: {...p.payment.zelle, holder: e.target.value} as any}}))} className={inputClasses} placeholder="Nombre del titular"/>
+                    </div>
+                </div>
+            </SettingsCard>
+        </div>
+    );
+};
+
 const BranchSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
     const [isEditingPhone, setIsEditingPhone] = useState(false);
     const [tempPhone, setTempPhone] = useState(settings.branch.whatsappNumber);
@@ -205,7 +266,7 @@ const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; initialPag
         if (settings) {
             try {
                 await saveAppSettings(settings);
-                alert("Ajustes generales guardados.");
+                alert("Ajustes guardados correctamente.");
             } catch (e) {
                 alert("Error al guardar ajustes.");
             }
@@ -216,8 +277,8 @@ const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; initialPag
 
     const navItems: { id: SettingsPage; name: string; icon: React.ReactNode }[] = [
         { id: 'general', name: 'General', icon: <IconSettings className="h-4 w-4" /> },
-        { id: 'store-data', name: 'Datos de la tienda', icon: <IconStore className="h-4 w-4" /> },
-        { id: 'payment-methods', name: 'Pagos', icon: <IconPayment className="h-4 w-4" /> },
+        { id: 'store-data', name: 'Sucursal', icon: <IconStore className="h-4 w-4" /> },
+        { id: 'payment-methods', name: 'Pagos y Bancos', icon: <IconPayment className="h-4 w-4" /> },
     ];
 
     return (
@@ -239,7 +300,8 @@ const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; initialPag
                     </aside>
                     <main className="flex-1 p-8 overflow-y-auto bg-white dark:bg-gray-900">
                         {activePage === 'store-data' && <BranchSettingsView settings={settings} setSettings={setSettings} onSave={handleSave} />}
-                        {activePage !== 'store-data' && <div className="text-center py-20 opacity-40 italic">Sección en desarrollo...</div>}
+                        {activePage === 'payment-methods' && <PaymentSettingsView settings={settings} setSettings={setSettings} onSave={handleSave} />}
+                        {activePage === 'general' && <div className="text-center py-20 opacity-40 italic">Ajustes generales en construcción...</div>}
                     </main>
                 </div>
             </div>
@@ -270,7 +332,7 @@ const AdminView: React.FC = () => {
             />
             <div className="flex-1 flex flex-col min-w-0">
                 <header className="h-20 bg-white dark:bg-gray-800 border-b dark:border-gray-700 flex items-center justify-between px-8 shrink-0">
-                    <h2 className="text-2xl font-bold">{PAGE_TITLES[currentPage]}</h2>
+                    <h2 className="text-2xl font-bold uppercase tracking-tight">{PAGE_TITLES[currentPage]}</h2>
                     <div className="flex items-center space-x-6">
                         <button onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-2 font-bold text-gray-500 hover:text-emerald-600 transition-colors">
                             <IconSettings className="h-5 w-5"/> Configuración
@@ -282,7 +344,18 @@ const AdminView: React.FC = () => {
                 </header>
                 <main className="flex-1 overflow-auto p-8">
                     <div className="max-w-7xl mx-auto">
-                        <div className="text-center py-20 opacity-30 italic">Bienvenido al Panel de Administración.</div>
+                         {currentPage === 'dashboard' && (
+                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700">
+                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Estado del sistema</h3>
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-3 w-3 bg-green-500 rounded-full animate-pulse"></div>
+                                        <p className="font-bold text-lg">Menú en línea activo</p>
+                                    </div>
+                                </div>
+                             </div>
+                         )}
+                        <div className="text-center py-20 opacity-30 italic">Bienvenido al Panel de Administración de ALTOQUE FOOD.</div>
                     </div>
                 </main>
             </div>

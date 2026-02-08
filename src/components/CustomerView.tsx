@@ -16,7 +16,7 @@ const Header: React.FC<{ title: string; onBack?: () => void }> = ({ title, onBac
                 <IconArrowLeft className="h-6 w-6" />
             </button>
         ) : <div className="w-10 h-10" /> }
-        <h1 className="text-lg font-black text-white uppercase tracking-tight">{title}</h1>
+        <h1 className="text-lg font-black text-white uppercase tracking-tight text-center flex-1">{title}</h1>
         <div className="w-10 h-10" /> 
     </header>
 );
@@ -95,6 +95,8 @@ export default function CustomerView() {
     const [isLoading, setIsLoading] = useState(true);
     const [activeCategory, setActiveCategory] = useState<string>('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('Efectivo');
+    const [paymentProofBase64, setPaymentProofBase64] = useState<string | null>(null);
 
     // --- ESTADO PERSISTENTE DE MESA ---
     const [tableInfo, setTableInfo] = useState<{ table: string; zone: string } | null>(() => {
@@ -159,12 +161,26 @@ export default function CustomerView() {
         const zone = params.get('zone');
         
         if (table && zone && !localStorage.getItem('altoque_table_info')) {
-            setTableInfo({ table, zone });
+            const info = { table, zone };
+            setTableInfo(info);
             setOrderType(OrderType.DineIn);
+            localStorage.setItem('altoque_table_info', JSON.stringify(info));
         }
 
         return () => unsubscribeFromChannel();
     }, []);
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPaymentProofBase64(reader.result as string);
+                alert("Captura de pago adjuntada correctamente.");
+            };
+            reader.readAsDataURL(file);
+        }
+    };
 
     const handleOrderAction = async (customer: Customer, paymentMethod: PaymentMethod, tipAmount: number, paymentProof?: string | null) => {
         if (!settings) return;
@@ -177,25 +193,30 @@ export default function CustomerView() {
                     `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
                     `🪑 Mesa: ${tableInfo?.table} (${tableInfo?.zone})`, `👤 Cliente: ${customer.name}`, `--------------------------------`,
                     `💵 *TOTAL A PAGAR: $${sessionTotal.toFixed(2)}*`, `💳 Método: ${paymentMethod}`,
-                    paymentProof ? `✅ Comprobante adjunto` : '', `_Cliente solicita la cuenta para retirarse._`
+                    paymentProof ? `✅ Comprobante adjunto: [IMAGEN_ENVIADA]` : '', 
+                    `_Cliente solicita la cuenta para retirarse._`
                 ].filter(Boolean).join('\n');
 
                 window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
                 
-                // Limpiar sesión local
                 localStorage.removeItem('altoque_consumed_items');
                 localStorage.removeItem('altoque_table_info');
                 localStorage.removeItem('altoque_customer_name');
                 setSessionItems([]);
                 setTableInfo(null);
                 setCustomerName('');
+                setPaymentProofBase64(null);
                 clearCart();
                 setView('confirmation');
 
             } else {
                 // ENVIAR RONDA (O PEDIDO NORMAL)
                 const newOrderData: Omit<Order, 'id' | 'createdAt'> = {
-                    customer, items: cartItems, total: cartTotal, status: OrderStatus.Pending, orderType,
+                    customer: { ...customer, paymentProof: paymentProof || undefined }, 
+                    items: cartItems, 
+                    total: cartTotal, 
+                    status: OrderStatus.Pending, 
+                    orderType,
                     tableId: isTableSession ? `${tableInfo?.zone} - ${tableInfo?.table}` : undefined,
                     paymentStatus: 'pending'
                 };
@@ -218,17 +239,18 @@ export default function CustomerView() {
                         (sessionItems.length > 0) ? `📈 *Total Acumulado Mesa: $${(sessionTotal + cartTotal).toFixed(2)}*` : '',
                     ].filter(Boolean).join('\n');
                 } else {
-                    // FLUJO ORIGINAL DELIVERY (WhatsApp Message)
                     msg = [
-                        `🧾 *NUEVO PEDIDO (${orderType})*`, `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
+                        `🧾 *NUEVO PEDIDO (${orderType.toUpperCase()})*`, `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
                         `👤 Cliente: ${customer.name}`, `📱 Tel: ${customer.phone}`,
                         orderType === OrderType.Delivery ? `🏠 Dir: ${customer.address.calle} ${customer.address.numero}, ${customer.address.colonia}` : '',
                         `--------------------------------`, itemsStr, `--------------------------------`,
-                        `💰 Total: $${cartTotal.toFixed(2)}`, `💳 Método: ${paymentMethod}`
+                        `💰 Total: $${cartTotal.toFixed(2)}`, `💳 Método: ${paymentMethod}`,
+                        paymentProof ? `✅ Captura de pago adjuntada.` : ''
                     ].filter(Boolean).join('\n');
                 }
 
                 window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+                setPaymentProofBase64(null);
                 clearCart();
                 setView('confirmation');
             }
@@ -277,7 +299,6 @@ export default function CustomerView() {
                 <div className="flex-1 overflow-y-auto pb-48">
                     {view === 'menu' && (
                         <div className="animate-fade-in">
-                            {/* --- HERO IDENTICO A LA IMAGEN --- */}
                             <div className="relative pt-12 pb-8 flex flex-col items-center text-center">
                                 <div className="w-24 h-24 bg-black rounded-full flex items-center justify-center border-4 border-gray-800 mb-4 overflow-hidden shadow-2xl">
                                     {settings.branch.logoUrl ? <img src={settings.branch.logoUrl} className="w-full h-full object-cover" /> : <span className="text-emerald-500 font-bold text-2xl">AN</span>}
@@ -289,7 +310,6 @@ export default function CustomerView() {
                                     <span className="text-emerald-500 text-[10px] font-bold uppercase tracking-widest">Abierto Ahora</span>
                                 </div>
 
-                                {/* Toggle oculto si es sesión de mesa */}
                                 {!isTableSession ? (
                                     <div className="w-[85%] bg-gray-800/40 rounded-xl p-1 flex mt-6 border border-gray-700">
                                         <button onClick={() => setOrderType(OrderType.Delivery)} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${orderType === OrderType.Delivery ? 'bg-gray-700 text-emerald-400 shadow-lg' : 'text-gray-500'}`}>A domicilio</button>
@@ -300,47 +320,23 @@ export default function CustomerView() {
                                         <IconTableLayout className="h-3 w-3"/> MESA {tableInfo!.table} • {tableInfo!.zone}
                                     </div>
                                 )}
-
-                                {!isTableSession && (
-                                    <div className="grid grid-cols-2 w-full mt-6 divide-x divide-gray-800">
-                                        <div className="flex flex-col items-center">
-                                            <span className="text-[10px] text-gray-500 uppercase font-black tracking-tighter">Tiempo Envío</span>
-                                            <span className="text-sm font-bold text-gray-200">25 - 45 min</span>
-                                        </div>
-                                        <div className="flex flex-col items-center">
-                                            <span className="text-[10px] text-gray-500 uppercase font-black tracking-tighter">Costo Envío</span>
-                                            <span className="text-sm font-bold text-gray-200">Por definir</span>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
 
-                            {/* --- BUSCADOR Y CATEGORIAS IDENTICO A LA IMAGEN --- */}
+                            {/* ... Resto del menú idéntico ... */}
                             <div className="sticky top-0 z-20 bg-[#0f172a]/95 backdrop-blur-md px-4 py-4 space-y-4 border-b border-gray-800/50">
                                 <div className="relative">
                                     <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 h-5 w-5" />
-                                    <input 
-                                        type="text" 
-                                        placeholder="Buscar productos..." 
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="w-full bg-[#1e293b] border-none rounded-xl py-3.5 pl-12 pr-4 text-sm focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder-gray-500 font-medium" 
-                                    />
+                                    <input type="text" placeholder="Buscar productos..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[#1e293b] border-none rounded-xl py-3.5 pl-12 pr-4 text-sm focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder-gray-500 font-medium" />
                                 </div>
                                 <div className="flex overflow-x-auto gap-2 no-scrollbar pb-1">
                                     {allCategories.map(cat => (
-                                        <button 
-                                            key={cat.id} 
-                                            onClick={() => scrollToCategory(cat.id)}
-                                            className={`whitespace-nowrap px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${activeCategory === cat.id ? 'bg-white text-gray-900 border-white' : 'bg-transparent text-gray-400 border-gray-800 hover:border-gray-600'}`}
-                                        >
+                                        <button key={cat.id} onClick={() => scrollToCategory(cat.id)} className={`whitespace-nowrap px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${activeCategory === cat.id ? 'bg-white text-gray-900 border-white' : 'bg-transparent text-gray-400 border-gray-800 hover:border-gray-600'}`}>
                                             {cat.name}
                                         </button>
                                     ))}
                                 </div>
                             </div>
 
-                            {/* --- LISTADO DE PRODUCTOS --- */}
                             <div className="p-4 space-y-8 mt-4">
                                 {allCategories.map(cat => {
                                     const products = allProducts.filter(p => p.categoryId === cat.id && p.available && p.name.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -390,9 +386,7 @@ export default function CustomerView() {
                             <div className="space-y-4">
                                 <h2 className="text-4xl font-black text-white uppercase tracking-tighter leading-none">{isFinalClosing ? '¡HASTA PRONTO!' : '¡A COCINA!'}</h2>
                                 <p className="text-gray-500 text-sm leading-relaxed max-w-xs mx-auto font-medium">
-                                    {isFinalClosing 
-                                        ? 'Hemos enviado tu solicitud. Un mesero pasará a confirmar el pago para liberar la mesa.' 
-                                        : 'Tu ronda ha sido enviada. Puedes seguir disfrutando y pidiendo más cosas desde el menú.'}
+                                    {isFinalClosing ? 'Hemos enviado tu solicitud. Un mesero pasará a confirmar el pago.' : 'Tu ronda ha sido enviada. Puedes seguir pidiendo más cosas desde el menú.'}
                                 </p>
                             </div>
                             <button onClick={() => { setIsFinalClosing(false); setView('menu'); }} className="w-full max-w-xs bg-gray-800 text-white py-4 rounded-xl font-bold hover:bg-gray-700 transition-colors border border-gray-700 uppercase tracking-widest text-xs">
@@ -403,7 +397,6 @@ export default function CustomerView() {
                     
                     {view === 'cart' && ( 
                         <div className="p-5 animate-fade-in"> 
-                            <PairingAI items={cartItems} allProducts={allProducts} /> 
                             <h2 className="text-xl font-black text-white mb-6 uppercase tracking-tight">Mi Ronda Actual</h2> 
                             <div className="space-y-4"> 
                                 {cartItems.map(i => ( 
@@ -441,35 +434,28 @@ export default function CustomerView() {
                     {view === 'account' && ( 
                         <div className="p-6 animate-fade-in"> 
                             <div className="bg-gray-800/30 p-7 rounded-[2.5rem] border border-gray-800 mb-6 shadow-xl"> 
-                                <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-8 flex items-center gap-3"> 
-                                    <IconReceipt className="h-4 w-4"/> MI CONSUMO TOTAL 
-                                </h3> 
+                                <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-8 flex items-center gap-3"> <IconReceipt className="h-4 w-4"/> MI CONSUMO TOTAL </h3> 
                                 <div className="space-y-4"> 
                                     {sessionItems.map((item, idx) => ( 
                                         <div key={idx} className="flex justify-between items-start text-sm border-b border-gray-700/50 pb-3 last:border-0"> 
-                                            <div className="flex gap-4"> 
-                                                <span className="font-black text-gray-500 bg-gray-800 h-6 w-6 flex items-center justify-center rounded-lg text-[10px]">{item.quantity}</span> 
-                                                <span className="font-bold text-gray-300">{item.name}</span> 
-                                            </div> 
+                                            <div className="flex gap-4"> <span className="font-black text-gray-500 bg-gray-800 h-6 w-6 flex items-center justify-center rounded-lg text-[10px]">{item.quantity}</span> <span className="font-bold text-gray-300">{item.name}</span> </div> 
                                             <span className="font-bold text-white">${(item.price * item.quantity).toFixed(2)}</span> 
                                         </div> 
                                     ))} 
-                                    {sessionItems.length === 0 && <p className="text-center text-gray-500 py-4 italic">Aún no has consumido nada en esta sesión.</p>} 
                                 </div> 
                                 <div className="mt-6 pt-6 border-t border-gray-700/50 flex justify-between items-center"> 
                                     <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">TOTAL ACUMULADO</span> 
                                     <span className="text-2xl font-black text-white">${sessionTotal.toFixed(2)}</span> 
                                 </div> 
                             </div> 
-                            <button onClick={() => { setIsFinalClosing(true); setView('checkout'); }} className="w-full bg-white text-gray-900 py-5 rounded-2xl font-black shadow-2xl active:scale-[0.98] transition-all uppercase tracking-[0.2em] text-sm"> 
-                                PEDIR LA CUENTA / PAGAR 
-                            </button> 
+                            <button onClick={() => { setIsFinalClosing(true); setView('checkout'); }} className="w-full bg-white text-gray-900 py-5 rounded-2xl font-black shadow-2xl active:scale-[0.98] transition-all uppercase tracking-[0.2em] text-sm"> PEDIR LA CUENTA / PAGAR </button> 
                         </div> 
                     )}
 
                     {view === 'checkout' && ( 
-                        <form onSubmit={e => { e.preventDefault(); const fd = new FormData(e.currentTarget); const name = fd.get('name') as string || customerName; const payment = (fd.get('payment') as PaymentMethod) || 'Efectivo'; const proof = (e.currentTarget.elements.namedItem('proof') as any)?.dataset.url; handleOrderAction({ name, phone: fd.get('phone') as string || '', address: { colonia: fd.get('colonia') as string || '', calle: fd.get('calle') as string || '', numero: fd.get('numero') as string || '' } } as any, payment, 0, proof); }} className="p-6 space-y-6 animate-fade-in"> 
+                        <form onSubmit={e => { e.preventDefault(); const fd = new FormData(e.currentTarget); const name = fd.get('name') as string || customerName; handleOrderAction({ name, phone: fd.get('phone') as string || '', address: { colonia: fd.get('colonia') as string || '', calle: fd.get('calle') as string || '', numero: fd.get('numero') as string || '' } } as any, selectedPayment, 0, paymentProofBase64); }} className="p-6 space-y-6 animate-fade-in"> 
                             
+                            {/* Datos del Cliente */}
                             {(!customerName || !isTableSession) && (
                                 <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]">
                                     <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">TUS DATOS</h3>
@@ -478,38 +464,63 @@ export default function CustomerView() {
                                 </div>
                             )}
 
-                            {!isTableSession && orderType === OrderType.Delivery && (
-                                <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]">
-                                    <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">DIRECCIÓN DE ENTREGA</h3>
-                                    <input name="calle" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="Calle y Avenida" required />
-                                    <input name="numero" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="Nro Casa / Apto" required />
-                                    <input name="colonia" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="Colonia / Sector" required />
-                                </div>
-                            )}
-
-                            {(isFinalClosing || !isTableSession) && (
-                                <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]">
-                                    <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">MÉTODO DE PAGO</h3>
-                                    <div className="grid grid-cols-1 gap-2">
-                                        {['Efectivo', 'Pago Móvil', 'Transferencia', 'Zelle'].map(m => (
-                                            <label key={m} className="flex justify-between items-center p-4 bg-gray-800/50 border border-gray-700 rounded-xl cursor-pointer hover:border-emerald-500 transition-all has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10">
-                                                <span className="text-sm font-bold text-gray-300">{m}</span>
-                                                <input type="radio" name="payment" value={m} defaultChecked={m === 'Efectivo'} className="accent-emerald-500 h-5 w-5" />
-                                            </label>
-                                        ))}
-                                    </div>
-                                    
-                                    {isFinalClosing && (
-                                        <label className="mt-4 flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-700 rounded-2xl cursor-pointer hover:bg-gray-800/50 transition-all group relative overflow-hidden">
-                                            <div className="flex flex-col items-center text-gray-500 group-hover:text-emerald-400">
-                                                <IconUpload className="h-8 w-8 mb-2 opacity-50" />
-                                                <span className="text-[10px] font-black uppercase tracking-widest">Subir Comprobante</span>
-                                            </div>
-                                            <input name="proof" type="file" className="hidden" accept="image/*" onChange={e => { if (e.target.files?.[0]) { const r = new FileReader(); r.onload = (re) => { e.target.dataset.url = re.target?.result as string; alert("Comprobante cargado correctamente."); }; r.readAsDataURL(e.target.files[0]); } }} />
+                            {/* Selección de Método de Pago */}
+                            <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]">
+                                <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">MÉTODO DE PAGO</h3>
+                                <div className="grid grid-cols-1 gap-2">
+                                    {['Efectivo', 'Pago Móvil', 'Transferencia', 'Zelle'].map(m => (
+                                        <label key={m} className={`flex justify-between items-center p-4 bg-gray-800/50 border rounded-xl cursor-pointer transition-all ${selectedPayment === m ? 'border-emerald-500 bg-emerald-500/10' : 'border-gray-700'}`}>
+                                            <span className="text-sm font-bold text-gray-300">{m}</span>
+                                            <input type="radio" name="payment" value={m} checked={selectedPayment === m} onChange={() => setSelectedPayment(m as any)} className="accent-emerald-500 h-5 w-5" />
                                         </label>
-                                    )}
+                                    ))}
                                 </div>
-                            )}
+
+                                {/* Mostrar datos bancarios dinámicamente */}
+                                {selectedPayment !== 'Efectivo' && (
+                                    <div className="mt-4 p-4 bg-gray-900 rounded-2xl border border-gray-700 space-y-3 animate-fade-in">
+                                        <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-2 text-center">Realiza el pago a estos datos:</p>
+                                        
+                                        {selectedPayment === 'Pago Móvil' && settings.payment.pagoMovil && (
+                                            <div className="space-y-1 text-sm">
+                                                <p><span className="text-gray-500">Banco:</span> <span className="font-bold">{settings.payment.pagoMovil.bank}</span></p>
+                                                <p><span className="text-gray-500">Teléfono:</span> <span className="font-bold">{settings.payment.pagoMovil.phone}</span></p>
+                                                <p><span className="text-gray-500">Cédula:</span> <span className="font-bold">{settings.payment.pagoMovil.idNumber}</span></p>
+                                            </div>
+                                        )}
+                                        {selectedPayment === 'Transferencia' && settings.payment.transfer && (
+                                            <div className="space-y-1 text-sm">
+                                                <p><span className="text-gray-500">Banco:</span> <span className="font-bold">{settings.payment.transfer.bank}</span></p>
+                                                <p><span className="text-gray-500">Cuenta:</span> <span className="font-mono text-xs break-all">{settings.payment.transfer.accountNumber}</span></p>
+                                                <p><span className="text-gray-500">Titular:</span> <span className="font-bold">{settings.payment.transfer.accountHolder}</span></p>
+                                                <p><span className="text-gray-500">Cédula:</span> <span className="font-bold">{settings.payment.transfer.idNumber}</span></p>
+                                            </div>
+                                        )}
+                                        {selectedPayment === 'Zelle' && settings.payment.zelle && (
+                                            <div className="space-y-1 text-sm">
+                                                <p><span className="text-gray-500">Correo:</span> <span className="font-bold">{settings.payment.zelle.email}</span></p>
+                                                <p><span className="text-gray-500">Titular:</span> <span className="font-bold">{settings.payment.zelle.holder}</span></p>
+                                            </div>
+                                        )}
+
+                                        <hr className="border-gray-800 my-2" />
+                                        
+                                        <label className="flex flex-col items-center justify-center w-full p-4 border-2 border-dashed border-gray-700 rounded-xl cursor-pointer hover:bg-gray-800 transition-all">
+                                            {paymentProofBase64 ? (
+                                                <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase">
+                                                    <IconCheck className="h-4 w-4"/> Captura adjunta
+                                                </div>
+                                            ) : (
+                                                <div className="flex flex-col items-center text-gray-500">
+                                                    <IconUpload className="h-6 w-6 mb-1 opacity-50" />
+                                                    <span className="text-[10px] font-black uppercase tracking-widest">Subir Captura de Pago</span>
+                                                </div>
+                                            )}
+                                            <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
+                                        </label>
+                                    </div>
+                                )}
+                            </div>
 
                             <div className="pt-4">
                                 <div className="flex justify-between font-black text-2xl mb-6 px-2">
@@ -525,6 +536,7 @@ export default function CustomerView() {
                     )}
                 </div>
 
+                {/* Modal de Producto */}
                 {selectedProduct && (
                     <div className="fixed inset-0 z-50 flex items-end justify-center p-4">
                         <div className="absolute inset-0 bg-black/85 backdrop-blur-sm" onClick={() => setSelectedProduct(null)}></div>
@@ -537,10 +549,7 @@ export default function CustomerView() {
                             <div className="p-8 -mt-10 relative">
                                 <h2 className="text-3xl font-black mb-2 text-white leading-none">{selectedProduct.name}</h2>
                                 <p className="text-gray-400 text-sm mb-8 leading-relaxed font-medium mt-4">{selectedProduct.description}</p>
-                                <button 
-                                    onClick={() => { addToCart(selectedProduct, 1); setSelectedProduct(null); }}
-                                    className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex justify-between px-8 items-center active:scale-95 transition-all shadow-xl shadow-emerald-900/40"
-                                >
+                                <button onClick={() => { addToCart(selectedProduct, 1); setSelectedProduct(null); }} className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex justify-between px-8 items-center active:scale-95 transition-all shadow-xl shadow-emerald-900/40">
                                     <span className="uppercase tracking-widest text-[10px]">Añadir a la Ronda</span>
                                     <span className="text-xl font-black">${selectedProduct.price.toFixed(2)}</span>
                                 </button>
@@ -549,30 +558,20 @@ export default function CustomerView() {
                     </div>
                 )}
                 
+                {/* Botones Flotantes del Menú */}
                 {view === 'menu' && (
                     <div className="fixed bottom-6 left-4 right-4 max-w-md mx-auto z-40 flex flex-col gap-3">
                         {sessionItems.length > 0 && isTableSession && (
-                            <button 
-                                onClick={() => setView('account')} 
-                                className="w-full bg-gray-800/90 backdrop-blur-xl text-white font-black py-4 px-6 rounded-2xl flex justify-between items-center border border-emerald-500/30 shadow-2xl transition-transform active:scale-95 group"
-                            >
+                            <button onClick={() => setView('account')} className="w-full bg-gray-800/90 backdrop-blur-xl text-white font-black py-4 px-6 rounded-2xl flex justify-between items-center border border-emerald-500/30 shadow-2xl transition-transform active:scale-95 group">
                                 <div className="flex items-center gap-3">
-                                    <div className="bg-emerald-500/20 p-2 rounded-lg text-emerald-400 group-hover:text-emerald-300 transition-colors">
-                                        <IconReceipt className="h-5 w-5"/>
-                                    </div>
-                                    <div className="text-left leading-none">
-                                        <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-500 font-black mb-1">Mi Cuenta</p>
-                                        <p className="text-xs text-gray-400 font-bold">Ver acumulado</p>
-                                    </div>
+                                    <div className="bg-emerald-500/20 p-2 rounded-lg text-emerald-400 group-hover:text-emerald-300 transition-colors"> <IconReceipt className="h-5 w-5"/> </div>
+                                    <div className="text-left leading-none"> <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-500 font-black mb-1">Mi Cuenta</p> <p className="text-xs text-gray-400 font-bold">Ver acumulado</p> </div>
                                 </div>
                                 <span className="text-xl font-black">${sessionTotal.toFixed(2)}</span>
                             </button>
                         )}
                         {itemCount > 0 && (
-                            <button 
-                                onClick={() => setView('cart')} 
-                                className="w-full bg-emerald-600 text-white font-black py-4 px-6 rounded-2xl flex justify-between items-center shadow-xl shadow-emerald-900/50 active:scale-[0.98] transition-all border border-emerald-400/50"
-                            >
+                            <button onClick={() => setView('cart')} className="w-full bg-emerald-600 text-white font-black py-4 px-6 rounded-2xl flex justify-between items-center shadow-xl shadow-emerald-900/50 active:scale-[0.98] transition-all border border-emerald-400/50">
                                 <div className="flex items-center gap-3">
                                     <div className="bg-emerald-800 px-3 py-1 rounded-lg text-sm font-black border border-emerald-400/30 shadow-inner">{itemCount}</div>
                                     <span className="tracking-[0.1em] uppercase text-xs font-black">{isTableSession ? 'Ver Ronda Actual' : 'Ver Pedido'}</span>
@@ -584,15 +583,6 @@ export default function CustomerView() {
                 )}
                 <Chatbot />
             </div>
-            <style>{`
-                .no-scrollbar::-webkit-scrollbar { display: none; }
-                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-                @keyframes slide-up {
-                    from { transform: translateY(100%); opacity: 0; }
-                    to { transform: translateY(0); opacity: 1; }
-                }
-                .animate-slide-up { animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-            `}</style>
         </div>
     );
 }
