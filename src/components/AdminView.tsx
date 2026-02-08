@@ -81,7 +81,7 @@ const SettingsCard: React.FC<{ title: string; description?: string; children: Re
 );
 
 const PaymentSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
-    const inputClasses = "mt-1 block w-full px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white transition-all sm:text-sm";
+    const inputClasses = "mt-1 block w-full px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white transition-all sm:text-sm text-gray-900";
     
     return (
         <div className="space-y-6 max-w-4xl mx-auto">
@@ -141,126 +141,15 @@ const PaymentSettingsView: React.FC<{ onSave: () => Promise<void>; settings: App
     );
 };
 
-const BranchSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
-    const [isEditingPhone, setIsEditingPhone] = useState(false);
-    const [tempPhone, setTempPhone] = useState(settings.branch.whatsappNumber);
-
-    useEffect(() => {
-        setTempPhone(settings.branch.whatsappNumber);
-    }, [settings.branch.whatsappNumber]);
-
-    const handleWhatsAppSave = async () => {
-        const cleanPhone = tempPhone.replace(/[^\d]/g, '');
-        if (!cleanPhone) {
-            alert("Introduce un número válido.");
-            return;
-        }
-        const newSettings = { ...settings, branch: { ...settings.branch, whatsappNumber: cleanPhone } };
-        try {
-            await saveAppSettings(newSettings);
-            setSettings(newSettings);
-            setIsEditingPhone(false);
-            alert("Número de WhatsApp actualizado correctamente.");
-        } catch (e) {
-            alert("Error al guardar en la base de datos.");
-        }
-    };
-
-    const handleCancelPhone = () => {
-        setTempPhone(settings.branch.whatsappNumber);
-        setIsEditingPhone(false);
-    };
-
-    const inputClasses = "mt-1 block w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white transition-all";
-
-    return (
-        <div className="space-y-6 max-w-4xl mx-auto">
-            <SettingsCard 
-                title="Número de WhatsApp para pedidos" 
-                description="Este es el número donde recibirás las comandas de tus clientes."
-                noActions={!isEditingPhone}
-                onSave={handleWhatsAppSave}
-                onCancel={handleCancelPhone}
-            >
-                <div className="flex flex-col gap-3">
-                    {isEditingPhone ? (
-                        <div className="space-y-3 animate-fade-in">
-                            <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Nuevo número (con código de país, ej: 58414...)</label>
-                            <div className="relative">
-                                <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 font-mono text-lg">+</span>
-                                <input 
-                                    type="tel" 
-                                    value={tempPhone} 
-                                    onChange={e => setTempPhone(e.target.value)}
-                                    className={`${inputClasses} pl-8 font-mono text-lg font-bold border-emerald-500/50 shadow-inner`}
-                                    placeholder="584146945877"
-                                    autoFocus
-                                />
-                            </div>
-                            <p className="text-[10px] text-gray-400">Tus clientes verán este número al finalizar su pedido en el menú digital.</p>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col sm:flex-row justify-between items-center p-5 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                            <div className="flex items-center gap-4 mb-4 sm:mb-0">
-                                <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
-                                    <IconWhatsapp className="h-6 w-6 text-green-600 dark:text-green-400" />
-                                </div>
-                                <div className="flex flex-col text-left">
-                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Número activo</span>
-                                    <span className="font-mono text-xl font-bold text-gray-800 dark:text-gray-100">
-                                        +{settings.branch.whatsappNumber || "Sin configurar"}
-                                    </span>
-                                </div>
-                            </div>
-                            <button 
-                                type="button" 
-                                onClick={() => setIsEditingPhone(true)}
-                                className="w-full sm:w-auto px-6 py-2.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-all active:scale-95"
-                            >
-                                Cambiar número
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </SettingsCard>
-
-            <SettingsCard title="Datos de sucursal" onSave={onSave}>
-                <div className="grid grid-cols-1 gap-6">
-                    <div>
-                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Alias de sucursal</label>
-                        <input 
-                            type="text" 
-                            value={settings.branch.alias} 
-                            onChange={e => setSettings(p => ({...p, branch: {...p.branch, alias: e.target.value}}))} 
-                            className={inputClasses}
-                            placeholder="Nombre de la sucursal"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Dirección completa</label>
-                        <input 
-                            type="text" 
-                            value={settings.branch.fullAddress} 
-                            onChange={e => setSettings(p => ({...p, branch: {...p.branch, fullAddress: e.target.value}}))} 
-                            className={inputClasses}
-                        />
-                    </div>
-                </div>
-            </SettingsCard>
-        </div>
-    );
-};
-
-const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; initialPage?: SettingsPage }> = ({ isOpen, onClose, initialPage = 'general' }) => {
+const AdminView: React.FC = () => {
+    const [currentPage, setCurrentPage] = useState<AdminViewPage>('dashboard');
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [theme, toggleTheme] = useTheme();
     const [settings, setSettings] = useState<AppSettings | null>(null);
-    const [activePage, setActivePage] = useState<SettingsPage>(initialPage);
 
     useEffect(() => {
-        if (isOpen) {
-            getAppSettings().then(setSettings);
-            setActivePage(initialPage);
-        }
-    }, [isOpen, initialPage]);
+        getAppSettings().then(setSettings);
+    }, []);
 
     const handleSave = async () => {
         if (settings) {
@@ -273,64 +162,12 @@ const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; initialPag
         }
     };
 
-    if (!isOpen || !settings) return null;
-
-    const navItems: { id: SettingsPage; name: string; icon: React.ReactNode }[] = [
-        { id: 'general', name: 'General', icon: <IconSettings className="h-4 w-4" /> },
-        { id: 'store-data', name: 'Sucursal', icon: <IconStore className="h-4 w-4" /> },
-        { id: 'payment-methods', name: 'Pagos y Bancos', icon: <IconPayment className="h-4 w-4" /> },
-    ];
-
-    return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end">
-            <div className="bg-white dark:bg-gray-900 h-full w-full max-w-5xl flex flex-col shadow-2xl animate-slide-in-right">
-                <header className="p-6 border-b dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800">
-                    <h2 className="text-xl font-bold">Configuración del Sistema</h2>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"><IconX/></button>
-                </header>
-                <div className="flex-1 flex overflow-hidden">
-                    <aside className="w-64 border-r dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-800/50">
-                        <nav className="space-y-1">
-                            {navItems.map(item => (
-                                <button key={item.id} onClick={() => setActivePage(item.id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold transition-all ${activePage === item.id ? 'bg-emerald-600 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'}`}>
-                                    {item.icon} {item.name}
-                                </button>
-                            ))}
-                        </nav>
-                    </aside>
-                    <main className="flex-1 p-8 overflow-y-auto bg-white dark:bg-gray-900">
-                        {activePage === 'store-data' && <BranchSettingsView settings={settings} setSettings={setSettings} onSave={handleSave} />}
-                        {activePage === 'payment-methods' && <PaymentSettingsView settings={settings} setSettings={setSettings} onSave={handleSave} />}
-                        {activePage === 'general' && <div className="text-center py-20 opacity-40 italic">Ajustes generales en construcción...</div>}
-                    </main>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const AdminView: React.FC = () => {
-    const [currentPage, setCurrentPage] = useState<AdminViewPage>('dashboard');
-    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [theme, toggleTheme] = useTheme();
-    const [settings, setSettings] = useState<AppSettings | null>(null);
-
-    useEffect(() => {
-        getAppSettings().then(setSettings);
-        subscribeToMenuUpdates(() => {
-            getAppSettings().then(setSettings);
-        });
-        return () => { unsubscribeFromChannel(); };
-    }, []);
+    if (!settings) return null;
 
     return (
         <div className="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-200 overflow-hidden">
-            <Sidebar 
-                currentPage={currentPage} 
-                setCurrentPage={setCurrentPage} 
-                whatsappNumber={settings?.branch.whatsappNumber || "..."} 
-            />
-            <div className="flex-1 flex flex-col min-w-0">
+            <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} whatsappNumber={settings.branch.whatsappNumber} />
+            <div className="flex-1 flex flex-col">
                 <header className="h-20 bg-white dark:bg-gray-800 border-b dark:border-gray-700 flex items-center justify-between px-8 shrink-0">
                     <h2 className="text-2xl font-bold uppercase tracking-tight">{PAGE_TITLES[currentPage]}</h2>
                     <div className="flex items-center space-x-6">
@@ -343,29 +180,32 @@ const AdminView: React.FC = () => {
                     </div>
                 </header>
                 <main className="flex-1 overflow-auto p-8">
-                    <div className="max-w-7xl mx-auto">
-                         {currentPage === 'dashboard' && (
-                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700">
-                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Estado del sistema</h3>
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-3 w-3 bg-green-500 rounded-full animate-pulse"></div>
-                                        <p className="font-bold text-lg">Menú en línea activo</p>
-                                    </div>
-                                </div>
-                             </div>
-                         )}
-                        <div className="text-center py-20 opacity-30 italic">Bienvenido al Panel de Administración de ALTOQUE FOOD.</div>
-                    </div>
+                     {currentPage === 'dashboard' && <div className="p-10 text-center text-gray-400">Panel de control principal</div>}
+                     {currentPage === 'orders' && <OrderManagement onSettingsClick={() => setIsSettingsOpen(true)} />}
+                     {currentPage === 'products' && <MenuManagement />}
+                     {/* ... otras vistas ... */}
                 </main>
             </div>
-            <SettingsModal 
-                isOpen={isSettingsOpen} 
-                onClose={() => setIsSettingsOpen(false)} 
-                initialPage="store-data"
-            />
+            
+            {isSettingsOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end">
+                    <div className="bg-white dark:bg-gray-900 h-full w-full max-w-4xl flex flex-col shadow-2xl animate-slide-in-right">
+                        <header className="p-6 border-b dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800">
+                            <h2 className="text-xl font-bold">Configuración</h2>
+                            <button onClick={() => setIsSettingsOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"><IconX/></button>
+                        </header>
+                        <div className="flex-1 p-8 overflow-y-auto">
+                            <PaymentSettingsView settings={settings} setSettings={setSettings} onSave={handleSave} />
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
 
 export default AdminView;
+
+// (Componentes placeholder para que compile)
+const MenuManagement = () => <div className="p-4">Gestión de Menú</div>;
+const OrderManagement = ({onSettingsClick}: any) => <div className="p-4">Gestión de Pedidos</div>;
