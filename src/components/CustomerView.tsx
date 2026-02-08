@@ -121,7 +121,7 @@ export default function CustomerView() {
             const reader = new FileReader();
             reader.onload = (res) => {
                 setPaymentProof(res.target?.result as string);
-                alert("Captura de pago adjuntada con éxito.");
+                alert("Captura de pago cargada correctamente.");
             };
             reader.readAsDataURL(file);
         }
@@ -143,7 +143,7 @@ export default function CustomerView() {
                     `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
                     `🪑 Mesa: ${tableInfo?.table} (${tableInfo?.zone})`, `👤 Cliente: ${name}`, `--------------------------------`,
                     `💵 *TOTAL A PAGAR: $${sessionTotal.toFixed(2)}*`, `💳 Método: ${selectedPayment}`,
-                    paymentProof ? `✅ Comprobante adjunto en chat` : '', `_Cliente solicita la cuenta para retirarse._`
+                    paymentProof ? `✅ Comprobante enviado por chat` : '', `_Cliente solicita la cuenta para retirarse._`
                 ].filter(Boolean).join('\n');
 
                 window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
@@ -158,7 +158,7 @@ export default function CustomerView() {
                 setView('confirmation');
 
             } else {
-                // ENVIAR RONDA
+                // ENVIAR RONDA / PEDIDO
                 const itemsStr = cartItems.map(i => `• ${i.quantity}x ${i.name}`).join('\n');
                 let msg: string;
                 
@@ -215,7 +215,6 @@ export default function CustomerView() {
                 <div className="flex-1 overflow-y-auto pb-48">
                     {view === 'menu' && (
                         <div className="animate-fade-in">
-                            {/* --- HERO IDENTICO A LA IMAGEN --- */}
                             <div className="relative pt-12 pb-8 flex flex-col items-center text-center">
                                 <div className="w-24 h-24 bg-black rounded-full flex items-center justify-center border-4 border-gray-800 mb-4 overflow-hidden shadow-2xl">
                                     {settings.branch.logoUrl ? <img src={settings.branch.logoUrl} className="w-full h-full object-cover" /> : <span className="text-emerald-500 font-bold text-2xl">AN</span>}
@@ -239,7 +238,6 @@ export default function CustomerView() {
                                 )}
                             </div>
 
-                            {/* --- LISTADO DE PRODUCTOS --- */}
                             <div className="p-4 space-y-8 mt-4">
                                 {allCategories.map(cat => {
                                     const products = allProducts.filter(p => p.categoryId === cat.id && p.available);
@@ -284,14 +282,12 @@ export default function CustomerView() {
                     {view === 'checkout' && ( 
                         <form onSubmit={handleOrderAction} className="p-6 space-y-6 animate-fade-in"> 
                             
-                            {/* Datos Cliente */}
                             <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]">
                                 <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">TUS DATOS</h3>
                                 <input name="name" type="text" defaultValue={customerName} className="w-full bg-gray-800 border-none rounded-xl p-4 text-sm font-bold text-white outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Nombre completo" required />
                                 {!isTableSession && <input name="phone" type="tel" className="w-full bg-gray-800 border-none rounded-xl p-4 text-sm font-bold text-white outline-none focus:ring-1 focus:ring-emerald-500" placeholder="WhatsApp" required />}
                             </div>
 
-                            {/* Dirección (si es delivery) */}
                             {!isTableSession && orderType === OrderType.Delivery && (
                                 <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]">
                                     <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">DIRECCIÓN DE ENTREGA</h3>
@@ -301,9 +297,11 @@ export default function CustomerView() {
                                 </div>
                             )}
 
-                            {/* Método de Pago Dinámico */}
-                            <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]">
-                                <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">MÉTODO DE PAGO</h3>
+                            <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem] relative">
+                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0f172a] px-6 py-2 border border-gray-800 rounded-full z-10">
+                                    <h3 className="text-[10px] font-black text-white uppercase tracking-[0.3em]">CONFIRMAR</h3>
+                                </div>
+                                <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] pt-4">MÉTODO DE PAGO</h3>
                                 <div className="grid grid-cols-1 gap-2">
                                     {['Efectivo', 'Pago Móvil', 'Transferencia', 'Zelle'].map(m => (
                                         <label key={m} className={`flex justify-between items-center p-4 bg-gray-800/50 border rounded-xl cursor-pointer transition-all ${selectedPayment === m ? 'border-emerald-500 bg-emerald-500/10' : 'border-gray-700'}`}>
@@ -313,43 +311,50 @@ export default function CustomerView() {
                                     ))}
                                 </div>
 
-                                {/* DESPLIEGUE DE DATOS BANCARIOS */}
                                 {selectedPayment !== 'Efectivo' && (
-                                    <div className="mt-4 p-4 bg-gray-900 rounded-2xl border border-emerald-500/30 space-y-4 animate-fade-in shadow-xl">
-                                        <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] text-center mb-2">Transfiere a estos datos:</p>
-                                        
-                                        {selectedPayment === 'Pago Móvil' && settings.payment.pagoMovil && (
-                                            <div className="space-y-1.5 text-xs">
-                                                <div className="flex justify-between"><span className="text-gray-500">Banco:</span><span className="font-bold text-white">{settings.payment.pagoMovil.bank}</span></div>
-                                                <div className="flex justify-between"><span className="text-gray-500">Teléfono:</span><span className="font-bold text-white">{settings.payment.pagoMovil.phone}</span></div>
-                                                <div className="flex justify-between"><span className="text-gray-500">Cédula:</span><span className="font-bold text-white">{settings.payment.pagoMovil.idNumber}</span></div>
-                                            </div>
-                                        )}
+                                    <div className="mt-4 p-5 bg-gray-900 rounded-3xl border border-emerald-500/30 space-y-4 animate-fade-in shadow-2xl">
+                                        <div className="text-center">
+                                            <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-4">DATOS BANCARIOS</p>
+                                            
+                                            {selectedPayment === 'Pago Móvil' && settings.payment.pagoMovil && (
+                                                <div className="space-y-2 text-xs">
+                                                    <div className="flex justify-between text-gray-400 border-b border-gray-800 pb-1"><span>Banco:</span><span className="font-bold text-white uppercase">{settings.payment.pagoMovil.bank || 'No configurado'}</span></div>
+                                                    <div className="flex justify-between text-gray-400 border-b border-gray-800 pb-1"><span>Teléfono:</span><span className="font-bold text-white font-mono">{settings.payment.pagoMovil.phone || 'No configurado'}</span></div>
+                                                    <div className="flex justify-between text-gray-400"><span>Cédula/RIF:</span><span className="font-bold text-white uppercase">{settings.payment.pagoMovil.idNumber || 'No configurado'}</span></div>
+                                                </div>
+                                            )}
 
-                                        {selectedPayment === 'Transferencia' && settings.payment.transfer && (
-                                            <div className="space-y-1.5 text-xs">
-                                                <div className="flex justify-between"><span className="text-gray-500">Banco:</span><span className="font-bold text-white">{settings.payment.transfer.bank}</span></div>
-                                                <div className="flex flex-col"><span className="text-gray-500">Cuenta:</span><span className="font-mono text-white text-[10px] break-all">{settings.payment.transfer.accountNumber}</span></div>
-                                                <div className="flex justify-between"><span className="text-gray-500">Titular:</span><span className="font-bold text-white">{settings.payment.transfer.accountHolder}</span></div>
-                                                <div className="flex justify-between"><span className="text-gray-500">Cédula:</span><span className="font-bold text-white">{settings.payment.transfer.idNumber}</span></div>
-                                            </div>
-                                        )}
+                                            {selectedPayment === 'Transferencia' && settings.payment.transfer && (
+                                                <div className="space-y-2 text-xs">
+                                                    <div className="flex justify-between text-gray-400 border-b border-gray-800 pb-1"><span>Banco:</span><span className="font-bold text-white uppercase">{settings.payment.transfer.bank || 'No configurado'}</span></div>
+                                                    <div className="flex flex-col items-start text-gray-400 border-b border-gray-800 pb-1">
+                                                        <span>Cuenta:</span>
+                                                        <span className="font-mono text-white text-[10px] mt-1 break-all w-full text-left">{settings.payment.transfer.accountNumber || 'No configurado'}</span>
+                                                    </div>
+                                                    <div className="flex justify-between text-gray-400 border-b border-gray-800 pb-1"><span>Titular:</span><span className="font-bold text-white uppercase">{settings.payment.transfer.accountHolder || 'No configurado'}</span></div>
+                                                    <div className="flex justify-between text-gray-400"><span>Cédula/RIF:</span><span className="font-bold text-white uppercase">{settings.payment.transfer.idNumber || 'No configurado'}</span></div>
+                                                </div>
+                                            )}
 
-                                        {selectedPayment === 'Zelle' && settings.payment.zelle && (
-                                            <div className="space-y-1.5 text-xs">
-                                                <div className="flex justify-between"><span className="text-gray-500">Correo:</span><span className="font-bold text-white">{settings.payment.zelle.email}</span></div>
-                                                <div className="flex justify-between"><span className="text-gray-500">Titular:</span><span className="font-bold text-white">{settings.payment.zelle.holder}</span></div>
-                                            </div>
-                                        )}
+                                            {selectedPayment === 'Zelle' && settings.payment.zelle && (
+                                                <div className="space-y-2 text-xs">
+                                                    <div className="flex justify-between text-gray-400 border-b border-gray-800 pb-1"><span>Correo:</span><span className="font-bold text-white font-mono">{settings.payment.zelle.email || 'No configurado'}</span></div>
+                                                    <div className="flex justify-between text-gray-400"><span>Titular:</span><span className="font-bold text-white uppercase">{settings.payment.zelle.holder || 'No configurado'}</span></div>
+                                                </div>
+                                            )}
+                                        </div>
 
-                                        <div className="pt-2 border-t border-gray-800">
-                                            <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-800 rounded-xl cursor-pointer hover:bg-gray-800 transition-all">
+                                        <div className="pt-4">
+                                            <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-emerald-500/20 rounded-2xl cursor-pointer hover:bg-emerald-500/5 transition-all group overflow-hidden bg-gray-800/50">
                                                 {paymentProof ? (
-                                                    <div className="flex items-center gap-2 text-emerald-400 font-bold text-[10px] uppercase"> <IconCheck className="h-4 w-4"/> Captura Lista </div>
+                                                    <div className="flex flex-col items-center gap-2 animate-bounce">
+                                                        <div className="bg-emerald-500/20 p-2 rounded-full"><IconCheck className="h-6 w-6 text-emerald-500"/></div>
+                                                        <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">¡CAPTURA CARGADA!</span>
+                                                    </div>
                                                 ) : (
-                                                    <div className="flex flex-col items-center text-gray-500">
-                                                        <IconUpload className="h-6 w-6 mb-1 opacity-50" />
-                                                        <span className="text-[9px] font-black uppercase tracking-widest">Subir Comprobante</span>
+                                                    <div className="flex flex-col items-center text-gray-500 group-hover:text-emerald-400 transition-colors">
+                                                        <IconUpload className="h-8 w-8 mb-2 opacity-50" />
+                                                        <span className="text-[9px] font-black uppercase tracking-widest">SUBIR COMPROBANTE</span>
                                                     </div>
                                                 )}
                                                 <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
@@ -359,36 +364,25 @@ export default function CustomerView() {
                                 )}
                             </div>
 
-                            <div className="pt-4 px-2">
-                                <div className="flex justify-between font-black text-2xl mb-6">
-                                    <span className="text-gray-500 text-[10px] tracking-[0.3em] uppercase self-center">TOTAL RONDA</span>
-                                    <span className="text-emerald-400 text-3xl font-black">${(isFinalClosing ? sessionTotal : cartTotal).toFixed(2)}</span>
+                            <div className="pt-8 px-2 space-y-4">
+                                <div className="flex justify-between font-black text-2xl px-2">
+                                    <span className="text-gray-500 text-[10px] tracking-[0.4em] uppercase self-center">TOTAL RONDA</span>
+                                    <span className="text-emerald-400 text-4xl font-black">${(isFinalClosing ? sessionTotal : cartTotal).toFixed(2)}</span>
                                 </div>
-                                <button type="submit" className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex items-center justify-center gap-4 active:scale-95 transition-all text-xs uppercase tracking-[0.2em] shadow-2xl">
+                                <button type="submit" className="w-full bg-[#10b981] hover:bg-[#059669] py-5 rounded-2xl font-black text-white flex items-center justify-center gap-4 active:scale-95 transition-all text-xs uppercase tracking-[0.2em] shadow-[0_10px_40px_-10px_rgba(16,185,129,0.5)] border-t border-white/10">
                                     <IconWhatsapp className="h-5 w-5" /> REALIZAR PEDIDO
                                 </button>
                             </div>
                         </form> 
                     )}
                 </div>
-
-                {/* Modal de Producto y Botones Flotantes Ommitidos para brevedad, se asumen intactos */}
-                {view === 'menu' && itemCount > 0 && (
-                    <div className="fixed bottom-6 left-4 right-4 max-w-md mx-auto z-40">
-                         <button onClick={() => setView('checkout')} className="w-full bg-emerald-600 text-white font-black py-5 px-8 rounded-2xl flex justify-between items-center shadow-2xl active:scale-95 transition-all border border-emerald-400/30">
-                            <span className="tracking-[0.2em] uppercase text-xs">CONFIRMAR PEDIDO</span>
-                            <span className="font-black text-xl">${cartTotal.toFixed(2)}</span>
-                        </button>
-                    </div>
-                )}
-                
                 <Chatbot />
             </div>
             <style>{`
                 .no-scrollbar::-webkit-scrollbar { display: none; }
                 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
                 @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-                .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
+                .animate-fade-in { animation: fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
             `}</style>
         </div>
     );
