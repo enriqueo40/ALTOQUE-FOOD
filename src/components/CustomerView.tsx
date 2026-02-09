@@ -509,7 +509,7 @@ export default function CustomerView() {
                                         {[0, 5, 10, 15].map(p => {
                                             const amount = baseTotal * (p / 100);
                                             return (
-                                                <button key={p} type="button" onClick={() => setTipAmount(amount)} className={`py-3 rounded-xl text-xs font-bold transition-all border ${Math.abs(tipAmount - amount) < 0.1 ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400'}`}>
+                                                <button key={p} type="button" onClick={() => setTipAmount(amount)} className={`py-3 rounded-xl text-xs font-bold transition-all border ${Math.abs(tipAmount - amount) < 0.01 ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400'}`}>
                                                     {p}%
                                                 </button>
                                             );

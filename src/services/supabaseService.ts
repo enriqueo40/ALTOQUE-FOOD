@@ -200,7 +200,7 @@ export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt'>): Promise
         order_type: order.orderType,
         table_id: order.tableId,
         payment_status: order.paymentStatus || 'pending',
-        tip: order.tip || 0 // Add tip to payload
+        tip: order.tip || 0
     };
     const { data, error } = await getClient().from('orders').insert(payload).select().single();
     if (error || !data) throw new Error(error?.message || 'Error saving order');

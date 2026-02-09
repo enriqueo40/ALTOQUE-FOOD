@@ -1,6 +1,6 @@
-
 import React from 'react';
-import { Product, Category, Order, OrderStatus, Conversation, Personalization, Promotion, Zone, Customer, OrderType, DiscountType, PromotionAppliesTo, Table, Currency, AppSettings, ShippingCostType, PrintingMethod } from './types';
+// FIX: Add Conversation type to be used in MOCK_CONVERSATIONS
+import { AppSettings, Conversation, Currency, DiscountType, OrderType, PaymentMethod, PrintingMethod, PromotionAppliesTo, ShippingCostType } from './types';
 
 // SVG Icon Components
 export const IconComponent: React.FC<{ d: string; className?: string; title?: string }> = ({ d, className = "h-6 w-6", title }) => (
@@ -31,7 +31,7 @@ export const IconAnalytics: React.FC<{ className?: string }> = ({ className }) =
 export const IconEdit: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" className={className} />;
 export const IconPencil: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" className={className} />;
 export const IconDuplicate: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.5a1.125 1.125 0 011.125-1.125h7.5a3.375 3.375 0 013.375 3.375z" className={className} />;
-export const IconSparkles: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM18.259 15.315L18 14.25l-.259-1.065a3.375 3.375 0 00-2.455 2.456L14.25 18l1.036.259a3.375 3.375 0 002.455 2.456L18 21.75l.259-1.035a3.375 3.375 0 002.456-2.456L21.75 18l-1.035-.259a3.375 3.375 0 00-2.456-2.456z" className={className} />;
+export const IconSparkles: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM18.259 15.315L18 14.25l-.259 1.065a3.375 3.375 0 00-2.455 2.456L14.25 18l1.036.259a3.375 3.375 0 002.455 2.456L18 21.75l.259-1.035a3.375 3.375 0 002.456-2.456L21.75 18l-1.035-.259a3.375 3.375 0 00-2.456-2.456z" className={className} />;
 export const IconSend: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" className={className} />;
 export const IconExternalLink: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" className={className} />;
 export const IconCalendar: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0h18" className={className} />;
@@ -55,7 +55,7 @@ export const IconReceipt: React.FC<{ className?: string }> = ({ className }) => 
 export const IconTableLayout: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M9 4.5v15m6-15v15m-10.5-15h15a2.25 2.25 0 012.25 2.25v10.5a2.25 2.25 0 01-2.25-2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75A2.25 2.25 0 014.5 4.5z" className={className} />;
 export const IconUpload: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" className={className} />;
 export const IconStore: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.25a.75.75 0 01-.75-.75v-9a.75.75 0 01.75-.75h21a.75.75 0 01.75.75v9a.75.75 0 01-.75-.75h-5.25m-4.5 0h-4.5" className={className} />;
-export const IconSettings: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M10.343 3.94c.09-.542.56-1.008 1.11-1.212l.06-.025a1.875 1.875 0 011.97 0l.06.025c.55.204 1.02.67 1.11 1.212l.044.262a.75.75 0 001.344.144l.243-.209a1.875 1.875 0 012.352.53l.05.071a1.875 1.875 0 01-.53 2.352l-.209.243a.75.75 0 00-.144 1.344l-.243.209a1.875 1.875 0 01-2.352-.53l-.05-.071a1.875 1.875 0 01.53-2.352l.209-.243a.75.75 0 000.144-1.344l.262-.044zM12 15.75a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z" className={className} />;
+export const IconSettings: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M10.343 3.94c.09-.542.56-1.008 1.11-1.212l.06-.025a1.875 1.875 0 011.97 0l.06.025c.55.204 1.02.67 1.11 1.212l.044.262a.75.75 0 001.344.144l.243-.209a1.875 1.875 0 012.352.53l.05.071a1.875 1.875 0 01-.53 2.352l-.209.243a.75.75 0 00-.144 1.344l.243.209a1.875 1.875 0 01-2.352-.53l-.05-.071a1.875 1.875 0 01.53-2.352l.209-.243a.75.75 0 000.144-1.344l.262-.044zM12 15.75a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z" className={className} />;
 export const IconDelivery: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.125-.504 1.125-1.125V14.25m-17.25 4.5h10.5a1.125 1.125 0 001.125-1.125V6.75a1.125 1.125 0 00-1.125-1.125H4.5A1.125 1.125 0 003.375 6.75v10.5a1.125 1.125 0 001.125 1.125z" className={className} />;
 export const IconPayment: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h6m3-5.25H21m-9 5.25h9m-9 2.25h9M2.25 9h19.5" className={className} />;
 
@@ -73,12 +73,36 @@ export const CURRENCIES: Currency[] = [
     { code: 'VES', name: 'Bolívar Venezolano (VES Bs.D)' },
 ];
 
-export const MOCK_CONVERSATIONS: Conversation[] = [];
+// FIX: Add MOCK_CONVERSATIONS so it can be imported in AdminView
+export const MOCK_CONVERSATIONS: Conversation[] = [
+    {
+        id: 'conv-1',
+        customerName: 'Alice Johnson',
+        lastMessage: 'Perfect, thank you!',
+        lastMessageTimestamp: new Date(Date.now() - 10 * 60 * 1000),
+        unreadCount: 0,
+        messages: [
+            { id: 'msg-1-1', sender: 'customer', text: 'Hi, do you have any gluten-free options?', timestamp: new Date(Date.now() - 12 * 60 * 1000) },
+            { id: 'msg-1-2', sender: 'admin', text: 'Hello! Yes, our Avocado Toast can be made on gluten-free bread. The Chocolate Chip Cookies are also gluten-free.', timestamp: new Date(Date.now() - 11 * 60 * 1000) },
+            { id: 'msg-1-3', sender: 'customer', text: 'Perfect, thank you!', timestamp: new Date(Date.now() - 10 * 60 * 1000) },
+        ]
+    },
+    {
+        id: 'conv-2',
+        customerName: 'Bob Williams',
+        lastMessage: 'Can I place an order for pickup?',
+        lastMessageTimestamp: new Date(Date.now() - 2 * 60 * 1000),
+        unreadCount: 1,
+        messages: [
+            { id: 'msg-2-1', sender: 'customer', text: 'Can I place an order for pickup?', timestamp: new Date(Date.now() - 2 * 60 * 1000) },
+        ]
+    }
+];
 
 export const INITIAL_SETTINGS: AppSettings = {
     company: {
         name: 'ALTOQUE FOOD',
-        currency: { code: 'MXN', name: 'Peso Mexicano (MXN $)' },
+        currency: { code: 'USD', name: 'Dólar Estadounidense (USD $)' },
     },
     branch: {
         alias: 'ALTOQUE FOOD - Sucursal Principal',
@@ -99,8 +123,8 @@ export const INITIAL_SETTINGS: AppSettings = {
     payment: {
         deliveryMethods: ['Efectivo', 'Pago Móvil'],
         pickupMethods: ['Efectivo', 'Pago Móvil'],
-        showTipField: false,
-        pagoMovil: { bank: '', phone: '', idNumber: '' },
+        showTipField: true,
+        pagoMovil: { bank: '', phone: '', idNumber: '', accountNumber: '' },
         transfer: { bank: '', accountNumber: '', accountHolder: '', idNumber: '' },
         zelle: { email: '', holder: '' }
     },
