@@ -143,7 +143,7 @@ export default function CustomerView() {
                     `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
                     `🪑 Mesa: ${tableInfo?.table} (${tableInfo?.zone})`, `👤 Cliente: ${name}`, `--------------------------------`,
                     `💵 *TOTAL A PAGAR: $${sessionTotal.toFixed(2)}*`, `💳 Método: ${selectedPayment}`,
-                    paymentProof ? `✅ CAPTURA DE PAGO CARGADA (Se enviará ahora)` : `❌ Sin comprobante adjunto`, 
+                    paymentProof ? `✅ CAPTURA DE PAGO ADJUNTA (Se enviará ahora)` : `❌ Sin comprobante adjunto`, 
                     `_Cliente solicita la cuenta para retirarse._`
                 ].filter(Boolean).join('\n');
 
@@ -201,6 +201,8 @@ export default function CustomerView() {
             <p className="text-emerald-500 font-black uppercase tracking-widest text-xs">Cargando experiencia...</p>
         </div>
     );
+
+    const isBankPayment = ['Pago Móvil', 'Transferencia', 'Zelle'].includes(selectedPayment);
 
     return (
         <div className="bg-[#0f172a] min-h-screen text-gray-100 font-sans pb-safe selection:bg-emerald-500/30">
@@ -298,7 +300,7 @@ export default function CustomerView() {
                                 </div>
                             )}
 
-                            <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem] relative shadow-2xl">
+                            <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem] relative shadow-2xl overflow-hidden">
                                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0f172a] px-6 py-2 border border-gray-800 rounded-full z-10">
                                     <h3 className="text-[10px] font-black text-white uppercase tracking-[0.3em]">MÉTODO DE PAGO</h3>
                                 </div>
@@ -311,7 +313,7 @@ export default function CustomerView() {
                                     ))}
                                 </div>
 
-                                {selectedPayment !== 'Efectivo' && (
+                                {isBankPayment && (
                                     <div className="mt-4 p-5 bg-gray-900 rounded-3xl border border-emerald-500/30 space-y-4 animate-fade-in relative overflow-hidden group">
                                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500/0 via-emerald-500 to-emerald-500/0"></div>
                                         <div className="text-center">
@@ -330,7 +332,7 @@ export default function CustomerView() {
                                                     <div className="flex justify-between text-gray-400 border-b border-gray-700/50 pb-2"><span>Banco:</span><span className="font-bold text-white uppercase">{settings.payment.transfer.bank || 'No configurado'}</span></div>
                                                     <div className="flex flex-col items-start text-gray-400 border-b border-gray-700/50 pb-2">
                                                         <span>Cuenta:</span>
-                                                        <span className="font-mono text-white text-[10px] mt-1 break-all w-full text-left">{settings.payment.transfer.accountNumber || 'No configurado'}</span>
+                                                        <span className="font-mono text-white text-[10px] mt-1 break-all w-full text-left leading-tight">{settings.payment.transfer.accountNumber || 'No configurado'}</span>
                                                     </div>
                                                     <div className="flex justify-between text-gray-400 border-b border-gray-700/50 pb-2"><span>Titular:</span><span className="font-bold text-white uppercase">{settings.payment.transfer.accountHolder || 'No configurado'}</span></div>
                                                     <div className="flex justify-between text-gray-400"><span>Cédula/RIF:</span><span className="font-bold text-white uppercase">{settings.payment.transfer.idNumber || 'No configurado'}</span></div>
@@ -345,7 +347,7 @@ export default function CustomerView() {
                                             )}
                                         </div>
 
-                                        <div className="pt-4">
+                                        <div className="pt-2">
                                             <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-emerald-500/20 rounded-2xl cursor-pointer hover:bg-emerald-500/5 transition-all group overflow-hidden bg-gray-800/50">
                                                 {paymentProof ? (
                                                     <div className="flex flex-col items-center gap-2 animate-bounce">
@@ -353,9 +355,9 @@ export default function CustomerView() {
                                                         <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">¡CAPTURA LISTA!</span>
                                                     </div>
                                                 ) : (
-                                                    <div className="flex flex-col items-center text-gray-500 group-hover:text-emerald-400 transition-colors">
+                                                    <div className="flex flex-col items-center text-gray-500 group-hover:text-emerald-400 transition-colors px-4">
                                                         <IconUpload className="h-8 w-8 mb-2 opacity-50" />
-                                                        <span className="text-[9px] font-black uppercase tracking-widest">SUBIR CAPTURA DE PAGO</span>
+                                                        <span className="text-[9px] font-black uppercase tracking-widest text-center">SUBIR CAPTURA DE PAGO</span>
                                                     </div>
                                                 )}
                                                 <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
