@@ -189,20 +189,6 @@ export default function CustomerView() {
         const customer: Customer = { name, phone, address: addressData, paymentProof: paymentProof || undefined };
 
         try {
-            if (!isFinalClosing && cartItems.length > 0) {
-                const newOrderData: any = {
-                    customer, 
-                    items: cartItems, 
-                    total: finalTotal, // Use total with tip
-                    status: OrderStatus.Pending, 
-                    orderType,
-                    tableId: isTableSession ? `${tableInfo?.zone} - ${tableInfo?.table}` : undefined,
-                    paymentStatus: 'pending',
-                    tip: tipAmount
-                };
-                await saveOrder(newOrderData);
-            }
-
             if (isFinalClosing && isTableSession) {
                 // FLUJO CIERRE MESA
                 const msg = [
@@ -231,6 +217,20 @@ export default function CustomerView() {
 
             } else {
                 // FLUJO PEDIDO NUEVO / RONDA
+                if (cartItems.length > 0) {
+                    const newOrderData: any = {
+                        customer, 
+                        items: cartItems, 
+                        total: finalTotal,
+                        status: OrderStatus.Pending, 
+                        orderType,
+                        tableId: isTableSession ? `${tableInfo?.zone} - ${tableInfo?.table}` : undefined,
+                        paymentStatus: 'pending',
+                        tip: tipAmount
+                    };
+                    await saveOrder(newOrderData);
+                }
+
                 if (isTableSession) {
                     setSessionItems(prev => [...prev, ...cartItems]);
                     setCustomerName(name);
