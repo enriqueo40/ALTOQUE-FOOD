@@ -622,7 +622,11 @@ export default function CustomerView() {
                                 <h2 className="text-3xl font-black mb-2 text-white leading-none">{selectedProduct.name}</h2>
                                 <p className="text-gray-400 text-sm mb-8 leading-relaxed font-medium mt-4">{selectedProduct.description}</p>
                                 <button 
-                                    onClick={() => { addToCart(selectedProduct, 1); setSelectedProduct(null); }}
+                                    onClick={() => { 
+                                        const { price } = getDiscountedPrice(selectedProduct, allPromotions);
+                                        addToCart({ ...selectedProduct, price }, 1); 
+                                        setSelectedProduct(null); 
+                                    }}
                                     className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex justify-between px-8 items-center active:scale-95 transition-all shadow-xl shadow-emerald-900/40"
                                 >
                                     <span className="uppercase tracking-widest text-[10px]">Añadir a la Ronda</span>
