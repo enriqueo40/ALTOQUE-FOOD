@@ -202,9 +202,32 @@ export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt'>): Promise
         payment_status: order.paymentStatus || 'pending',
         tip: order.tip || 0
     };
-    const { data, error } = await getClient().from('orders').insert(payload).select().single();
-    if (error || !data) throw new Error(error?.message || 'Error saving order');
-    return { ...order, id: data.id, createdAt: new Date(data.created_at) } as Order;
+
+    // Try normal insert
+    try {
+        const { data, error } = await getClient().from('orders').insert(payload).select().single();
+        if (error) throw error;
+        return { ...order, id: data.id, createdAt: new Date(data.created_at) } as Order;
+    } catch (error: any) {
+        // Fallback: If 'tip' column is missing (PGRST204), retry without it
+        if (error.code === 'PGRST204' && (error.message?.includes('tip') || error.message?.includes('column'))) {
+            console.warn("Database schema mismatch: 'tip' column missing. Retrying save without 'tip'.");
+            const { tip, ...safePayload } = payload;
+            const { data: retryData, error: retryError } = await getClient().from('orders').insert(safePayload).select().single();
+            if (retryError) throw retryError;
+            return { ...order, id: retryData.id, createdAt: new Date(retryData.created_at) } as Order;
+        }
+        // Fallback: If 'payment_status' column is missing
+        if (error.code === 'PGRST204' && error.message?.includes('payment_status')) {
+             console.warn("Database schema mismatch: 'payment_status' column missing. Retrying save without it.");
+             const { payment_status, ...safePayload } = payload;
+             const { data: retryData, error: retryError } = await getClient().from('orders').insert(safePayload).select().single();
+             if (retryError) throw retryError;
+             return { ...order, id: retryData.id, createdAt: new Date(retryData.created_at) } as Order;
+        }
+        
+        throw new Error(error.message || 'Error saving order');
+    }
 };
 
 export const updateOrder = async (orderId: string, updates: Partial<Order>): Promise<void> => {
