@@ -65,6 +65,7 @@ export interface Order {
     paymentStatus?: PaymentStatus;
     paymentProof?: string;
     total: number;
+    tip?: number;
     createdAt: Date;
     branchId?: string;
     orderType?: OrderType;
