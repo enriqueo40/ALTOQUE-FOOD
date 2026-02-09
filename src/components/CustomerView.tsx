@@ -275,7 +275,7 @@ export default function CustomerView() {
             }
         } catch(e) {
             console.error("Error al procesar el pedido:", e);
-            alert("Error al procesar el pedido.");
+            alert("Error al procesar el pedido. Intenta de nuevo.");
         }
     };
 
