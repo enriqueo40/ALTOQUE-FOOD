@@ -36,7 +36,7 @@ export const IconAnalytics: React.FC<{ className?: string }> = ({ className }) =
 export const IconEdit: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" className={className} />;
 export const IconPencil: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" className={className} />;
 export const IconDuplicate: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.5a1.125 1.125 0 011.125-1.125h7.5a3.375 3.375 0 013.375 3.375z" className={className} />;
-export const IconSparkles: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM18.259 15.315L18 14.25l-.259 1.065a3.375 3.375 0 00-2.455 2.456L14.25 18l1.036.259a3.375 3.375 0 002.455 2.456L18 21.75l.259-1.035a3.375 3.375 0 002.456-2.456L21.75 18l-1.035-.259a3.375 3.375 0 00-2.456-2.456z" className={className} />;
+export const IconSparkles: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" className={className} />;
 export const IconSend: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" className={className} />;
 export const IconExternalLink: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" className={className} />;
 export const IconCalendar: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0h18" className={className} />;
@@ -75,17 +75,18 @@ export const CURRENCIES: Currency[] = [
     { code: 'USD', name: 'Dólar Estadounidense (USD $)' },
     { code: 'MXN', name: 'Peso Mexicano (MXN $)' },
     { code: 'EUR', name: 'Euro (EUR €)' },
+    { code: 'VES', name: 'Bolívar Venezolano (VES Bs.D)' },
 ];
 
 export const MOCK_CONVERSATIONS: Conversation[] = [];
 
 export const INITIAL_SETTINGS: AppSettings = {
     company: {
-        name: 'ANYVAL PARK',
+        name: 'ALTOQUE FOOD',
         currency: { code: 'MXN', name: 'Peso Mexicano (MXN $)' },
     },
     branch: {
-        alias: 'ANYVAL PARK - Suc.',
+        alias: 'ALTOQUE FOOD - Sucursal Principal',
         fullAddress: '',
         googleMapsLink: '',
         whatsappNumber: '584146945877',
@@ -101,8 +102,8 @@ export const INITIAL_SETTINGS: AppSettings = {
         pickupTime: { min: 15 },
     },
     payment: {
-        deliveryMethods: ['Efectivo'],
-        pickupMethods: ['Efectivo'],
+        deliveryMethods: ['Efectivo', 'Pago Móvil'],
+        pickupMethods: ['Efectivo', 'Pago Móvil'],
         showTipField: false,
         pagoMovil: { bank: '', phone: '', idNumber: '' },
         transfer: { bank: '', accountNumber: '', accountHolder: '', idNumber: '' },
