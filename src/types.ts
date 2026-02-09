@@ -201,6 +201,7 @@ export interface PagoMovilDetails {
     bank: string;
     phone: string;
     idNumber: string; // C.I. or RIF
+    accountNumber?: string;
 }
 
 export interface TransferDetails {

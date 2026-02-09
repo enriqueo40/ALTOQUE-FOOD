@@ -300,7 +300,7 @@ export default function CustomerView() {
                                 </div>
                             )}
 
-                            <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem] relative shadow-2xl overflow-hidden">
+                            <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem] relative shadow-2xl">
                                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0f172a] px-6 py-2 border border-gray-800 rounded-full z-10">
                                     <h3 className="text-[10px] font-black text-white uppercase tracking-[0.3em]">MÉTODO DE PAGO</h3>
                                 </div>
@@ -323,7 +323,8 @@ export default function CustomerView() {
                                                 <div className="space-y-2 text-xs bg-gray-800/40 p-4 rounded-2xl border border-gray-700">
                                                     <div className="flex justify-between text-gray-400 border-b border-gray-700/50 pb-2"><span>Banco:</span><span className="font-bold text-white uppercase">{settings.payment.pagoMovil.bank || 'No configurado'}</span></div>
                                                     <div className="flex justify-between text-gray-400 border-b border-gray-700/50 pb-2"><span>Teléfono:</span><span className="font-bold text-white font-mono">{settings.payment.pagoMovil.phone || 'No configurado'}</span></div>
-                                                    <div className="flex justify-between text-gray-400"><span>Cédula/RIF:</span><span className="font-bold text-white uppercase">{settings.payment.pagoMovil.idNumber || 'No configurado'}</span></div>
+                                                    <div className="flex justify-between text-gray-400 border-b border-gray-700/50 pb-2"><span>Cédula/RIF:</span><span className="font-bold text-white uppercase">{settings.payment.pagoMovil.idNumber || 'No configurado'}</span></div>
+                                                    {settings.payment.pagoMovil.accountNumber && <div className="flex flex-col items-start text-gray-400"><span>Cuenta:</span><span className="font-mono text-white text-[10px] mt-1 break-all w-full text-left leading-tight">{settings.payment.pagoMovil.accountNumber}</span></div>}
                                                 </div>
                                             )}
 
