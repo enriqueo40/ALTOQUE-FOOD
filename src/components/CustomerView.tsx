@@ -165,7 +165,7 @@ export default function CustomerView() {
             const reader = new FileReader();
             reader.onload = (res) => {
                 setPaymentProof(res.target?.result as string);
-                alert("Comprobante cargado correctamente.");
+                alert("Captura de pago cargada con éxito.");
             };
             reader.readAsDataURL(file);
         }
@@ -522,50 +522,59 @@ export default function CustomerView() {
                             {(isFinalClosing || !isTableSession) && (
                                 <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem] overflow-hidden relative">
                                     <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-4">MÉTODO DE PAGO</h3>
-                                    <div className="grid grid-cols-1 gap-3">
+                                    <div className="grid grid-cols-1 gap-2">
                                         {['Efectivo', 'Pago Móvil', 'Transferencia', 'Zelle'].map(m => (
-                                            <label key={m} className={`flex justify-between items-center p-4 bg-gray-800/50 border rounded-xl cursor-pointer transition-all ${selectedPayment === m ? 'border-emerald-500 bg-emerald-500/10' : 'border-gray-700'}`}>
-                                                <span className="text-sm font-bold text-gray-200">{m}</span>
-                                                <input type="radio" name="payment" value={m} checked={selectedPayment === m} onChange={() => { setSelectedPayment(m as any); setPaymentProof(null); }} className="accent-emerald-500 h-5 w-5" />
+                                            <label key={m} className={`flex justify-between items-center p-4 bg-gray-800/50 border rounded-xl cursor-pointer transition-all ${selectedPayment === m ? 'border-emerald-500 bg-emerald-500/10' : 'border-gray-700 hover:border-gray-500'}`}>
+                                                <span className="text-sm font-bold text-gray-300">{m}</span>
+                                                <input 
+                                                    type="radio" 
+                                                    name="payment" 
+                                                    value={m} 
+                                                    checked={selectedPayment === m}
+                                                    onChange={() => { setSelectedPayment(m as PaymentMethod); setPaymentProof(null); }}
+                                                    className="accent-emerald-500 h-5 w-5" 
+                                                />
                                             </label>
                                         ))}
                                     </div>
                                     
                                     {isBankPayment && (
-                                        <div className="mt-4 p-5 bg-gray-900 rounded-2xl border border-gray-700 space-y-4 animate-fade-in">
-                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center border-b border-gray-800 pb-2">DATOS DE PAGO</p>
+                                        <div className="mt-4 p-5 bg-gray-900 rounded-2xl border border-gray-700 space-y-4 animate-fade-in relative overflow-hidden">
+                                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent opacity-50"></div>
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center border-b border-gray-800 pb-2 mb-2">DATOS PARA EL PAGO</p>
                                             
                                             {selectedPayment === 'Pago Móvil' && settings.payment.pagoMovil && (
                                                 <div className="space-y-2 text-xs">
-                                                    <div className="flex justify-between"><span className="text-gray-500">Banco:</span><span className="font-bold text-white uppercase">{settings.payment.pagoMovil.bank}</span></div>
-                                                    <div className="flex justify-between"><span className="text-gray-500">Teléfono:</span><span className="font-bold text-white font-mono text-base">{settings.payment.pagoMovil.phone}</span></div>
-                                                    <div className="flex justify-between"><span className="text-gray-500">C.I./RIF:</span><span className="font-bold text-white uppercase">{settings.payment.pagoMovil.idNumber}</span></div>
+                                                    <div className="flex justify-between"><span className="text-gray-500">Banco:</span><span className="font-bold text-white uppercase">{settings.payment.pagoMovil.bank || '---'}</span></div>
+                                                    <div className="flex justify-between"><span className="text-gray-500">Teléfono:</span><span className="font-bold text-white font-mono text-sm">{settings.payment.pagoMovil.phone || '---'}</span></div>
+                                                    <div className="flex justify-between"><span className="text-gray-500">C.I./RIF:</span><span className="font-bold text-white uppercase">{settings.payment.pagoMovil.idNumber || '---'}</span></div>
                                                 </div>
                                             )}
                                             {selectedPayment === 'Transferencia' && settings.payment.transfer && (
                                                 <div className="space-y-2 text-xs">
-                                                    <div className="flex justify-between"><span className="text-gray-500">Banco:</span><span className="font-bold text-white uppercase">{settings.payment.transfer.bank}</span></div>
-                                                    <div className="flex justify-between"><span className="text-gray-500">Cuenta:</span><span className="font-bold text-white font-mono text-[10px] break-all text-right">{settings.payment.transfer.accountNumber}</span></div>
-                                                    <div className="flex justify-between"><span className="text-gray-500">Titular:</span><span className="font-bold text-white uppercase">{settings.payment.transfer.accountHolder}</span></div>
-                                                    <div className="flex justify-between"><span className="text-gray-500">RIF:</span><span className="font-bold text-white uppercase">{settings.payment.transfer.idNumber}</span></div>
+                                                    <div className="flex justify-between"><span className="text-gray-500">Banco:</span><span className="font-bold text-white uppercase">{settings.payment.transfer.bank || '---'}</span></div>
+                                                    <div className="flex justify-between items-start"><span className="text-gray-500">Cuenta:</span><span className="font-bold text-white font-mono text-[10px] text-right break-all">{settings.payment.transfer.accountNumber || '---'}</span></div>
+                                                    <div className="flex justify-between"><span className="text-gray-500">Titular:</span><span className="font-bold text-white uppercase">{settings.payment.transfer.accountHolder || '---'}</span></div>
+                                                    <div className="flex justify-between"><span className="text-gray-500">RIF:</span><span className="font-bold text-white uppercase">{settings.payment.transfer.idNumber || '---'}</span></div>
                                                 </div>
                                             )}
                                             {selectedPayment === 'Zelle' && settings.payment.zelle && (
                                                 <div className="space-y-2 text-xs">
-                                                    <div className="flex justify-between"><span className="text-gray-500">Correo:</span><span className="font-bold text-white">{settings.payment.zelle.email}</span></div>
-                                                    <div className="flex justify-between"><span className="text-gray-500">Titular:</span><span className="font-bold text-white uppercase">{settings.payment.zelle.holder}</span></div>
+                                                    <div className="flex justify-between"><span className="text-gray-500">Correo:</span><span className="font-bold text-white">{settings.payment.zelle.email || '---'}</span></div>
+                                                    <div className="flex justify-between"><span className="text-gray-500">Titular:</span><span className="font-bold text-white uppercase">{settings.payment.zelle.holder || '---'}</span></div>
                                                 </div>
                                             )}
 
-                                            <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:bg-gray-800 transition-colors mt-4">
+                                            <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:bg-gray-800 transition-colors mt-6 bg-black/20">
                                                 {paymentProof ? (
-                                                    <div className="flex items-center gap-2 text-emerald-400">
-                                                        <IconCheck className="h-5 w-5"/> <span className="text-xs font-bold uppercase">Comprobante Listo</span>
+                                                    <div className="flex flex-col items-center gap-1 text-emerald-400 animate-bounce">
+                                                        <IconCheck className="h-6 w-6"/> 
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider">¡Comprobante Listo!</span>
                                                     </div>
                                                 ) : (
-                                                    <div className="flex flex-col items-center text-gray-500">
-                                                        <IconUpload className="h-6 w-6 mb-1"/>
-                                                        <span className="text-[10px] font-bold uppercase">Subir Captura</span>
+                                                    <div className="flex flex-col items-center text-gray-500 hover:text-white transition-colors">
+                                                        <IconUpload className="h-6 w-6 mb-1 opacity-70"/>
+                                                        <span className="text-[9px] font-bold uppercase tracking-widest">Toca para subir captura</span>
                                                     </div>
                                                 )}
                                                 <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
