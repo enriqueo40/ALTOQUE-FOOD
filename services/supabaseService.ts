@@ -393,7 +393,8 @@ export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created
         order_type: order.orderType || null,      
         table_id: order.tableId || null,          
         general_comments: order.generalComments || null, 
-        payment_status: order.paymentStatus || 'pending' 
+        payment_status: order.paymentStatus || 'pending',
+        tip: order.tip || 0
     };
 
     const { error } = await getClient().from('orders').insert(dbOrderPayload);
@@ -428,7 +429,8 @@ export const getActiveOrders = async (): Promise<Order[]> => {
         tableId: o.table_id,
         generalComments: o.general_comments,
         paymentStatus: o.payment_status,
-        paymentProof: o.customer?.paymentProof 
+        paymentProof: o.customer?.paymentProof,
+        tip: o.tip
     })) as Order[];
 };
 
@@ -459,43 +461,29 @@ export const subscribeToNewOrders = (
     }
     
     ordersChannel = client.channel('orders-channel');
+    const transform = (order: any) => ({
+        id: order.id,
+        customer: order.customer,
+        items: order.items,
+        status: order.status,
+        total: order.total,
+        createdAt: new Date(order.created_at),
+        branchId: order.branch_id,
+        orderType: order.order_type,
+        tableId: order.table_id,
+        generalComments: order.general_comments,
+        paymentStatus: order.payment_status,
+        paymentProof: order.customer?.paymentProof,
+        tip: order.tip
+    });
+    
     ordersChannel
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-             const newOrder = payload.new;
-             const transformed = {
-                id: newOrder.id,
-                customer: newOrder.customer,
-                items: newOrder.items,
-                status: newOrder.status,
-                total: newOrder.total,
-                createdAt: new Date(newOrder.created_at),
-                branchId: newOrder.branch_id,
-                orderType: newOrder.order_type,
-                tableId: newOrder.table_id,
-                generalComments: newOrder.general_comments,
-                paymentStatus: newOrder.payment_status,
-                paymentProof: newOrder.customer?.paymentProof
-             };
-            onInsert(transformed);
+             onInsert(transform(payload.new));
         })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
             if (onUpdate) {
-                 const updatedOrder = payload.new;
-                 const transformed = {
-                    id: updatedOrder.id,
-                    customer: updatedOrder.customer,
-                    items: updatedOrder.items,
-                    status: updatedOrder.status,
-                    total: updatedOrder.total,
-                    createdAt: new Date(updatedOrder.created_at),
-                    branchId: updatedOrder.branch_id,
-                    orderType: updatedOrder.order_type,
-                    tableId: updatedOrder.table_id,
-                    generalComments: updatedOrder.general_comments,
-                    paymentStatus: updatedOrder.payment_status,
-                    paymentProof: updatedOrder.customer?.paymentProof
-                 };
-                onUpdate(transformed);
+                onUpdate(transform(payload.new));
             }
         })
         .subscribe();
