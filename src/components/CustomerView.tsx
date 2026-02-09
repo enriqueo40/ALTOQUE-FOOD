@@ -274,6 +274,7 @@ export default function CustomerView() {
                 setView('confirmation');
             }
         } catch(e) {
+            console.error("Error al procesar el pedido:", e);
             alert("Error al procesar el pedido.");
         }
     };
