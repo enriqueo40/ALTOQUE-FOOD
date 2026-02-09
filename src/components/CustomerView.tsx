@@ -88,10 +88,11 @@ export default function CustomerView() {
         return sessionItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     }, [sessionItems]);
 
+    // El total final incluye la propina seleccionada + (el total de la sesión actual o el carrito actual)
+    const baseTotal = isFinalClosing ? sessionTotal : cartTotal;
     const finalTotal = useMemo(() => {
-        const base = isFinalClosing ? sessionTotal : cartTotal;
-        return base + tipAmount;
-    }, [isFinalClosing, sessionTotal, cartTotal, tipAmount]);
+        return baseTotal + tipAmount;
+    }, [baseTotal, tipAmount]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -142,16 +143,40 @@ export default function CustomerView() {
         const phone = fd.get('phone') as string || '';
 
         try {
+            // Guardamos la orden en Supabase, incluyendo la propina
+            if (!isFinalClosing) {
+                const orderData: any = {
+                    customer: { 
+                        name, 
+                        phone, 
+                        address: { 
+                            calle: fd.get('calle') as string, 
+                            numero: fd.get('numero') as string, 
+                            colonia: fd.get('colonia') as string 
+                        },
+                        paymentProof: paymentProof
+                    },
+                    items: cartItems,
+                    total: finalTotal, // Guardamos el total CON propina
+                    status: OrderStatus.Pending,
+                    paymentStatus: 'pending',
+                    orderType: orderType,
+                    tableId: tableInfo ? `${tableInfo.zone} - ${tableInfo.table}` : undefined,
+                    tip: tipAmount // Guardamos la propina explícitamente
+                };
+                await saveOrder(orderData);
+            }
+
             if (isFinalClosing && isTableSession) {
                 // CIERRE DE CUENTA
                 const msg = [
                     `💰 *SOLICITUD DE CIERRE DE CUENTA*`,
                     `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
                     `🪑 Mesa: ${tableInfo?.table} (${tableInfo?.zone})`, `👤 Cliente: ${name}`, `--------------------------------`,
-                    `💵 Subtotal: $${sessionTotal.toFixed(2)}`,
+                    `💵 Subtotal Consumo: $${sessionTotal.toFixed(2)}`,
                     tipAmount > 0 ? `✨ Propina: $${tipAmount.toFixed(2)}` : '',
                     `⭐ *TOTAL A PAGAR: $${finalTotal.toFixed(2)}*`, `💳 Método: ${selectedPayment}`,
-                    paymentProof ? `✅ CAPTURA DE PAGO ADJUNTA (Se enviará ahora)` : `❌ Sin comprobante adjunto`, 
+                    paymentProof ? `✅ CAPTURA DE PAGO ADJUNTA` : `❌ Sin comprobante adjunto`, 
                     `_Cliente solicita la cuenta para retirarse._`
                 ].filter(Boolean).join('\n');
 
@@ -176,11 +201,11 @@ export default function CustomerView() {
                         `🧾 *🔥 NUEVA RONDA A COCINA*`,
                         `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
                         `🪑 MESA: ${tableInfo!.table} (${tableInfo!.zone})`, `👤 Cliente: ${name}`, `--------------------------------`, itemsStr, `--------------------------------`,
-                        `💰 Ronda Actual: $${cartTotal.toFixed(2)}`,
+                        `💰 Subtotal Ronda: $${cartTotal.toFixed(2)}`,
                         tipAmount > 0 ? `✨ Propina Ronda: $${tipAmount.toFixed(2)}` : '',
                         `💵 *Total Ronda + Propina: $${finalTotal.toFixed(2)}*`,
-                        (sessionItems.length > 0) ? `📈 *Total Acumulado Mesa: $${(sessionTotal + finalTotal).toFixed(2)}*` : '',
-                        paymentProof ? `✅ Comprobante de pago cargado` : ''
+                        (sessionItems.length > 0) ? `📈 *Total Acumulado Mesa (Previo): $${sessionTotal.toFixed(2)}*` : '',
+                        paymentProof ? `✅ Comprobante cargado` : ''
                     ].filter(Boolean).join('\n');
                     
                     setSessionItems(prev => [...prev, ...cartItems]);
@@ -190,8 +215,10 @@ export default function CustomerView() {
                         `👤 Cliente: ${name}`, `📱 Tel: ${phone}`,
                         orderType === OrderType.Delivery ? `🏠 Dir: ${fd.get('calle')} #${fd.get('numero')}, ${fd.get('colonia')}` : '',
                         `--------------------------------`, itemsStr, `--------------------------------`,
+                        `💰 Subtotal: $${cartTotal.toFixed(2)}`,
                         tipAmount > 0 ? `✨ Propina: $${tipAmount.toFixed(2)}` : '',
-                        `💰 *Total Pedido: $${finalTotal.toFixed(2)}*`, `💳 Método: ${selectedPayment}`,
+                        `💵 *TOTAL A PAGAR: $${finalTotal.toFixed(2)}*`, 
+                        `💳 Método: ${selectedPayment}`,
                         paymentProof ? `✅ Comprobante de pago cargado` : ''
                     ].filter(Boolean).join('\n');
                 }
@@ -317,9 +344,9 @@ export default function CustomerView() {
                                     <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">¿DESEAS AGREGAR PROPINA?</h3>
                                     <div className="grid grid-cols-4 gap-2">
                                         {[0, 5, 10, 15].map(p => {
-                                            const amount = (isFinalClosing ? sessionTotal : cartTotal) * (p / 100);
+                                            const amount = baseTotal * (p / 100);
                                             return (
-                                                <button key={p} type="button" onClick={() => setTipAmount(amount)} className={`py-3 rounded-xl text-xs font-bold transition-all border ${tipAmount === amount ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400'}`}>
+                                                <button key={p} type="button" onClick={() => setTipAmount(amount)} className={`py-3 rounded-xl text-xs font-bold transition-all border ${Math.abs(tipAmount - amount) < 0.1 && (p !== 0 || tipAmount === 0) ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400'}`}>
                                                     {p}%
                                                 </button>
                                             );
@@ -333,7 +360,7 @@ export default function CustomerView() {
                             )}
 
                             <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem] relative shadow-2xl overflow-hidden">
-                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0f172a] px-6 py-2 border border-gray-800 rounded-full z-10">
+                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0f172a] px-6 py-2 border border-gray-800 rounded-full z-10 shadow-lg">
                                     <h3 className="text-[10px] font-black text-white uppercase tracking-[0.3em]">MÉTODO DE PAGO</h3>
                                 </div>
                                 <div className="grid grid-cols-1 gap-2 pt-4">
@@ -352,20 +379,20 @@ export default function CustomerView() {
                                             <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-4">DATOS BANCARIOS</p>
                                             
                                             {selectedPayment === 'Pago Móvil' && settings.payment.pagoMovil && (
-                                                <div className="space-y-2 text-xs bg-gray-800/40 p-4 rounded-2xl border border-gray-700">
+                                                <div className="space-y-2 text-xs bg-gray-800/40 p-4 rounded-2xl border border-gray-700 text-left">
                                                     <div className="flex justify-between text-gray-400 border-b border-gray-700/50 pb-2"><span>Banco:</span><span className="font-bold text-white uppercase">{settings.payment.pagoMovil.bank || 'No configurado'}</span></div>
                                                     <div className="flex justify-between text-gray-400 border-b border-gray-700/50 pb-2"><span>Teléfono:</span><span className="font-bold text-white font-mono">{settings.payment.pagoMovil.phone || 'No configurado'}</span></div>
                                                     <div className="flex justify-between text-gray-400 border-b border-gray-700/50 pb-2"><span>Cédula/RIF:</span><span className="font-bold text-white uppercase">{settings.payment.pagoMovil.idNumber || 'No configurado'}</span></div>
-                                                    {settings.payment.pagoMovil.accountNumber && <div className="flex flex-col items-start text-gray-400"><span>Cuenta:</span><span className="font-mono text-white text-[10px] mt-1 break-all w-full text-left leading-tight">{settings.payment.pagoMovil.accountNumber}</span></div>}
+                                                    {settings.payment.pagoMovil.accountNumber && <div className="flex flex-col items-start text-gray-400"><span>Cuenta:</span><span className="font-mono text-white text-[10px] mt-1 break-all w-full leading-tight">{settings.payment.pagoMovil.accountNumber}</span></div>}
                                                 </div>
                                             )}
 
                                             {selectedPayment === 'Transferencia' && settings.payment.transfer && (
-                                                <div className="space-y-2 text-xs bg-gray-800/40 p-4 rounded-2xl border border-gray-700">
+                                                <div className="space-y-2 text-xs bg-gray-800/40 p-4 rounded-2xl border border-gray-700 text-left">
                                                     <div className="flex justify-between text-gray-400 border-b border-gray-700/50 pb-2"><span>Banco:</span><span className="font-bold text-white uppercase">{settings.payment.transfer.bank || 'No configurado'}</span></div>
                                                     <div className="flex flex-col items-start text-gray-400 border-b border-gray-700/50 pb-2">
                                                         <span>Cuenta:</span>
-                                                        <span className="font-mono text-white text-[10px] mt-1 break-all w-full text-left leading-tight">{settings.payment.transfer.accountNumber || 'No configurado'}</span>
+                                                        <span className="font-mono text-white text-[10px] mt-1 break-all w-full leading-tight">{settings.payment.transfer.accountNumber || 'No configurado'}</span>
                                                     </div>
                                                     <div className="flex justify-between text-gray-400 border-b border-gray-700/50 pb-2"><span>Titular:</span><span className="font-bold text-white uppercase">{settings.payment.transfer.accountHolder || 'No configurado'}</span></div>
                                                     <div className="flex justify-between text-gray-400"><span>Cédula/RIF:</span><span className="font-bold text-white uppercase">{settings.payment.transfer.idNumber || 'No configurado'}</span></div>
@@ -373,7 +400,7 @@ export default function CustomerView() {
                                             )}
 
                                             {selectedPayment === 'Zelle' && settings.payment.zelle && (
-                                                <div className="space-y-2 text-xs bg-gray-800/40 p-4 rounded-2xl border border-gray-700">
+                                                <div className="space-y-2 text-xs bg-gray-800/40 p-4 rounded-2xl border border-gray-700 text-left">
                                                     <div className="flex justify-between text-gray-400 border-b border-gray-700/50 pb-2"><span>Correo:</span><span className="font-bold text-white font-mono">{settings.payment.zelle.email || 'No configurado'}</span></div>
                                                     <div className="flex justify-between text-gray-400"><span>Titular:</span><span className="font-bold text-white uppercase">{settings.payment.zelle.holder || 'No configurado'}</span></div>
                                                 </div>
@@ -401,9 +428,21 @@ export default function CustomerView() {
                             </div>
 
                             <div className="pt-8 px-2 space-y-4">
-                                <div className="flex justify-between font-black text-2xl px-2">
-                                    <span className="text-gray-500 text-[10px] tracking-[0.4em] uppercase self-center">TOTAL RONDA</span>
-                                    <span className="text-emerald-400 text-4xl font-black">${(isFinalClosing ? sessionTotal : cartTotal).toFixed(2)}</span>
+                                <div className="space-y-1">
+                                    <div className="flex justify-between px-2 text-gray-500 text-[10px] font-black uppercase tracking-widest">
+                                        <span>SUBTOTAL</span>
+                                        <span>${baseTotal.toFixed(2)}</span>
+                                    </div>
+                                    {tipAmount > 0 && (
+                                        <div className="flex justify-between px-2 text-emerald-500 text-[10px] font-black uppercase tracking-widest">
+                                            <span>PROPINA</span>
+                                            <span>${tipAmount.toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between font-black text-2xl px-2 pt-2 border-t border-gray-800 mt-2">
+                                        <span className="text-white text-[10px] tracking-[0.4em] uppercase self-center">TOTAL FINAL</span>
+                                        <span className="text-emerald-400 text-4xl font-black">${finalTotal.toFixed(2)}</span>
+                                    </div>
                                 </div>
                                 <button type="submit" className="w-full bg-[#10b981] hover:bg-[#059669] py-5 rounded-2xl font-black text-white flex items-center justify-center gap-4 active:scale-95 transition-all text-xs uppercase tracking-[0.2em] shadow-[0_10px_40px_-10px_rgba(16,185,129,0.5)] border-t border-white/10">
                                     <IconWhatsapp className="h-5 w-5" /> REALIZAR PEDIDO

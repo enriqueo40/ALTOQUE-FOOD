@@ -190,13 +190,17 @@ export const saveZoneLayout = async (zone: Zone): Promise<void> => {
 // --- Orders Functions ---
 export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt'>): Promise<Order> => {
     const payload = {
-        customer: order.customer,
+        customer: {
+            ...order.customer,
+            paymentProof: order.paymentProof 
+        },
         items: order.items,
         status: order.status,
         total: order.total,
         order_type: order.orderType,
         table_id: order.tableId,
-        payment_status: order.paymentStatus || 'pending'
+        payment_status: order.paymentStatus || 'pending',
+        tip: order.tip || 0 // Add tip to payload
     };
     const { data, error } = await getClient().from('orders').insert(payload).select().single();
     if (error || !data) throw new Error(error?.message || 'Error saving order');
@@ -213,7 +217,7 @@ export const getActiveOrders = async (): Promise<Order[]> => {
     const { data } = await getClient().from('orders').select('*').neq('status', 'Cancelled').order('created_at', { ascending: false });
     return (data || []).map((o: any) => ({
         id: o.id, customer: o.customer, items: o.items, status: o.status, total: o.total, createdAt: new Date(o.created_at),
-        orderType: o.order_type, tableId: o.table_id, paymentStatus: o.payment_status
+        orderType: o.order_type, tableId: o.table_id, paymentStatus: o.payment_status, tip: o.tip
     })) as Order[];
 };
 
@@ -223,7 +227,7 @@ export const subscribeToNewOrders = (onInsert: (o: Order) => void, onUpdate?: (o
     ordersChannel = client.channel('orders-channel');
     const transform = (o: any) => ({
         id: o.id, customer: o.customer, items: o.items, status: o.status, total: o.total, createdAt: new Date(o.created_at),
-        orderType: o.order_type, tableId: o.table_id, paymentStatus: o.payment_status
+        orderType: o.order_type, tableId: o.table_id, paymentStatus: o.payment_status, tip: o.tip
     }) as Order;
     ordersChannel
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (p) => onInsert(transform(p.new)))
