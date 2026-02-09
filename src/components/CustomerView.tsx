@@ -298,14 +298,13 @@ export default function CustomerView() {
                                 </div>
                             )}
 
-                            <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem] relative">
-                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0f172a] px-6 py-2 border border-gray-800 rounded-full z-10 shadow-lg">
-                                    <h3 className="text-[10px] font-black text-white uppercase tracking-[0.3em]">CONFIRMAR</h3>
+                            <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem] relative shadow-2xl">
+                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0f172a] px-6 py-2 border border-gray-800 rounded-full z-10">
+                                    <h3 className="text-[10px] font-black text-white uppercase tracking-[0.3em]">MÉTODO DE PAGO</h3>
                                 </div>
-                                <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] pt-4">MÉTODO DE PAGO</h3>
-                                <div className="grid grid-cols-1 gap-2">
+                                <div className="grid grid-cols-1 gap-2 pt-4">
                                     {['Efectivo', 'Pago Móvil', 'Transferencia', 'Zelle'].map(m => (
-                                        <label key={m} className={`flex justify-between items-center p-4 bg-gray-800/50 border rounded-xl cursor-pointer transition-all ${selectedPayment === m ? 'border-emerald-500 bg-emerald-500/10' : 'border-gray-700 hover:border-gray-500'}`}>
+                                        <label key={m} className={`flex justify-between items-center p-4 bg-gray-800/50 border rounded-xl cursor-pointer transition-all ${selectedPayment === m ? 'border-emerald-500 bg-emerald-500/10' : 'border-gray-700'}`}>
                                             <span className="text-sm font-bold text-gray-300">{m}</span>
                                             <input type="radio" name="payment" value={m} checked={selectedPayment === m} onChange={() => { setSelectedPayment(m as any); setPaymentProof(null); }} className="accent-emerald-500 h-5 w-5" />
                                         </label>
@@ -313,8 +312,9 @@ export default function CustomerView() {
                                 </div>
 
                                 {selectedPayment !== 'Efectivo' && (
-                                    <div className="mt-4 p-5 bg-gray-900 rounded-3xl border border-emerald-500/30 space-y-4 animate-fade-in shadow-2xl relative overflow-hidden">
-                                        <div className="text-center relative z-10">
+                                    <div className="mt-4 p-5 bg-gray-900 rounded-3xl border border-emerald-500/30 space-y-4 animate-fade-in relative overflow-hidden group">
+                                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500/0 via-emerald-500 to-emerald-500/0"></div>
+                                        <div className="text-center">
                                             <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-4">DATOS BANCARIOS</p>
                                             
                                             {selectedPayment === 'Pago Móvil' && settings.payment.pagoMovil && (
@@ -345,17 +345,17 @@ export default function CustomerView() {
                                             )}
                                         </div>
 
-                                        <div className="pt-4 relative z-10">
-                                            <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-emerald-500/20 rounded-2xl cursor-pointer hover:bg-emerald-500/5 transition-all group overflow-hidden bg-gray-800/50">
+                                        <div className="pt-4">
+                                            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-emerald-500/20 rounded-2xl cursor-pointer hover:bg-emerald-500/5 transition-all group overflow-hidden bg-gray-800/50">
                                                 {paymentProof ? (
                                                     <div className="flex flex-col items-center gap-2 animate-bounce">
                                                         <div className="bg-emerald-500/20 p-2 rounded-full"><IconCheck className="h-6 w-6 text-emerald-500"/></div>
                                                         <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">¡CAPTURA LISTA!</span>
                                                     </div>
                                                 ) : (
-                                                    <div className="flex flex-col items-center text-gray-500 group-hover:text-emerald-400 transition-colors px-4">
+                                                    <div className="flex flex-col items-center text-gray-500 group-hover:text-emerald-400 transition-colors">
                                                         <IconUpload className="h-8 w-8 mb-2 opacity-50" />
-                                                        <span className="text-[9px] font-black uppercase tracking-widest text-center">SUBIR CAPTURA DE PAGO</span>
+                                                        <span className="text-[9px] font-black uppercase tracking-widest">SUBIR CAPTURA DE PAGO</span>
                                                     </div>
                                                 )}
                                                 <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
