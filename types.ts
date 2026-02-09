@@ -210,12 +210,18 @@ export interface TransferDetails {
     idNumber: string; // C.I. or RIF
 }
 
+export interface ZelleDetails {
+    email: string;
+    holder: string;
+}
+
 export interface PaymentSettings {
   deliveryMethods: PaymentMethod[];
   pickupMethods: PaymentMethod[];
   showTipField: boolean;
   pagoMovil?: PagoMovilDetails;
   transfer?: TransferDetails;
+  zelle?: ZelleDetails;
 }
 
 export interface TimeRange {
