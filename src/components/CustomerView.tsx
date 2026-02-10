@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, PaymentMethod, OrderType, Personalization, Promotion, PersonalizationOption, Schedule, ShippingCostType } from '../types';
 import { useCart } from '../hooks/useCart';
@@ -178,6 +177,8 @@ export default function CustomerView() {
         const fd = new FormData(e.currentTarget);
         const name = fd.get('name') as string || customerName;
         const phone = fd.get('phone') as string || '';
+        // FIX: Read referenceNumber from form data
+        const referenceNumber = fd.get('referenceNumber') as string || '';
         const addressData = {
             calle: fd.get('calle') as string,
             numero: fd.get('numero') as string,
@@ -186,7 +187,8 @@ export default function CustomerView() {
             googleMapsLink: fd.get('googleMapsLink') as string
         };
 
-        const customer: Customer = { name, phone, address: addressData, paymentProof: paymentProof || undefined };
+        // FIX: Include referenceNumber in the customer object
+        const customer: Customer = { name, phone, address: addressData, paymentProof: paymentProof || undefined, referenceNumber: referenceNumber || undefined };
 
         try {
             if (!isFinalClosing) {
@@ -214,7 +216,8 @@ export default function CustomerView() {
                     `💵 Subtotal: $${sessionTotal.toFixed(2)}`,
                     tipAmount > 0 ? `✨ Propina: $${tipAmount.toFixed(2)}` : '',
                     `⭐ *TOTAL A PAGAR: $${finalTotal.toFixed(2)}*`, `💳 Método: ${selectedPayment}`,
-                    paymentProof ? `✅ Comprobante adjunto` : '', 
+                    // FIX: Include referenceNumber in WhatsApp message
+                    paymentProof ? `✅ Comprobante adjunto (Ref: ${referenceNumber})` : '', 
                     `_Cliente solicita la cuenta para retirarse._`
                 ].filter(Boolean).join('\n');
 
@@ -250,7 +253,8 @@ export default function CustomerView() {
                         tipAmount > 0 ? `✨ Propina Ronda: $${tipAmount.toFixed(2)}` : '',
                         `💵 *Total Ronda + Propina: $${finalTotal.toFixed(2)}*`,
                         (sessionItems.length > 0) ? `📈 *Total Acumulado Mesa: $${(sessionTotal + cartTotal).toFixed(2)}*` : '',
-                        paymentProof ? `✅ Comprobante adjunto` : ''
+                        // FIX: Include referenceNumber in WhatsApp message
+                        paymentProof ? `✅ Comprobante adjunto (Ref: ${referenceNumber})` : ''
                     ].filter(Boolean).join('\n');
                 } else {
                     msg = [
@@ -265,7 +269,8 @@ export default function CustomerView() {
                         tipAmount > 0 ? `✨ Propina: $${tipAmount.toFixed(2)}` : '',
                         `💵 *TOTAL A PAGAR: $${finalTotal.toFixed(2)}*`, 
                         `💳 Método: ${selectedPayment}`,
-                        paymentProof ? `✅ Comprobante adjunto` : ''
+                        // FIX: Include referenceNumber in WhatsApp message
+                        paymentProof ? `✅ Comprobante adjunto (Ref: ${referenceNumber})` : ''
                     ].filter(Boolean).join('\n');
                 }
 
@@ -565,6 +570,18 @@ export default function CustomerView() {
                                                 <div className="flex justify-between"><span className="text-gray-500">Titular:</span><span className="font-bold text-white uppercase">{settings.payment.zelle.holder || '---'}</span></div>
                                             </div>
                                         )}
+
+                                        <div className="mt-4">
+                                            <label htmlFor="referenceNumber" className="block text-sm font-medium text-gray-400 mb-1">Nro. de Referencia</label>
+                                            <input
+                                                id="referenceNumber"
+                                                name="referenceNumber"
+                                                type="text"
+                                                required={!!paymentProof}
+                                                className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white"
+                                                placeholder="Ej: 00123456"
+                                            />
+                                        </div>
 
                                         <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:bg-gray-800 transition-colors mt-6 bg-black/20">
                                             {paymentProof ? (

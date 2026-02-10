@@ -382,10 +382,7 @@ export const saveZoneLayout = async (zone: Zone): Promise<void> => {
 // --- Orders Functions (Real-time) ---
 export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created_at'>): Promise<void> => {
     const dbOrderPayload = {
-        customer: {
-            ...order.customer,
-            paymentProof: order.paymentProof 
-        },
+        customer: order.customer,
         items: order.items,
         status: order.status,
         total: order.total,
@@ -429,7 +426,6 @@ export const getActiveOrders = async (): Promise<Order[]> => {
         tableId: o.table_id,
         generalComments: o.general_comments,
         paymentStatus: o.payment_status,
-        paymentProof: o.customer?.paymentProof,
         tip: o.tip
     })) as Order[];
 };
@@ -441,7 +437,6 @@ export const updateOrder = async (orderId: string, updates: Partial<Order>): Pro
     if (updates.tableId) { dbUpdates.table_id = updates.tableId; delete dbUpdates.tableId; }
     if (updates.generalComments) { dbUpdates.general_comments = updates.generalComments; delete dbUpdates.generalComments; }
     if (updates.paymentStatus) { dbUpdates.payment_status = updates.paymentStatus; delete dbUpdates.paymentStatus; }
-    if (updates.paymentProof) { delete dbUpdates.paymentProof; } 
     
     const { error } = await getClient().from('orders').update(dbUpdates).eq('id', orderId);
     if (error) {
@@ -473,7 +468,6 @@ export const subscribeToNewOrders = (
         tableId: order.table_id,
         generalComments: order.general_comments,
         paymentStatus: order.payment_status,
-        paymentProof: order.customer?.paymentProof,
         tip: order.tip
     });
     

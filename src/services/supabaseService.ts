@@ -1,4 +1,3 @@
-
 import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 import { Product, Category, Personalization, Promotion, PersonalizationOption, Zone, Table, AppSettings, Order } from '../types';
 import { INITIAL_SETTINGS } from '../constants';
@@ -190,10 +189,8 @@ export const saveZoneLayout = async (zone: Zone): Promise<void> => {
 // --- Orders Functions ---
 export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt'>): Promise<Order> => {
     const payload = {
-        customer: {
-            ...order.customer,
-            paymentProof: order.paymentProof 
-        },
+        // FIX: The customer object already contains the payment proof. No need for a faulty merge.
+        customer: order.customer,
         items: order.items,
         status: order.status,
         total: order.total,
@@ -220,7 +217,7 @@ export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt'>): Promise
         // Fallback: If 'payment_status' column is missing
         if (error.code === 'PGRST204' && error.message?.includes('payment_status')) {
              console.warn("Database schema mismatch: 'payment_status' column missing. Retrying save without it.");
-             const { payment_status, ...safePayload } = payload;
+             const { payment_status, ...safePayload } = payload as any;
              const { data: retryData, error: retryError } = await getClient().from('orders').insert(safePayload).select().single();
              if (retryError) throw retryError;
              return { ...order, id: retryData.id, createdAt: new Date(retryData.created_at) } as Order;

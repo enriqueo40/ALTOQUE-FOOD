@@ -55,6 +55,7 @@ export interface Customer {
     phone: string;
     address: Address;
     paymentProof?: string;
+    referenceNumber?: string;
 }
 
 export interface Order {
@@ -63,7 +64,6 @@ export interface Order {
     customer: Customer;
     status: OrderStatus;
     paymentStatus?: PaymentStatus;
-    paymentProof?: string;
     total: number;
     tip?: number;
     createdAt: Date;
