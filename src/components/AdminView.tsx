@@ -367,14 +367,14 @@ const EmptyOrdersView: React.FC<{ onNewOrderClick: () => void }> = ({ onNewOrder
     </div>
 );
 
-const OrderCard: React.FC<{ order: Order; onClick: () => void }> = ({ order, onClick }) => (
+const OrderCard: React.FC<{ order: Order; onClick: () => void; currencySymbol: string }> = ({ order, onClick, currencySymbol }) => (
     <div onClick={onClick} className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm border p-4 cursor-pointer hover:shadow-md transition-all ${order.status === OrderStatus.Pending ? 'border-yellow-400 ring-1 ring-yellow-400/20' : 'border-gray-200 dark:border-gray-700'}`}>
         <div className="flex justify-between mb-2">
             <span className="font-bold text-gray-900 dark:text-gray-100">{order.customer.name}</span>
             <span className="text-xs text-gray-500">#{order.id.slice(0, 4)}</span>
         </div>
         <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-            {order.items.length} items • ${order.total.toFixed(2)}
+            {order.items.length} items • {currencySymbol}{order.total.toFixed(2)}
         </div>
         <div className="flex justify-between items-center text-xs">
             <TimeAgo date={order.createdAt} className="text-gray-400"/>
@@ -383,7 +383,7 @@ const OrderCard: React.FC<{ order: Order; onClick: () => void }> = ({ order, onC
     </div>
 );
 
-const OrdersKanbanBoard: React.FC<{ orders: Order[], onOrderClick: (order: Order) => void }> = ({ orders, onOrderClick }) => {
+const OrdersKanbanBoard: React.FC<{ orders: Order[], onOrderClick: (order: Order) => void, currencySymbol: string }> = ({ orders, onOrderClick, currencySymbol }) => {
     const columns = [
         { status: OrderStatus.Pending, title: 'Nuevos' },
         { status: OrderStatus.Confirmed, title: 'Confirmados' },
@@ -398,7 +398,7 @@ const OrdersKanbanBoard: React.FC<{ orders: Order[], onOrderClick: (order: Order
                 <div key={col.status} className="w-72 flex-shrink-0 flex flex-col">
                     <div className="font-bold text-gray-700 dark:text-gray-200 mb-2 px-2">{col.title}</div>
                     <div className="flex-1 overflow-y-auto space-y-3 pr-2">
-                        {orders.filter(o => o.status === col.status).map(o => <OrderCard key={o.id} order={o} onClick={() => onOrderClick(o)} />)}
+                        {orders.filter(o => o.status === col.status).map(o => <OrderCard key={o.id} order={o} onClick={() => onOrderClick(o)} currencySymbol={currencySymbol} />)}
                     </div>
                 </div>
             ))}
@@ -406,7 +406,7 @@ const OrdersKanbanBoard: React.FC<{ orders: Order[], onOrderClick: (order: Order
     );
 };
 
-const OrderListView: React.FC<{ orders: Order[], onOrderClick: (order: Order) => void }> = ({ orders, onOrderClick }) => (
+const OrderListView: React.FC<{ orders: Order[], onOrderClick: (order: Order) => void, currencySymbol: string }> = ({ orders, onOrderClick, currencySymbol }) => (
     <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg border dark:border-gray-700 overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-900/50">
@@ -424,7 +424,7 @@ const OrderListView: React.FC<{ orders: Order[], onOrderClick: (order: Order) =>
                         <td className="px-6 py-4 text-sm font-medium">#{o.id.slice(0,6)}</td>
                         <td className="px-6 py-4 text-sm">{o.customer.name}</td>
                         <td className="px-6 py-4"><OrderStatusBadge status={o.status}/></td>
-                        <td className="px-6 py-4 text-sm font-bold">${o.total.toFixed(2)}</td>
+                        <td className="px-6 py-4 text-sm font-bold">{currencySymbol}{o.total.toFixed(2)}</td>
                         <td className="px-6 py-4 text-sm"><TimeAgo date={o.createdAt}/></td>
                     </tr>
                 ))}
@@ -433,7 +433,7 @@ const OrderListView: React.FC<{ orders: Order[], onOrderClick: (order: Order) =>
     </div>
 );
 
-const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
+const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; currencySymbol: string }> = ({ isOpen, onClose, currencySymbol }) => {
     const [customerName, setCustomerName] = useState('');
     const { cartItems, addToCart, clearCart, cartTotal } = useCart();
     const [products, setProducts] = useState<Product[]>([]);
@@ -462,12 +462,12 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
                     {products.map(p => (
                         <div key={p.id} onClick={() => addToCart(p)} className="p-2 border rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
                             <div className="font-bold">{p.name}</div>
-                            <div>${p.price}</div>
+                            <div className="font-bold text-emerald-600 text-sm">{currencySymbol}{p.price}</div>
                         </div>
                     ))}
                 </div>
                 <div className="border-t pt-4 flex justify-between items-center">
-                    <span className="font-bold text-xl">Total: ${cartTotal.toFixed(2)} ({cartItems.length} items)</span>
+                    <span className="font-bold text-xl">Total: {currencySymbol}{cartTotal.toFixed(2)} ({cartItems.length} items)</span>
                     <div className="flex gap-2">
                         <button onClick={onClose} className="px-4 py-2 border rounded">Cancelar</button>
                         <button onClick={handleCreate} className="px-4 py-2 bg-emerald-600 text-white rounded">Crear</button>
@@ -478,7 +478,7 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
     );
 };
 
-const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onUpdateStatus: (id: string, status: OrderStatus) => void; onUpdatePayment: (id: string, status: PaymentStatus) => void }> = ({ order, onClose, onUpdateStatus, onUpdatePayment }) => {
+const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onUpdateStatus: (id: string, status: OrderStatus) => void; onUpdatePayment: (id: string, status: PaymentStatus) => void; currencySymbol: string }> = ({ order, onClose, onUpdateStatus, onUpdatePayment, currencySymbol }) => {
     if (!order) return null;
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -490,14 +490,14 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                 <div className="mb-4">
                     <p><strong>Cliente:</strong> {order.customer.name}</p>
                     <p><strong>Tel:</strong> {order.customer.phone}</p>
-                    <p><strong>Total:</strong> ${order.total.toFixed(2)}</p>
+                    <p><strong>Total:</strong> {currencySymbol}{order.total.toFixed(2)}</p>
                     {order.customer.address.googleMapsLink && <a href={order.customer.address.googleMapsLink} target="_blank" className="text-blue-500 underline">Ver mapa</a>}
                 </div>
                 <div className="mb-4 bg-gray-50 dark:bg-gray-700 p-2 rounded max-h-40 overflow-auto">
                     {order.items.map((i, idx) => (
                         <div key={idx} className="flex justify-between text-sm mb-1">
                             <span>{i.quantity}x {i.name}</span>
-                            <span>${(i.price * i.quantity).toFixed(2)}</span>
+                            <span className="font-semibold text-gray-700 dark:text-gray-300">{currencySymbol}{(i.price * i.quantity).toFixed(2)}</span>
                         </div>
                     ))}
                 </div>
@@ -737,7 +737,7 @@ const ShareView: React.FC<{ onGoToTableSettings: () => void }> = ({ onGoToTableS
 
 // --- Order Management ---
 
-const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettingsClick }) => {
+const OrderManagement: React.FC<{ onSettingsClick: () => void, currencySymbol: string }> = ({ onSettingsClick, currencySymbol }) => {
     const [orders, setOrders] = useState<Order[]>([]);
     const [activeTab, setActiveTab] = useState('panel-pedidos');
     const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
@@ -839,7 +839,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                         {orders.length === 0 ? (
                              <EmptyOrdersView onNewOrderClick={() => setIsNewOrderModalOpen(true)} />
                         ) : (
-                            viewMode === 'board' ? <OrdersKanbanBoard orders={orders} onOrderClick={setSelectedOrder} /> : <OrderListView orders={orders} onOrderClick={setSelectedOrder} />
+                            viewMode === 'board' ? <OrdersKanbanBoard orders={orders} onOrderClick={setSelectedOrder} currencySymbol={currencySymbol} /> : <OrderListView orders={orders} onOrderClick={setSelectedOrder} currencySymbol={currencySymbol} />
                         )}
                     </div>
                 );
@@ -868,8 +868,8 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                 </nav>
             </div>
              <div className="mt-6 flex-1">{renderContent()}</div>
-            <NewOrderModal isOpen={isNewOrderModalOpen} onClose={() => setIsNewOrderModalOpen(false)} />
-            <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} onUpdateStatus={updateOrderStatus} onUpdatePayment={updatePaymentStatus} />
+            <NewOrderModal isOpen={isNewOrderModalOpen} onClose={() => setIsNewOrderModalOpen(false)} currencySymbol={currencySymbol} />
+            <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} onUpdateStatus={updateOrderStatus} onUpdatePayment={updatePaymentStatus} currencySymbol={currencySymbol} />
         </div>
     );
 };
@@ -908,17 +908,18 @@ const AdminView: React.FC = () => {
     };
 
     const renderPage = () => {
+        const currentCurrencySymbol = settings?.company.currency.symbol || '$';
         switch (currentPage) {
             case 'dashboard': 
                 // Inyectamos el símbolo de la moneda en el Dashboard
-                return <Dashboard currencySymbol={settings?.company.currency.symbol || '$'} />;
+                return <Dashboard currencySymbol={currentCurrencySymbol} />;
             case 'products': return <MenuManagement />;
-            case 'orders': return <OrderManagement onSettingsClick={openTableSettings} />;
+            case 'orders': return <OrderManagement onSettingsClick={openTableSettings} currencySymbol={currentCurrencySymbol} />;
             case 'analytics': return <Analytics />;
             case 'messages': return <Messages />;
             case 'availability': return <AvailabilityView />;
             case 'share': return <ShareView onGoToTableSettings={openTableSettings}/>;
-            default: return <Dashboard currencySymbol={settings?.company.currency.symbol || '$'} />;
+            default: return <Dashboard currencySymbol={currentCurrencySymbol} />;
         }
     };
 
