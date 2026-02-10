@@ -511,7 +511,7 @@ export default function CustomerView() {
                                         {[0, 5, 10, 15].map(p => {
                                             const amount = baseTotal * (p / 100);
                                             return (
-                                                <button key={p} type="button" onClick={() => setTipAmount(amount)} className={`py-3 rounded-xl text-xs font-bold transition-all border ${Math.abs(tipAmount - amount) < 0.01 ? 'bg-emerald-50 border-emerald-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400'}`}>
+                                                <button key={p} type="button" onClick={() => setTipAmount(amount)} className={`py-3 rounded-xl text-xs font-bold transition-all border ${Math.abs(tipAmount - amount) < 0.01 ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400'}`}>
                                                     {p}%
                                                 </button>
                                             );
@@ -624,9 +624,7 @@ export default function CustomerView() {
                                 <p className="text-gray-400 text-sm mb-8 leading-relaxed font-medium mt-4">{selectedProduct.description}</p>
                                 <button 
                                     onClick={() => { 
-                                        // REPARACIÓN LÓGICA: Calculamos el precio con descuento real en el momento del clic
                                         const { price: finalPrice } = getDiscountedPrice(selectedProduct, allPromotions);
-                                        // Inyectamos el precio calculado para que useCart use el valor correcto de la oferta
                                         addToCart({ ...selectedProduct, price: finalPrice }, 1); 
                                         setSelectedProduct(null); 
                                     }}
