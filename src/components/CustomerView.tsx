@@ -98,7 +98,6 @@ export default function CustomerView() {
         return foundCurrency ? foundCurrency.symbol : '$';
     }, [settings]);
 
-
     const isTableSession = !!tableInfo;
 
     const sessionTotal = useMemo(() => {
@@ -204,7 +203,7 @@ export default function CustomerView() {
         try {
             if (!isFinalClosing) {
                 if (cartItems.length > 0) {
-                    const newOrderData: Omit<Order, 'id' | 'createdAt'> = {
+                    const newOrderData: any = {
                         customer, 
                         items: cartItems, 
                         total: finalTotal,
@@ -219,6 +218,7 @@ export default function CustomerView() {
             }
 
             if (isFinalClosing && isTableSession) {
+                // FLUJO CIERRE MESA
                 const msg = [
                     `💰 *SOLICITUD DE CIERRE DE CUENTA*`,
                     `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
@@ -226,7 +226,7 @@ export default function CustomerView() {
                     `💵 Subtotal: ${currencyDisplay}${sessionTotal.toFixed(2)}`,
                     tipAmount > 0 ? `✨ Propina: ${currencyDisplay}${tipAmount.toFixed(2)}` : '',
                     `⭐ *TOTAL A PAGAR: ${currencyDisplay}${finalTotal.toFixed(2)}*`, `💳 Método: ${selectedPayment}`,
-                    paymentProof ? '✅ Comprobante adjunto' : '', 
+                    paymentProof ? `✅ Comprobante adjunto` : '', 
                     `_Cliente solicita la cuenta para retirarse._`
                 ].filter(Boolean).join('\n');
 
@@ -244,6 +244,7 @@ export default function CustomerView() {
                 setView('confirmation');
 
             } else {
+                // FLUJO PEDIDO NUEVO / RONDA
                 if (isTableSession) {
                     setSessionItems(prev => [...prev, ...cartItems]);
                     setCustomerName(name);
@@ -261,7 +262,7 @@ export default function CustomerView() {
                         tipAmount > 0 ? `✨ Propina Ronda: ${currencyDisplay}${tipAmount.toFixed(2)}` : '',
                         `💵 *Total Ronda + Propina: ${currencyDisplay}${finalTotal.toFixed(2)}*`,
                         (sessionItems.length > 0) ? `📈 *Total Acumulado Mesa: ${currencyDisplay}${(sessionTotal + cartTotal).toFixed(2)}*` : '',
-                        paymentProof ? '✅ Comprobante adjunto' : ''
+                        paymentProof ? `✅ Comprobante adjunto` : ''
                     ].filter(Boolean).join('\n');
                 } else {
                     msg = [
@@ -276,7 +277,7 @@ export default function CustomerView() {
                         tipAmount > 0 ? `✨ Propina: ${currencyDisplay}${tipAmount.toFixed(2)}` : '',
                         `💵 *TOTAL A PAGAR: ${currencyDisplay}${finalTotal.toFixed(2)}*`, 
                         `💳 Método: ${selectedPayment}`,
-                        paymentProof ? '✅ Comprobante adjunto' : ''
+                        paymentProof ? `✅ Comprobante adjunto` : ''
                     ].filter(Boolean).join('\n');
                 }
 

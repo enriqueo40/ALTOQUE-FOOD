@@ -908,36 +908,4 @@ const AdminView: React.FC = () => {
     };
 
     const renderPage = () => {
-        const currentCurrencySymbol = settings?.company.currency.symbol || '$';
-        switch (currentPage) {
-            case 'dashboard': 
-                // Inyectamos el símbolo de la moneda en el Dashboard
-                return <Dashboard currencySymbol={currentCurrencySymbol} />;
-            case 'products': return <MenuManagement />;
-            case 'orders': return <OrderManagement onSettingsClick={openTableSettings} currencySymbol={currentCurrencySymbol} />;
-            case 'analytics': return <Analytics />;
-            case 'messages': return <Messages />;
-            case 'availability': return <AvailabilityView />;
-            case 'share': return <ShareView onGoToTableSettings={openTableSettings}/>;
-            default: return <Dashboard currencySymbol={currentCurrencySymbol} />;
-        }
-    };
-
-    if (!settings) return null;
-
-    return (
-        <div className="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-200 overflow-hidden transition-colors duration-200">
-            <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} whatsappNumber={settings.branch.whatsappNumber} />
-            <div className="flex-1 flex flex-col min-w-0">
-                <Header title={PAGE_TITLES[currentPage]} onSettingsClick={() => setIsSettingsOpen(true)} onPreviewClick={() => {}} theme={theme} toggleTheme={toggleTheme} />
-                <main className="flex-1 overflow-auto p-8 bg-gray-50 dark:bg-gray-900/50">
-                    <div className="max-w-7xl mx-auto">{renderPage()}</div>
-                </main>
-            </div>
-            {isZoneEditorOpen && zoneToEdit && <ZoneEditor initialZone={zoneToEdit} onSave={handleSaveZoneLayout} onExit={() => { setIsZoneEditorOpen(false); setZoneToEdit(null); setIsSettingsOpen(true); }} />}
-            <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} onEditZoneLayout={handleEditZoneLayout} />
-        </div>
-    );
-};
-
-export default AdminView;
+        const currentCurrencySymbol = settings?.company
