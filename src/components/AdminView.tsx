@@ -160,7 +160,7 @@ const TimeAgo: React.FC<{ date: Date; className?: string }> = ({ date, className
 
 // --- Pages and Views ---
 
-const Dashboard: React.FC = () => {
+const Dashboard: React.FC<{ currencySymbol: string }> = ({ currencySymbol }) => {
     const [orders, setOrders] = useState<Order[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     
@@ -196,15 +196,15 @@ const Dashboard: React.FC = () => {
                 />
             </div>
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <DashboardStatCard title="Ventas" value={`$${totalSales.toFixed(2)}`} secondaryValue={`$${previousDaySales.toFixed(2)}`} />
+                <DashboardStatCard title="Ventas" value={`${currencySymbol}${totalSales.toFixed(2)}`} secondaryValue={`${currencySymbol}${previousDaySales.toFixed(2)}`} />
                 <DashboardStatCard title="Pedidos" value={totalOrders.toString()} secondaryValue={previousDayOrders.toString()} />
                 <DashboardStatCard title="Envíos" value={totalEnvios.toString()} secondaryValue={"0"} />
-                <DashboardStatCard title="Propinas" value={`$${totalPropinas.toFixed(2)}`} secondaryValue={"$0.00"} />
+                <DashboardStatCard title="Propinas" value={`${currencySymbol}${totalPropinas.toFixed(2)}`} secondaryValue={`${currencySymbol}0.00`} />
 
                 <div className="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 lg:col-span-2">
                     <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-4">Ticket promedio</h4>
                     <div className="h-48 flex items-center justify-center">
-                        <div className="text-4xl font-bold text-gray-300 dark:text-gray-600">${totalOrders > 0 ? (totalSales / totalOrders).toFixed(2) : '0.00'}</div>
+                        <div className="text-4xl font-bold text-gray-300 dark:text-gray-600">{currencySymbol}{totalOrders > 0 ? (totalSales / totalOrders).toFixed(2) : '0.00'}</div>
                     </div>
                 </div>
                 <div className="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 lg:col-span-2">
@@ -909,14 +909,16 @@ const AdminView: React.FC = () => {
 
     const renderPage = () => {
         switch (currentPage) {
-            case 'dashboard': return <Dashboard />;
+            case 'dashboard': 
+                // Inyectamos el símbolo de la moneda en el Dashboard
+                return <Dashboard currencySymbol={settings?.company.currency.symbol || '$'} />;
             case 'products': return <MenuManagement />;
             case 'orders': return <OrderManagement onSettingsClick={openTableSettings} />;
             case 'analytics': return <Analytics />;
             case 'messages': return <Messages />;
             case 'availability': return <AvailabilityView />;
             case 'share': return <ShareView onGoToTableSettings={openTableSettings}/>;
-            default: return <Dashboard />;
+            default: return <Dashboard currencySymbol={settings?.company.currency.symbol || '$'} />;
         }
     };
 

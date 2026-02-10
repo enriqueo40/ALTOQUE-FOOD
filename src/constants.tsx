@@ -1,10 +1,8 @@
 
 import React from 'react';
-// FIX: Add Conversation type to be used in MOCK_CONVERSATIONS
 import { AppSettings, Conversation, Currency, DiscountType, OrderType, PaymentMethod, PrintingMethod, PromotionAppliesTo, ShippingCostType } from './types';
 
 // SVG Icon Components
-// Fix: Added optional title prop for accessibility/tooltips.
 export const IconComponent: React.FC<{ d: string; className?: string; title?: string }> = ({ d, className = "h-6 w-6", title }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
         {title && <title>{title}</title>}
