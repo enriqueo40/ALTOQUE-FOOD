@@ -603,7 +603,7 @@ export default function CustomerView() {
                                 </div>
                                 <button type="submit" disabled={!isFinalClosing && cartItems.length === 0} className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex items-center justify-center gap-4 active:scale-95 transition-all text-xs uppercase tracking-[0.2em] shadow-2xl shadow-emerald-900/30 disabled:opacity-50 disabled:cursor-not-allowed">
                                     <IconWhatsapp className="h-5 w-5" /> 
-                                    {isFinalClosing ? 'ENVIAR COMPROBANTE' : 'REALIZAR PEDIDO'}
+                                    {isFinalClosing ? 'ENVIAR COMPROBANTE' : (isTableSession ? 'ENVIAR A COCINA' : 'REALIZAR PEDIDO')}
                                 </button>
                             </div>
                         </form> 
