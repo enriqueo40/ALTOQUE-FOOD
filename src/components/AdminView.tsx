@@ -367,6 +367,45 @@ const EmptyOrdersView: React.FC<{ onNewOrderClick: () => void }> = ({ onNewOrder
     </div>
 );
 
+{/* FIX: Define OrderCard component to resolve reference error and adapt to use currencySymbol prop */}
+const OrderCard: React.FC<{ order: Order; onClick: () => void; currencySymbol: string }> = ({ order, onClick, currencySymbol }) => (
+    <div onClick={onClick} className={`group relative bg-white dark:bg-gray-800 rounded-xl shadow-sm border p-4 cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5 ${order.status === OrderStatus.Pending ? 'border-yellow-400 ring-1 ring-yellow-400/20' : 'border-gray-200 dark:border-gray-700'}`}>
+        <div className="flex justify-between items-start mb-3">
+            <div className="flex items-center gap-2">
+                 <span className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${order.orderType === OrderType.Delivery ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' : 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300'}`}>
+                    {order.orderType === OrderType.Delivery ? <IconDelivery className="h-4 w-4"/> : <IconStore className="h-4 w-4"/>}
+                 </span>
+                 <div>
+                     <p className="font-bold text-gray-900 dark:text-gray-100 leading-tight">{order.customer.name}</p>
+                     <p className="text-xs text-gray-500 dark:text-gray-400">#{order.id.slice(0, 4)}</p>
+                 </div>
+            </div>
+            <div className="text-right">
+                <p className="font-bold text-emerald-600 dark:text-emerald-400">{currencySymbol}{order.total.toFixed(2)}</p>
+                <TimeAgo date={order.createdAt} className="text-xs block"/>
+            </div>
+        </div>
+        
+        <div className="space-y-1 mb-4">
+            {order.items.slice(0, 3).map((item, i) => (
+                <div key={i} className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
+                    <span className="flex-1 truncate"><span className="font-bold text-gray-800 dark:text-gray-200">{item.quantity}x</span> {item.name}</span>
+                </div>
+            ))}
+            {order.items.length > 3 && <p className="text-xs text-gray-400 italic">+ {order.items.length - 3} más...</p>}
+        </div>
+
+        <div className="flex justify-between items-center pt-3 border-t dark:border-gray-700">
+             <span className={`text-xs font-semibold px-2 py-0.5 rounded ${order.paymentStatus === 'paid' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}`}>
+                 {order.paymentStatus === 'paid' ? 'PAGADO' : 'PENDIENTE'}
+             </span>
+             <button className="opacity-0 group-hover:opacity-100 transition-opacity text-emerald-600 text-sm font-bold flex items-center hover:underline">
+                 Ver detalles <IconArrowLeft className="h-3 w-3 rotate-180 ml-1"/>
+             </button>
+        </div>
+    </div>
+);
+
 const OrdersKanbanBoard: React.FC<{ orders: Order[], onOrderClick: (order: Order) => void, currencySymbol: string }> = ({ orders, onOrderClick, currencySymbol }) => {
     const columns = [
         { status: OrderStatus.Pending, title: 'Nuevos' },
