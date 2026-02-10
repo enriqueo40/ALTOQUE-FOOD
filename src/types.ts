@@ -1,3 +1,4 @@
+
 export interface Product {
     id: string;
     name: string;
@@ -54,8 +55,6 @@ export interface Customer {
     phone: string;
     address: Address;
     paymentProof?: string;
-    // FIX: Added referenceNumber to the Customer interface to handle payment references.
-    referenceNumber?: string;
 }
 
 export interface Order {
@@ -64,6 +63,7 @@ export interface Order {
     customer: Customer;
     status: OrderStatus;
     paymentStatus?: PaymentStatus;
+    paymentProof?: string;
     total: number;
     tip?: number;
     createdAt: Date;
