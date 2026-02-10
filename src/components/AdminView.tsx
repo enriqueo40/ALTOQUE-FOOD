@@ -367,22 +367,6 @@ const EmptyOrdersView: React.FC<{ onNewOrderClick: () => void }> = ({ onNewOrder
     </div>
 );
 
-const OrderCard: React.FC<{ order: Order; onClick: () => void; currencySymbol: string }> = ({ order, onClick, currencySymbol }) => (
-    <div onClick={onClick} className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm border p-4 cursor-pointer hover:shadow-md transition-all ${order.status === OrderStatus.Pending ? 'border-yellow-400 ring-1 ring-yellow-400/20' : 'border-gray-200 dark:border-gray-700'}`}>
-        <div className="flex justify-between mb-2">
-            <span className="font-bold text-gray-900 dark:text-gray-100">{order.customer.name}</span>
-            <span className="text-xs text-gray-500">#{order.id.slice(0, 4)}</span>
-        </div>
-        <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-            {order.items.length} items • {currencySymbol}{order.total.toFixed(2)}
-        </div>
-        <div className="flex justify-between items-center text-xs">
-            <TimeAgo date={order.createdAt} className="text-gray-400"/>
-            <span className={`px-2 py-0.5 rounded ${order.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>{order.paymentStatus === 'paid' ? 'PAGADO' : 'PENDIENTE'}</span>
-        </div>
-    </div>
-);
-
 const OrdersKanbanBoard: React.FC<{ orders: Order[], onOrderClick: (order: Order) => void, currencySymbol: string }> = ({ orders, onOrderClick, currencySymbol }) => {
     const columns = [
         { status: OrderStatus.Pending, title: 'Nuevos' },
@@ -908,4 +892,35 @@ const AdminView: React.FC = () => {
     };
 
     const renderPage = () => {
-        const currentCurrencySymbol = settings?.company
+        const currentCurrencySymbol = settings?.company.currency.symbol || '$';
+        switch (currentPage) {
+            case 'dashboard': 
+                return <Dashboard currencySymbol={currentCurrencySymbol} />;
+            case 'products': return <MenuManagement />;
+            case 'orders': return <OrderManagement onSettingsClick={openTableSettings} currencySymbol={currentCurrencySymbol} />;
+            case 'analytics': return <Analytics />;
+            case 'messages': return <Messages />;
+            case 'availability': return <AvailabilityView />;
+            case 'share': return <ShareView onGoToTableSettings={openTableSettings}/>;
+            default: return <Dashboard currencySymbol={currentCurrencySymbol} />;
+        }
+    };
+
+    if (!settings) return null;
+
+    return (
+        <div className="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-200 overflow-hidden transition-colors duration-200">
+            <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} whatsappNumber={settings.branch.whatsappNumber} />
+            <div className="flex-1 flex flex-col min-w-0">
+                <Header title={PAGE_TITLES[currentPage]} onSettingsClick={() => setIsSettingsOpen(true)} onPreviewClick={() => {}} theme={theme} toggleTheme={toggleTheme} />
+                <main className="flex-1 overflow-auto p-8 bg-gray-50 dark:bg-gray-900/50">
+                    <div className="max-w-7xl mx-auto">{renderPage()}</div>
+                </main>
+            </div>
+            {isZoneEditorOpen && zoneToEdit && <ZoneEditor initialZone={zoneToEdit} onSave={handleSaveZoneLayout} onExit={() => { setIsZoneEditorOpen(false); setZoneToEdit(null); setIsSettingsOpen(true); }} />}
+            <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} onEditZoneLayout={handleEditZoneLayout} />
+        </div>
+    );
+};
+
+export default AdminView;

@@ -34,7 +34,7 @@ export const IconLogout: React.FC<{ className?: string }> = ({ className }) => <
 export const IconSearch: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" className={className} />;
 export const IconBell: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.31 6.032 23.848 23.848 0 005.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" className={className} />;
 export const IconEdit: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" className={className} />;
-export const IconToggleOn: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M3.75 12a8.25 8.25 0 1016.5 0 8.25 8.25 0 00-16.5 0zM12 18.75a.75.75 0 100-1.5.75.75 0 000 1.5zM12 18.75a.75.75 0 100-1.5.75.75 0 000 1.5zM3.75 12a8.25 8.25 0 1016.5 0 8.25 8.25 0 00-16.5 0z" className={className} />;
+export const IconToggleOn: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M3.75 12a8.25 8.25 0 1016.5 0 8.25 8.25 0 00-16.5 0zM12 18.75a.75.75 0 100-1.5.75.75 0 000 1.5z" className={className} />;
 export const IconToggleOff: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M12 9.75a.75.75 0 100-1.5.75.75 0 000 1.5zm0 2.25a.75.75 0 100-1.5.75.75 0 000 1.5zM12 15a.75.75 0 100-1.5.75.75 0 000 1.5zM3.75 12a8.25 8.25 0 1016.5 0 8.25 8.25 0 00-16.5 0z" className={className} />;
 export const IconMoreVertical: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" className={className} />;
 export const IconArrowUp: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.517l2.74-1.22m0 0l-3.75-2.25M21 12l-2.25-3.75" className={className} />;
@@ -53,7 +53,6 @@ export const IconGripVertical: React.FC<{ className?: string }> = ({ className }
 export const IconPencil: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" className={className} />;
 export const IconPercent: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M9.548 3.452a.75.75 0 010 1.096l-6 7.5a.75.75 0 11-1.096-1.096l6-7.5a.75.75 0 011.096 0zM15 7.5a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-2.25 6a2.25 2.25 0 100 4.5 2.25 2.25 0 000-4.5z" className={className} />;
 export const IconTag: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M12.586 2.586a2 2 0 00-2.828 0L7.172 5.172a2 2 0 000 2.828l4.242 4.242a2 2 0 002.828 0l2.586-2.586a2 2 0 000-2.828l-4.242-4.242zM14.5 9.5a1 1 0 11-2 0 1 1 0 012 0z" className={className} />;
-// Fix: Added optional title prop to fix type error.
 export const IconInfo: React.FC<{ className?: string; title?: string }> = ({ className, title }) => <IconComponent d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" className={className} title={title} />;
 export const IconLogoutAlt: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m-3 0l3-3m0 0l-3-3m3 3H9" className={className} />;
 export const IconSun: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M12 3v2.25m6.364.364l-1.591 1.591M21 12h-2.25m-.364 6.364l-1.591-1.591M12 18.75V21m-6.364-.364l1.591-1.591M3 12h2.25m.364-6.364l1.591 1.591M12 12a4.5 4.5 0 100-9 4.5 4.5 0 000 9z" className={className} />;
@@ -76,19 +75,17 @@ export const IconKey: React.FC<{ className?: string }> = ({ className }) => <Ico
 export const IconVolumeUp: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" className={className} />;
 export const IconVolumeOff: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" className={className} />;
 
-
 export const CURRENCIES: Currency[] = [
     { code: 'USD', name: 'Dólar Estadounidense (USD $)', symbol: '$' },
     { code: 'MXN', name: 'Peso Mexicano (MXN $)', symbol: '$' },
     { code: 'EUR', name: 'Euro (EUR €)', symbol: '€' },
     { code: 'ARS', name: 'Peso Argentino (ARS $)', symbol: '$' },
     { code: 'PAB', name: 'Balboa Panameño (PAB B/.)', symbol: 'B/.' },
-    { code: 'BOB', name: 'Boliviano (BOB Bs)', symbol: 'Bs' },
+    { code: 'BOB', name: 'Boliviano (BOB Bs)', symbol: 'Bs.' },
     { code: 'CRC', name: 'Colón Costarricense (CRC ₡)', symbol: '₡' },
     { code: 'NIO', name: 'Córdoba Nicaragüense (NIO C$)', symbol: 'C$' },
     { code: 'PYG', name: 'Guaraní Paraguayo (PYG Gs)', symbol: 'Gs' },
     { code: 'HNL', name: 'Lempira Hondureño (HNL L)', symbol: 'L' },
-    { code: 'VES', name: 'Bolívar Venezolano (VES Bs.D)', symbol: 'Bs.D' },
 ];
 
 export const MOCK_CONVERSATIONS: Conversation[] = [
@@ -118,14 +115,14 @@ export const MOCK_CONVERSATIONS: Conversation[] = [
 
 export const INITIAL_SETTINGS: AppSettings = {
     company: {
-        name: 'ALTOQUE FOOD',
-        currency: { code: 'USD', name: 'Dólar Estadounidense (USD $)', symbol: '$' },
+        name: 'ANYVAL PARK',
+        currency: { code: 'MXN', name: 'Peso Mexicano (MXN $)', symbol: '$' },
     },
     branch: {
-        alias: 'ALTOQUE FOOD - Sucursal Principal',
+        alias: 'ANYVAL PARK - Suc.',
         fullAddress: '',
         googleMapsLink: '',
-        whatsappNumber: '584146945877',
+        whatsappNumber: '+58 4146945877',
         logoUrl: '',
         coverImageUrl: '',
     },
@@ -145,7 +142,21 @@ export const INITIAL_SETTINGS: AppSettings = {
         transfer: { bank: '', accountNumber: '', accountHolder: '', idNumber: '' },
         zelle: { email: '', holder: '' }
     },
-    schedules: [],
+    schedules: [
+        {
+            id: 'general',
+            name: 'Menú general',
+            days: [
+                { day: 'Lunes', shifts: [], isOpen: true },
+                { day: 'Martes', shifts: [], isOpen: true },
+                { day: 'Miércoles', shifts: [], isOpen: true },
+                { day: 'Jueves', shifts: [], isOpen: true },
+                { day: 'Viernes', shifts: [], isOpen: true },
+                { day: 'Sábado', shifts: [], isOpen: true },
+                { day: 'Domingo', shifts: [], isOpen: true },
+            ]
+        }
+    ],
     printing: {
         method: PrintingMethod.Native,
     }
