@@ -384,7 +384,8 @@ export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created
     const dbOrderPayload = {
         customer: {
             ...order.customer,
-            paymentProof: order.paymentProof 
+// FIX: Removed incorrect and redundant access to `order.paymentProof`. 
+// The `paymentProof` is correctly located within `order.customer` which is already spread.
         },
         items: order.items,
         status: order.status,
@@ -429,7 +430,8 @@ export const getActiveOrders = async (): Promise<Order[]> => {
         tableId: o.table_id,
         generalComments: o.general_comments,
         paymentStatus: o.payment_status,
-        paymentProof: o.customer?.paymentProof,
+// FIX: Removed `paymentProof` from the top-level Order object to maintain type consistency.
+// It is correctly nested inside the `customer` object.
         tip: o.tip
     })) as Order[];
 };
@@ -441,7 +443,7 @@ export const updateOrder = async (orderId: string, updates: Partial<Order>): Pro
     if (updates.tableId) { dbUpdates.table_id = updates.tableId; delete dbUpdates.tableId; }
     if (updates.generalComments) { dbUpdates.general_comments = updates.generalComments; delete dbUpdates.generalComments; }
     if (updates.paymentStatus) { dbUpdates.payment_status = updates.paymentStatus; delete dbUpdates.paymentStatus; }
-    if (updates.paymentProof) { delete dbUpdates.paymentProof; } 
+// FIX: Removed invalid check for `updates.paymentProof` as it doesn't exist on the `Order` type.
     
     const { error } = await getClient().from('orders').update(dbUpdates).eq('id', orderId);
     if (error) {
