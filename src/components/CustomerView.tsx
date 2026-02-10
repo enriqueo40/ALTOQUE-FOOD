@@ -5,6 +5,7 @@ import { useCart } from '../hooks/useCart';
 import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconStore, IconCheck, IconUpload, IconReceipt, IconSparkles, IconClock, IconLocationMarker } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import { getPairingSuggestion } from '../services/geminiService';
+import { CURRENCIES } from '../constants';
 import Chatbot from './Chatbot';
 
 // --- Sub-componentes ---
@@ -85,6 +86,18 @@ export default function CustomerView() {
     const [allProducts, setAllProducts] = useState<Product[]>([]);
     const [allCategories, setAllCategories] = useState<Category[]>([]);
     const [allPromotions, setAllPromotions] = useState<Promotion[]>([]);
+
+    // FIX: Add currencyDisplay to format prices dynamically based on settings
+    const currencyDisplay = useMemo(() => {
+        if (!settings) return '$';
+        // Try to get symbol directly from settings
+        if (settings.company.currency.symbol) return settings.company.currency.symbol;
+        
+        // Fallback: Find symbol based on code in CURRENCIES constant (handles legacy data without symbol)
+        const foundCurrency = CURRENCIES.find(c => c.code === settings.company.currency.code);
+        return foundCurrency ? foundCurrency.symbol : '$';
+    }, [settings]);
+
 
     const isTableSession = !!tableInfo;
 
@@ -191,7 +204,7 @@ export default function CustomerView() {
         try {
             if (!isFinalClosing) {
                 if (cartItems.length > 0) {
-                    const newOrderData: any = {
+                    const newOrderData: Omit<Order, 'id' | 'createdAt'> = {
                         customer, 
                         items: cartItems, 
                         total: finalTotal,
@@ -206,15 +219,14 @@ export default function CustomerView() {
             }
 
             if (isFinalClosing && isTableSession) {
-                // FLUJO CIERRE MESA
                 const msg = [
                     `💰 *SOLICITUD DE CIERRE DE CUENTA*`,
                     `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
                     `🪑 Mesa: ${tableInfo?.table} (${tableInfo?.zone})`, `👤 Cliente: ${name}`, `--------------------------------`,
-                    `💵 Subtotal: $${sessionTotal.toFixed(2)}`,
-                    tipAmount > 0 ? `✨ Propina: $${tipAmount.toFixed(2)}` : '',
-                    `⭐ *TOTAL A PAGAR: $${finalTotal.toFixed(2)}*`, `💳 Método: ${selectedPayment}`,
-                    paymentProof ? `✅ Comprobante adjunto` : '', 
+                    `💵 Subtotal: ${currencyDisplay}${sessionTotal.toFixed(2)}`,
+                    tipAmount > 0 ? `✨ Propina: ${currencyDisplay}${tipAmount.toFixed(2)}` : '',
+                    `⭐ *TOTAL A PAGAR: ${currencyDisplay}${finalTotal.toFixed(2)}*`, `💳 Método: ${selectedPayment}`,
+                    paymentProof ? '✅ Comprobante adjunto' : '', 
                     `_Cliente solicita la cuenta para retirarse._`
                 ].filter(Boolean).join('\n');
 
@@ -232,7 +244,6 @@ export default function CustomerView() {
                 setView('confirmation');
 
             } else {
-                // FLUJO PEDIDO NUEVO / RONDA
                 if (isTableSession) {
                     setSessionItems(prev => [...prev, ...cartItems]);
                     setCustomerName(name);
@@ -246,11 +257,11 @@ export default function CustomerView() {
                         `🧾 *🔥 NUEVA RONDA A COCINA*`,
                         `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
                         `🪑 MESA: ${tableInfo!.table} (${tableInfo!.zone})`, `👤 Cliente: ${name}`, `--------------------------------`, itemsStr, `--------------------------------`,
-                        `💰 Subtotal Ronda: $${cartTotal.toFixed(2)}`,
-                        tipAmount > 0 ? `✨ Propina Ronda: $${tipAmount.toFixed(2)}` : '',
-                        `💵 *Total Ronda + Propina: $${finalTotal.toFixed(2)}*`,
-                        (sessionItems.length > 0) ? `📈 *Total Acumulado Mesa: $${(sessionTotal + cartTotal).toFixed(2)}*` : '',
-                        paymentProof ? `✅ Comprobante adjunto` : ''
+                        `💰 Subtotal Ronda: ${currencyDisplay}${cartTotal.toFixed(2)}`,
+                        tipAmount > 0 ? `✨ Propina Ronda: ${currencyDisplay}${tipAmount.toFixed(2)}` : '',
+                        `💵 *Total Ronda + Propina: ${currencyDisplay}${finalTotal.toFixed(2)}*`,
+                        (sessionItems.length > 0) ? `📈 *Total Acumulado Mesa: ${currencyDisplay}${(sessionTotal + cartTotal).toFixed(2)}*` : '',
+                        paymentProof ? '✅ Comprobante adjunto' : ''
                     ].filter(Boolean).join('\n');
                 } else {
                     msg = [
@@ -261,11 +272,11 @@ export default function CustomerView() {
                         orderType === OrderType.Delivery && addressData.referencias ? `👀 Ref: ${addressData.referencias}` : '',
                         orderType === OrderType.Delivery && addressData.googleMapsLink ? `📍 GPS: ${addressData.googleMapsLink}` : '',
                         `--------------------------------`, itemsStr, `--------------------------------`,
-                        `💰 Subtotal: $${cartTotal.toFixed(2)}`,
-                        tipAmount > 0 ? `✨ Propina: $${tipAmount.toFixed(2)}` : '',
-                        `💵 *TOTAL A PAGAR: $${finalTotal.toFixed(2)}*`, 
+                        `💰 Subtotal: ${currencyDisplay}${cartTotal.toFixed(2)}`,
+                        tipAmount > 0 ? `✨ Propina: ${currencyDisplay}${tipAmount.toFixed(2)}` : '',
+                        `💵 *TOTAL A PAGAR: ${currencyDisplay}${finalTotal.toFixed(2)}*`, 
                         `💳 Método: ${selectedPayment}`,
-                        paymentProof ? `✅ Comprobante adjunto` : ''
+                        paymentProof ? '✅ Comprobante adjunto' : ''
                     ].filter(Boolean).join('\n');
                 }
 
@@ -372,7 +383,7 @@ export default function CustomerView() {
                                                     const { price: displayPrice, promotion } = getDiscountedPrice(p, allPromotions);
                                                     return (
                                                         <div key={p.id} onClick={() => setSelectedProduct(p)} className="bg-[#1e293b]/50 p-3 rounded-2xl border border-gray-800/60 flex gap-4 active:scale-[0.98] transition-all cursor-pointer hover:bg-[#1e293b]/80 group relative overflow-hidden">
-                                                            {promotion && <div className="absolute top-0 left-0 bg-rose-500 text-white text-[9px] font-black px-2 py-1 rounded-br-xl z-10 shadow-lg">-{promotion.discountType === 'percentage' ? `${promotion.discountValue}%` : `$${promotion.discountValue}`}</div>}
+                                                            {promotion && <div className="absolute top-0 left-0 bg-rose-500 text-white text-[9px] font-black px-2 py-1 rounded-br-xl z-10 shadow-lg">-{promotion.discountType === 'percentage' ? `${promotion.discountValue}%` : `${currencyDisplay}${promotion.discountValue}`}</div>}
                                                             <div className="relative shrink-0">
                                                                 <img src={p.imageUrl} className="w-24 h-24 rounded-xl object-cover shadow-lg group-hover:scale-105 transition-transform" />
                                                             </div>
@@ -380,8 +391,8 @@ export default function CustomerView() {
                                                                 <h4 className="font-bold text-gray-100 group-hover:text-emerald-400 transition-colors leading-snug">{p.name}</h4>
                                                                 <p className="text-[11px] text-gray-500 line-clamp-2 mt-1 leading-relaxed">{p.description}</p>
                                                                 <div className="mt-2 flex flex-col">
-                                                                    {promotion && <span className="text-[10px] text-gray-600 line-through font-bold">MXN ${p.price.toFixed(2)}</span>}
-                                                                    <span className="font-black text-emerald-400 text-base">MXN ${displayPrice.toFixed(2)}</span>
+                                                                    {promotion && <span className="text-[10px] text-gray-600 line-through font-bold">{currencyDisplay}{p.price.toFixed(2)}</span>}
+                                                                    <span className="font-black text-emerald-400 text-base">{currencyDisplay}{displayPrice.toFixed(2)}</span>
                                                                 </div>
                                                             </div>
                                                             <div className="absolute bottom-3 right-3 bg-gray-800 p-1.5 rounded-lg text-emerald-400 border border-gray-700 shadow-xl group-hover:bg-emerald-600 group-hover:text-white transition-colors">
@@ -425,7 +436,7 @@ export default function CustomerView() {
                                         <div className="flex-1 flex flex-col justify-center"> 
                                             <div className="flex justify-between items-start mb-2"> 
                                                 <span className="font-bold text-sm text-gray-100">{i.name}</span> 
-                                                <span className="font-black text-emerald-400 text-sm">${(i.price * i.quantity).toFixed(2)}</span> 
+                                                <span className="font-black text-emerald-400 text-sm">{currencyDisplay}{(i.price * i.quantity).toFixed(2)}</span> 
                                             </div> 
                                             <div className="flex items-center justify-between"> 
                                                 <div className="flex items-center bg-gray-900 rounded-xl px-2 py-1 border border-gray-800"> 
@@ -442,7 +453,7 @@ export default function CustomerView() {
                             <div className="mt-8 pt-6 border-t border-gray-800"> 
                                 <div className="flex justify-between font-black text-xl mb-6"> 
                                     <span className="text-gray-500 text-[10px] tracking-[0.2em] uppercase self-center">SUBTOTAL RONDA</span> 
-                                    <span className="text-emerald-400 text-3xl font-black">${cartTotal.toFixed(2)}</span> 
+                                    <span className="text-emerald-400 text-3xl font-black">{currencyDisplay}{cartTotal.toFixed(2)}</span> 
                                 </div> 
                                 <button disabled={cartItems.length === 0} onClick={() => { setIsFinalClosing(false); setView('checkout'); }} className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white shadow-2xl active:scale-[0.98] transition-all disabled:opacity-30 uppercase tracking-[0.2em] text-sm"> 
                                     {isTableSession ? 'ENVIAR A COCINA' : 'IR A PAGAR'} 
@@ -464,13 +475,13 @@ export default function CustomerView() {
                                                 <span className="font-black text-gray-500 bg-gray-800 h-6 w-6 flex items-center justify-center rounded-lg text-[10px]">{item.quantity}</span> 
                                                 <span className="font-bold text-gray-300">{item.name}</span> 
                                             </div> 
-                                            <span className="font-bold text-white">${(item.price * item.quantity).toFixed(2)}</span> 
+                                            <span className="font-bold text-white">{currencyDisplay}{(item.price * item.quantity).toFixed(2)}</span> 
                                         </div> 
                                     ))} 
                                 </div> 
                                 <div className="mt-6 pt-6 border-t border-gray-700/50 flex justify-between items-center"> 
                                     <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">TOTAL ACUMULADO</span> 
-                                    <span className="text-2xl font-black text-white">${sessionTotal.toFixed(2)}</span> 
+                                    <span className="text-2xl font-black text-white">{currencyDisplay}{sessionTotal.toFixed(2)}</span> 
                                 </div> 
                             </div> 
                             <button onClick={() => { setIsFinalClosing(true); setView('checkout'); }} className="w-full bg-white text-gray-900 py-5 rounded-2xl font-black shadow-2xl active:scale-[0.98] transition-all uppercase tracking-[0.2em] text-sm"> 
@@ -511,7 +522,7 @@ export default function CustomerView() {
                                         {[0, 5, 10, 15].map(p => {
                                             const amount = baseTotal * (p / 100);
                                             return (
-                                                <button key={p} type="button" onClick={() => setTipAmount(amount)} className={`py-3 rounded-xl text-xs font-bold transition-all border ${Math.abs(tipAmount - amount) < 0.01 ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400'}`}>
+                                                <button key={p} type="button" onClick={() => setTipAmount(amount)} className={`py-3 rounded-xl text-xs font-bold transition-all border ${Math.abs(tipAmount - amount) < 0.01 ? 'bg-emerald-50 border-emerald-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400'}`}>
                                                     {p}%
                                                 </button>
                                             );
@@ -588,17 +599,17 @@ export default function CustomerView() {
                                 <div className="space-y-2 mb-6 px-2">
                                     <div className="flex justify-between text-xs text-gray-400 font-bold uppercase tracking-wider">
                                         <span>Subtotal</span>
-                                        <span>${baseTotal.toFixed(2)}</span>
+                                        <span>{currencyDisplay}{baseTotal.toFixed(2)}</span>
                                     </div>
                                     {tipAmount > 0 && (
                                         <div className="flex justify-between text-xs text-emerald-500 font-bold uppercase tracking-wider">
                                             <span>Propina</span>
-                                            <span>${tipAmount.toFixed(2)}</span>
+                                            <span>{currencyDisplay}{tipAmount.toFixed(2)}</span>
                                         </div>
                                     )}
                                     <div className="flex justify-between font-black text-3xl text-white pt-2 border-t border-gray-800">
                                         <span className="text-[10px] tracking-[0.4em] self-center text-gray-500">TOTAL</span>
-                                        <span className="text-emerald-400">${finalTotal.toFixed(2)}</span>
+                                        <span className="text-emerald-400">{currencyDisplay}{finalTotal.toFixed(2)}</span>
                                     </div>
                                 </div>
                                 <button type="submit" disabled={!isFinalClosing && cartItems.length === 0} className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex items-center justify-center gap-4 active:scale-95 transition-all text-xs uppercase tracking-[0.2em] shadow-2xl shadow-emerald-900/30 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -631,7 +642,7 @@ export default function CustomerView() {
                                     className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex justify-between px-8 items-center active:scale-95 transition-all shadow-xl shadow-emerald-900/40"
                                 >
                                     <span className="uppercase tracking-widest text-[10px]">Añadir a la Ronda</span>
-                                    <span className="text-xl font-black">${getDiscountedPrice(selectedProduct, allPromotions).price.toFixed(2)}</span>
+                                    <span className="text-xl font-black">{currencyDisplay}{getDiscountedPrice(selectedProduct, allPromotions).price.toFixed(2)}</span>
                                 </button>
                             </div>
                         </div>
@@ -654,7 +665,7 @@ export default function CustomerView() {
                                         <p className="text-xs text-gray-400 font-bold">Ver acumulado</p>
                                     </div>
                                 </div>
-                                <span className="text-xl font-black">${sessionTotal.toFixed(2)}</span>
+                                <span className="text-xl font-black">{currencyDisplay}{sessionTotal.toFixed(2)}</span>
                             </button>
                         )}
                         {itemCount > 0 && (
@@ -666,7 +677,7 @@ export default function CustomerView() {
                                     <div className="bg-emerald-800 px-3 py-1 rounded-lg text-sm font-black border border-emerald-400/30 shadow-inner">{itemCount}</div>
                                     <span className="tracking-[0.1em] uppercase text-xs font-black">{isTableSession ? 'Ver Ronda Actual' : 'Ver Pedido'}</span>
                                 </div>
-                                <span className="font-black text-xl">${cartTotal.toFixed(2)}</span>
+                                <span className="font-black text-xl">{currencyDisplay}{cartTotal.toFixed(2)}</span>
                             </button>
                         )}
                     </div>

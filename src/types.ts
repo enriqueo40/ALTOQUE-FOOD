@@ -160,6 +160,7 @@ export interface Zone {
 export interface Currency {
   code: string;
   name: string;
+  symbol: string;
 }
 
 export interface CompanySettings {
