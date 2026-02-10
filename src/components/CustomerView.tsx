@@ -10,7 +10,7 @@ import Chatbot from './Chatbot';
 // --- Sub-componentes ---
 
 const Header: React.FC<{ title: string; onBack?: () => void }> = ({ title, onBack }) => (
-    <header className="p-4 flex justify-between items-center sticky top-0 bg-gray-900/95 backdrop-blur-md z-30 border-b border-gray-800">
+    <header className="p-4 flex justify-between items-center sticky top-0 bg-[#0f172a]/95 backdrop-blur-md z-30 border-b border-gray-800">
         {onBack ? (
              <button onClick={onBack} className="p-2 -ml-2 text-gray-200 hover:bg-gray-800 rounded-full transition-colors" aria-label="Volver">
                 <IconArrowLeft className="h-6 w-6" />
@@ -321,7 +321,6 @@ export default function CustomerView() {
                 )}
                 
                 <div className="flex-1 overflow-y-auto pb-48">
-                    {/* ... (Menu, Confirmation, Cart, Account Views remain mostly same, focusing on Checkout) ... */}
                     {view === 'menu' && (
                         <div className="animate-fade-in">
                             <div className="relative pt-12 pb-8 flex flex-col items-center text-center">
@@ -512,7 +511,7 @@ export default function CustomerView() {
                                         {[0, 5, 10, 15].map(p => {
                                             const amount = baseTotal * (p / 100);
                                             return (
-                                                <button key={p} type="button" onClick={() => setTipAmount(amount)} className={`py-3 rounded-xl text-xs font-bold transition-all border ${Math.abs(tipAmount - amount) < 0.01 ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400'}`}>
+                                                <button key={p} type="button" onClick={() => setTipAmount(amount)} className={`py-3 rounded-xl text-xs font-bold transition-all border ${Math.abs(tipAmount - amount) < 0.01 ? 'bg-emerald-50 border-emerald-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400'}`}>
                                                     {p}%
                                                 </button>
                                             );
@@ -604,7 +603,7 @@ export default function CustomerView() {
                                 </div>
                                 <button type="submit" disabled={!isFinalClosing && cartItems.length === 0} className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex items-center justify-center gap-4 active:scale-95 transition-all text-xs uppercase tracking-[0.2em] shadow-2xl shadow-emerald-900/30 disabled:opacity-50 disabled:cursor-not-allowed">
                                     <IconWhatsapp className="h-5 w-5" /> 
-                                    {isFinalClosing ? 'ENVIAR COMPROBANTE' : (isTableSession ? 'ENVIAR A COCINA' : 'REALIZAR PEDIDO')}
+                                    {isFinalClosing ? 'ENVIAR COMPROBANTE' : 'REALIZAR PEDIDO'}
                                 </button>
                             </div>
                         </form> 
@@ -625,8 +624,10 @@ export default function CustomerView() {
                                 <p className="text-gray-400 text-sm mb-8 leading-relaxed font-medium mt-4">{selectedProduct.description}</p>
                                 <button 
                                     onClick={() => { 
-                                        const { price } = getDiscountedPrice(selectedProduct, allPromotions);
-                                        addToCart({ ...selectedProduct, price }, 1); 
+                                        // REPARACIÓN LÓGICA: Calculamos el precio con descuento real en el momento del clic
+                                        const { price: finalPrice } = getDiscountedPrice(selectedProduct, allPromotions);
+                                        // Inyectamos el precio calculado para que useCart use el valor correcto de la oferta
+                                        addToCart({ ...selectedProduct, price: finalPrice }, 1); 
                                         setSelectedProduct(null); 
                                     }}
                                     className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex justify-between px-8 items-center active:scale-95 transition-all shadow-xl shadow-emerald-900/40"
