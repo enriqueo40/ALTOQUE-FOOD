@@ -89,7 +89,8 @@ export default function CustomerView() {
 
     const currencyDisplay = useMemo(() => {
         if (!settings) return '$';
-        if (settings.company.currency.symbol) return settings.company.currency.symbol;
+        // Check for symbol in settings, then fallback to looking up code in constants, then fallback to $
+        if ((settings.company.currency as any).symbol) return (settings.company.currency as any).symbol;
         
         const foundCurrency = CURRENCIES.find(c => c.code === settings.company.currency.code);
         return foundCurrency ? foundCurrency.symbol : '$';

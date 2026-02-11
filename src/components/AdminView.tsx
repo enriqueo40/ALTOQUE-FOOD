@@ -148,8 +148,12 @@ const TimeAgo: React.FC<{ date: Date; className?: string }> = ({ date, className
     const [text, setText] = useState('');
     useEffect(() => {
         const update = () => {
-            const diff = Math.floor((new Date().getTime() - new Date(date).getTime()) / 60000);
-            setText(diff < 1 ? 'ahora' : `hace ${diff} min`);
+            const diff = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);
+            if (diff < 60) setText('hace un momento');
+            else {
+                const mins = Math.floor(diff / 60);
+                setText(`hace ${mins} min`);
+            }
         };
         update();
         const i = setInterval(update, 60000);
@@ -360,7 +364,6 @@ const EmptyOrdersView: React.FC<{ onNewOrderClick: () => void }> = ({ onNewOrder
     </div>
 );
 
-/* Error fix: Added OrderCard component which was missing and used in OrdersKanbanBoard */
 const OrderCard: React.FC<{ order: Order; onClick: () => void; currencySymbol: string }> = ({ order, onClick, currencySymbol }) => (
     <div onClick={onClick} className={`group relative bg-white dark:bg-gray-800 rounded-xl shadow-sm border p-4 cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5 ${order.status === OrderStatus.Pending ? 'border-yellow-400 ring-1 ring-yellow-400/20' : 'border-gray-200 dark:border-gray-700'}`}>
         <div className="flex justify-between items-start mb-3">
@@ -906,7 +909,7 @@ const AdminView: React.FC = () => {
     };
 
     const renderPage = () => {
-        const currentCurrencySymbol = settings?.company.currency.symbol || '$';
+        const currentCurrencySymbol = (settings?.company.currency as any)?.symbol || (CURRENCIES.find(c => c.code === settings?.company.currency.code)?.symbol) || '$';
         switch (currentPage) {
             case 'dashboard': 
                 return <Dashboard currencySymbol={currentCurrencySymbol} />;
