@@ -2,10 +2,9 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, PaymentMethod, OrderType, Personalization, Promotion, PersonalizationOption, Schedule, ShippingCostType } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconStore, IconCheck, IconUpload, IconReceipt, IconSparkles, IconClock, IconLocationMarker, FadeInImage } from '../constants';
+import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconStore, IconCheck, IconUpload, IconReceipt, IconSparkles, IconClock, IconLocationMarker, FadeInImage, getCurrencySymbol } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import { getPairingSuggestion } from '../services/geminiService';
-import { CURRENCIES } from '../constants';
 import Chatbot from './Chatbot';
 
 // --- Sub-componentes Memoizados ---
@@ -118,12 +117,8 @@ export default function CustomerView() {
     const [allCategories, setAllCategories] = useState<Category[]>([]);
     const [allPromotions, setAllPromotions] = useState<Promotion[]>([]);
 
-    const currencyDisplay = useMemo(() => {
-        if (!settings) return '$';
-        if ((settings.company.currency as any).symbol) return (settings.company.currency as any).symbol;
-        const foundCurrency = CURRENCIES.find(c => c.code === settings.company.currency.code);
-        return foundCurrency ? foundCurrency.symbol : '$';
-    }, [settings]);
+    // Use our new centralized helper!
+    const currencyDisplay = useMemo(() => getCurrencySymbol(settings), [settings]);
 
     const isTableSession = !!tableInfo;
 
@@ -168,7 +163,12 @@ export default function CustomerView() {
             setIsLoading(false);
         };
         fetchData();
-        subscribeToMenuUpdates(fetchData); // Realtime listener
+        
+        // Ensure realtime updates re-trigger fetchData
+        const channel = subscribeToMenuUpdates(() => {
+            console.log("Menu update received in CustomerView");
+            fetchData();
+        }); 
 
         const params = new URLSearchParams(window.location.hash.split('?')[1]);
         const table = params.get('table');
@@ -185,6 +185,19 @@ export default function CustomerView() {
     }, []);
 
     // Handlers
+    const scrollToCategory = (id: string) => {
+        setActiveCategory(id);
+        const el = document.getElementById(`cat-${id}`);
+        if (el) {
+            const offset = 160;
+            const bodyRect = document.body.getBoundingClientRect().top;
+            const elementRect = el.getBoundingClientRect().top;
+            const elementPosition = elementRect - bodyRect;
+            const offsetPosition = elementPosition - offset;
+            window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+        }
+    };
+
     const handleGetLocation = useCallback(() => {
         if (!navigator.geolocation) return alert("La geolocalización no es compatible.");
         setIsGettingLocation(true);
@@ -281,19 +294,6 @@ export default function CustomerView() {
             alert("Error al procesar el pedido. Intenta de nuevo.");
         }
     };
-
-    const scrollToCategory = useCallback((id: string) => {
-        setActiveCategory(id);
-        const el = document.getElementById(`cat-${id}`);
-        if (el) {
-            const offset = 160;
-            const bodyRect = document.body.getBoundingClientRect().top;
-            const elementRect = el.getBoundingClientRect().top;
-            const elementPosition = elementRect - bodyRect;
-            const offsetPosition = elementPosition - offset;
-            window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
-        }
-    }, []);
 
     if (isLoading || !settings) return (
         <div className="h-screen bg-gray-950 flex flex-col items-center justify-center">
