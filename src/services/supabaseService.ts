@@ -10,6 +10,24 @@ let supabase: SupabaseClient | null = null;
 let ordersChannel: RealtimeChannel | null = null;
 let menuChannel: RealtimeChannel | null = null;
 
+// --- IN-MEMORY CACHE ---
+// Used to store static data and avoid re-fetching on every component mount.
+const cache: {
+    categories: Category[] | null;
+    products: Product[] | null;
+    settings: AppSettings | null;
+    zones: Zone[] | null;
+    personalizations: Personalization[] | null;
+    promotions: Promotion[] | null;
+} = {
+    categories: null,
+    products: null,
+    settings: null,
+    zones: null,
+    personalizations: null,
+    promotions: null,
+};
+
 const getClient = (): SupabaseClient => {
     if (supabase) return supabase;
     supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -18,9 +36,11 @@ const getClient = (): SupabaseClient => {
 
 // --- Settings Functions ---
 export const getAppSettings = async (): Promise<AppSettings> => {
+    // Return cached settings instantly if available
+    if (cache.settings) return cache.settings;
+
     const { data, error } = await getClient().from('app_settings').select('settings').eq('id', 1).single();
     
-    // Deep merge function to ensure nested structures like 'payment' don't lose default fields
     const deepMerge = (target: any, source: any) => {
         for (const key in source) {
             if (source[key] instanceof Object && key in target) {
@@ -30,48 +50,65 @@ export const getAppSettings = async (): Promise<AppSettings> => {
         return { ...target, ...source };
     };
 
+    let result = JSON.parse(JSON.stringify(INITIAL_SETTINGS));
     if (!error && data?.settings) {
-        return deepMerge(JSON.parse(JSON.stringify(INITIAL_SETTINGS)), data.settings);
+        result = deepMerge(result, data.settings);
     }
-    return JSON.parse(JSON.stringify(INITIAL_SETTINGS));
+    
+    cache.settings = result; // Cache result
+    return result;
 };
 
 export const saveAppSettings = async (settings: AppSettings): Promise<void> => {
+    cache.settings = settings; // Optimistic cache update
     await getClient().from('app_settings').update({ settings, updated_at: new Date().toISOString() }).eq('id', 1);
 };
 
 // --- Categories Functions ---
-export const getCategories = async (): Promise<Category[]> => {
+export const getCategories = async (forceRefresh = false): Promise<Category[]> => {
+    if (cache.categories && !forceRefresh) return cache.categories;
     const { data } = await getClient().from('categories').select('*').order('created_at');
-    return data || [];
+    cache.categories = data || [];
+    return cache.categories;
 };
 
 export const saveCategory = async (category: Omit<Category, 'id' | 'created_at'> & { id?: string }): Promise<Category> => {
     const { id, ...categoryData } = category;
     const { data, error } = await getClient().from('categories').upsert({ id, ...categoryData }).select().single();
     if (error || !data) throw new Error(error?.message || "Could not save category.");
+    // Invalidate cache
+    cache.categories = null; 
     return data;
 };
 
 export const deleteCategory = async (categoryId: string): Promise<void> => {
     const { error } = await getClient().from('categories').delete().eq('id', categoryId);
     if (error) throw error;
+    cache.categories = null;
 };
 
 // --- Products Functions ---
-export const getProducts = async (): Promise<Product[]> => {
+export const getProducts = async (forceRefresh = false): Promise<Product[]> => {
+    if (cache.products && !forceRefresh) return cache.products;
     const { data } = await getClient().from('products').select('*').order('name');
-    return data || [];
+    cache.products = data || [];
+    return cache.products;
 };
 
 export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & { id?: string }): Promise<Product> => {
     const { id, ...productData } = product;
     const { data, error } = await getClient().from('products').upsert({ id, ...productData }).select().single();
     if (error || !data) throw new Error(error?.message || "Could not save product.");
+    cache.products = null;
     return data;
 };
 
 export const updateProductAvailability = async (productId: string, available: boolean): Promise<Product> => {
+    // Optimistic update in cache if exists
+    if (cache.products) {
+        cache.products = cache.products.map(p => p.id === productId ? { ...p, available } : p);
+    }
+    
     const { data, error } = await getClient().from('products').update({ available }).eq('id', productId).select().single();
     if (error || !data) throw new Error("Could not update product availability.");
     return data;
@@ -80,23 +117,31 @@ export const updateProductAvailability = async (productId: string, available: bo
 export const deleteProduct = async (productId: string): Promise<void> => {
     const { error } = await getClient().from('products').delete().eq('id', productId);
     if (error) throw error;
+    cache.products = null;
 };
 
 // --- Personalizations Functions ---
-export const getPersonalizations = async (): Promise<Personalization[]> => {
+export const getPersonalizations = async (forceRefresh = false): Promise<Personalization[]> => {
+    if (cache.personalizations && !forceRefresh) return cache.personalizations;
+    
     const { data, error } = await getClient().from('personalizations').select('*, options:personalization_options(*)');
     if (error) throw error;
-    return (data?.map(p => ({
+    
+    const result = (data?.map(p => ({
         ...p,
         allowRepetition: p.allow_repetition,
         minSelection: p.min_selection,
         maxSelection: p.max_selection
     })) || []) as Personalization[];
+    
+    cache.personalizations = result;
+    return result;
 };
 
 export const updatePersonalizationOptionAvailability = async (optionId: string, available: boolean): Promise<PersonalizationOption> => {
     const { data, error } = await getClient().from('personalization_options').update({ available }).eq('id', optionId).select().single();
     if (error || !data) throw new Error("Could not update option availability.");
+    cache.personalizations = null; // Invalidate deep nested structure
     return data;
 };
 
@@ -112,19 +157,24 @@ export const savePersonalization = async (personalization: Omit<Personalization,
     if (options && options.length > 0) {
         await getClient().from('personalization_options').insert(options.map(o => ({ personalization_id: savedP.id, name: o.name, price: o.price, available: true })));
     }
-    return (await getPersonalizations()).find(p => p.id === savedP.id)!;
+    cache.personalizations = null;
+    return (await getPersonalizations(true)).find(p => p.id === savedP.id)!;
 };
 
 export const deletePersonalization = async (personalizationId: string): Promise<void> => {
     const { error } = await getClient().from('personalizations').delete().eq('id', personalizationId);
     if (error) throw error;
+    cache.personalizations = null;
 };
 
 // --- Promotions Functions ---
-export const getPromotions = async (): Promise<Promotion[]> => {
+export const getPromotions = async (forceRefresh = false): Promise<Promotion[]> => {
+    if (cache.promotions && !forceRefresh) return cache.promotions;
+
     const { data, error } = await getClient().from('promotions').select('*, promotion_products(product_id)');
     if (error) throw error;
-    return data?.map(promo => ({
+    
+    const result = data?.map(promo => ({
         ...promo,
         discountType: promo.discount_type,
         discountValue: promo.discount_value,
@@ -133,6 +183,9 @@ export const getPromotions = async (): Promise<Promotion[]> => {
         startDate: promo.start_date,
         endDate: promo.end_date,
     })) || [];
+    
+    cache.promotions = result;
+    return result;
 };
 
 export const savePromotion = async (promotion: Omit<Promotion, 'id' | 'created_at'> & { id?: string }): Promise<Promotion> => {
@@ -147,30 +200,36 @@ export const savePromotion = async (promotion: Omit<Promotion, 'id' | 'created_a
     if (productIds && productIds.length > 0) {
         await getClient().from('promotion_products').insert(productIds.map(pid => ({ promotion_id: savedPromo.id, product_id: pid })));
     }
+    cache.promotions = null;
     return { ...promotion, id: savedPromo.id };
 };
 
 export const deletePromotion = async (promotionId: string): Promise<void> => {
     const { error } = await getClient().from('promotions').delete().eq('id', promotionId);
     if (error) throw error;
+    cache.promotions = null;
 };
 
 // --- Zones and Tables Functions ---
-export const getZones = async (): Promise<Zone[]> => {
+export const getZones = async (forceRefresh = false): Promise<Zone[]> => {
+    if (cache.zones && !forceRefresh) return cache.zones;
     const { data } = await getClient().from('zones').select('*, tables(*)');
-    return data || [];
+    cache.zones = data || [];
+    return cache.zones;
 };
 
 export const saveZone = async (zone: Pick<Zone, 'name' | 'rows' | 'cols'> & { id?: string }): Promise<Zone> => {
     const { id, ...zoneData } = zone;
     const { data, error } = await getClient().from('zones').upsert({ id, ...zoneData }).select('*, tables(*)').single();
     if (error || !data) throw new Error("Could not save zone.");
+    cache.zones = null;
     return data as Zone;
 };
 
 export const deleteZone = async (zoneId: string): Promise<void> => {
     const { error } = await getClient().from('zones').delete().eq('id', zoneId);
     if (error) throw error;
+    cache.zones = null;
 };
 
 export const saveZoneLayout = async (zone: Zone): Promise<void> => {
@@ -185,6 +244,7 @@ export const saveZoneLayout = async (zone: Zone): Promise<void> => {
         const toSave = tables.map(({ created_at, zoneId, ...rest }) => ({ ...rest, zone_id: zone.id }));
         await getClient().from('tables').upsert(toSave);
     }
+    cache.zones = null;
 };
 
 // --- Orders Functions ---
@@ -203,29 +263,18 @@ export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt'>): Promise
         tip: order.tip || 0
     };
 
-    // Try normal insert
     try {
         const { data, error } = await getClient().from('orders').insert(payload).select().single();
         if (error) throw error;
         return { ...order, id: data.id, createdAt: new Date(data.created_at) } as Order;
     } catch (error: any) {
-        // Fallback: If 'tip' column is missing (PGRST204), retry without it
-        if (error.code === 'PGRST204' && (error.message?.includes('tip') || error.message?.includes('column'))) {
-            console.warn("Database schema mismatch: 'tip' column missing. Retrying save without 'tip'.");
-            const { tip, ...safePayload } = payload;
+        if (error.code === 'PGRST204') {
+            console.warn("Database schema mismatch. Retrying save without problematic columns.");
+            const { tip, payment_status, ...safePayload } = payload;
             const { data: retryData, error: retryError } = await getClient().from('orders').insert(safePayload).select().single();
             if (retryError) throw retryError;
             return { ...order, id: retryData.id, createdAt: new Date(retryData.created_at) } as Order;
         }
-        // Fallback: If 'payment_status' column is missing
-        if (error.code === 'PGRST204' && error.message?.includes('payment_status')) {
-             console.warn("Database schema mismatch: 'payment_status' column missing. Retrying save without it.");
-             const { payment_status, ...safePayload } = payload;
-             const { data: retryData, error: retryError } = await getClient().from('orders').insert(safePayload).select().single();
-             if (retryError) throw retryError;
-             return { ...order, id: retryData.id, createdAt: new Date(retryData.created_at) } as Order;
-        }
-        
         throw new Error(error.message || 'Error saving order');
     }
 };
@@ -263,11 +312,11 @@ export const subscribeToMenuUpdates = (onUpdate: () => void) => {
     const client = getClient();
     if (menuChannel) client.removeChannel(menuChannel);
     menuChannel = client.channel('menu-updates')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, onUpdate)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, onUpdate)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'promotions' }, onUpdate)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'personalizations' }, onUpdate)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, onUpdate)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => { cache.products = null; onUpdate(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => { cache.categories = null; onUpdate(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'promotions' }, () => { cache.promotions = null; onUpdate(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'personalizations' }, () => { cache.personalizations = null; onUpdate(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => { cache.settings = null; onUpdate(); })
         .subscribe();
 };
 

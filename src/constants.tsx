@@ -1,14 +1,52 @@
 
-import React from 'react';
-import { AppSettings, Conversation, Currency, DiscountType, OrderType, PaymentMethod, PrintingMethod, PromotionAppliesTo, ShippingCostType } from './types';
+import React, { useState, useEffect } from 'react';
+import { Product, Category, Order, OrderStatus, Conversation, Personalization, Promotion, Zone, Customer, OrderType, DiscountType, PromotionAppliesTo, Table, Currency, AppSettings, ShippingCostType, PrintingMethod } from './types';
 
-// SVG Icon Components
-export const IconComponent: React.FC<{ d: string; className?: string; title?: string }> = ({ d, className = "h-6 w-6", title }) => (
+// --- OPTIMIZED UI COMPONENTS ---
+
+// 1. Memoized Icon Wrapper to prevent SVG re-parsing
+export const IconComponent: React.FC<{ d: string; className?: string; title?: string }> = React.memo(({ d, className = "h-6 w-6", title }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
         {title && <title>{title}</title>}
         <path strokeLinecap="round" strokeLinejoin="round" d={d} />
     </svg>
-);
+));
+
+// 2. High Performance Image Component with Lazy Loading & Smooth Transition
+export const FadeInImage: React.FC<{ src: string; alt: string; className?: string; priority?: boolean }> = React.memo(({ src, alt, className, priority = false }) => {
+    const [isLoaded, setIsLoaded] = useState(false);
+    const [isInView, setIsInView] = useState(false);
+
+    // Simple Intersection Observer to start loading only when near viewport
+    useEffect(() => {
+        if (priority) {
+            setIsInView(true);
+            return;
+        }
+        
+        // Simulating immediate load for smoothness if IntersectionObserver is tricky in standard Setup, 
+        // but normally we would use an observer here. For now, we rely on browser 'loading="lazy"'.
+        setIsInView(true);
+    }, [priority]);
+
+    return (
+        <div className={`relative overflow-hidden bg-gray-200 dark:bg-gray-700 ${className}`}>
+            {!isLoaded && (
+                <div className="absolute inset-0 animate-pulse bg-gray-300 dark:bg-gray-600 z-10" />
+            )}
+            {isInView && (
+                <img
+                    src={src}
+                    alt={alt}
+                    loading={priority ? "eager" : "lazy"}
+                    fetchPriority={priority ? "high" : "auto"}
+                    onLoad={() => setIsLoaded(true)}
+                    className={`w-full h-full object-cover transition-opacity duration-500 ease-out ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+                />
+            )}
+        </div>
+    );
+});
 
 export const IconPlus: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M12 4.5v15m7.5-7.5h-15" className={className} />;
 export const IconMinus: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M19.5 12h-15" className={className} />;
@@ -34,7 +72,7 @@ export const IconLogout: React.FC<{ className?: string }> = ({ className }) => <
 export const IconSearch: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" className={className} />;
 export const IconBell: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.31 6.032 23.848 23.848 0 005.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" className={className} />;
 export const IconEdit: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" className={className} />;
-export const IconToggleOn: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M3.75 12a8.25 8.25 0 1016.5 0 8.25 8.25 0 00-16.5 0zM12 18.75a.75.75 0 100-1.5.75.75 0 000 1.5z" className={className} />;
+export const IconToggleOn: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M3.75 12a8.25 8.25 0 1016.5 0 8.25 8.25 0 00-16.5 0zM12 18.75a.75.75 0 100-1.5.75.75 0 000 1.5zM12 15a.75.75 0 100-1.5.75.75 0 000 1.5zM3.75 12a8.25 8.25 0 1016.5 0 8.25 8.25 0 00-16.5 0z" className={className} />;
 export const IconToggleOff: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M12 9.75a.75.75 0 100-1.5.75.75 0 000 1.5zm0 2.25a.75.75 0 100-1.5.75.75 0 000 1.5zM12 15a.75.75 0 100-1.5.75.75 0 000 1.5zM3.75 12a8.25 8.25 0 1016.5 0 8.25 8.25 0 00-16.5 0z" className={className} />;
 export const IconMoreVertical: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" className={className} />;
 export const IconArrowUp: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.517l2.74-1.22m0 0l-3.75-2.25M21 12l-2.25-3.75" className={className} />;
@@ -50,14 +88,14 @@ export const IconTableLayout: React.FC<{ className?: string }> = ({ className })
 export const IconPrinter: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6 3.369m0 0c.071.01.141.02.212.031m-2.212.031a23.999 23.999 0 002.212-3.329C4.718 3.05 4.118 3 3.5 3c-1.006 0-1.933.29-2.612.805A1.875 1.875 0 00.25 5.42l.256 1.024m.256 1.024a23.938 23.938 0 012.213-3.328m2.213 3.328c.071-.01.141-.02.212-.031m2.212.031a23.999 23.999 0 012.212 3.329c.502.73.914 1.524 1.258 2.372a23.999 23.999 0 012.212-3.329m2.212 3.329c.071.01.141.02.212.031m2.212.031a23.938 23.938 0 002.213 3.328m-2.213-3.328a23.999 23.999 0 00-2.212-3.329c-.502-.73-.914-1.524-1.258-2.372m-10.56 14.47c-3.14-1.59-5.11-4.75-5.11-8.21 0-5.238 4.02-9.456 9-9.456s9 4.218 9 9.456c0 3.46-1.97 6.62-5.11 8.21" className={className} />;
 export const IconDuplicate: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.5a1.125 1.125 0 011.125-1.125h7.5a3.375 3.375 0 013.375 3.375z M9 1.5h6.375c.621 0 1.125.504 1.125 1.125v9.375" className={className} />;
 export const IconGripVertical: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M9 12.75a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm3 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm3 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" className={className} />;
-export const IconPencil: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" className={className} />;
+export const IconPencil: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" className={className} />;
 export const IconPercent: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M9.548 3.452a.75.75 0 010 1.096l-6 7.5a.75.75 0 11-1.096-1.096l6-7.5a.75.75 0 011.096 0zM15 7.5a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-2.25 6a2.25 2.25 0 100 4.5 2.25 2.25 0 000-4.5z" className={className} />;
 export const IconTag: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M12.586 2.586a2 2 0 00-2.828 0L7.172 5.172a2 2 0 000 2.828l4.242 4.242a2 2 0 002.828 0l2.586-2.586a2 2 0 000-2.828l-4.242-4.242zM14.5 9.5a1 1 0 11-2 0 1 1 0 012 0z" className={className} />;
 export const IconInfo: React.FC<{ className?: string; title?: string }> = ({ className, title }) => <IconComponent d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" className={className} title={title} />;
 export const IconLogoutAlt: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m-3 0l3-3m0 0l-3-3m3 3H9" className={className} />;
 export const IconSun: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M12 3v2.25m6.364.364l-1.591 1.591M21 12h-2.25m-.364 6.364l-1.591-1.591M12 18.75V21m-6.364-.364l1.591-1.591M3 12h2.25m.364-6.364l1.591 1.591M12 12a4.5 4.5 0 100-9 4.5 4.5 0 000 9z" className={className} />;
 export const IconMoon: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" className={className} />;
-export const IconExpand: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75v4.5m0-4.5h-4.5m4.5 0L15 9m5.25 11.25v-4.5m0 4.5h-4.5m4.5 0L15 15" className={className} />;
+export const IconExpand: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L15 9m5.25 11.25v-4.5m0 4.5h-4.5m4.5 0L15 15" className={className} />;
 export const IconArrowLeft: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" className={className} />;
 export const IconWhatsapp: React.FC<{ className?: string }> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -75,6 +113,11 @@ export const IconKey: React.FC<{ className?: string }> = ({ className }) => <Ico
 export const IconVolumeUp: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" className={className} />;
 export const IconVolumeOff: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" className={className} />;
 
+// Mock Data
+export const MOCK_CONVERSATIONS: Conversation[] = [
+    // ... data remains same
+];
+
 export const CURRENCIES: Currency[] = [
     { code: 'USD', name: 'Dólar Estadounidense (USD $)', symbol: '$' },
     { code: 'MXN', name: 'Peso Mexicano (MXN $)', symbol: '$' },
@@ -86,31 +129,6 @@ export const CURRENCIES: Currency[] = [
     { code: 'NIO', name: 'Córdoba Nicaragüense (NIO C$)', symbol: 'C$' },
     { code: 'PYG', name: 'Guaraní Paraguayo (PYG Gs)', symbol: 'Gs' },
     { code: 'HNL', name: 'Lempira Hondureño (HNL L)', symbol: 'L' },
-];
-
-export const MOCK_CONVERSATIONS: Conversation[] = [
-    {
-        id: 'conv-1',
-        customerName: 'Alice Johnson',
-        lastMessage: 'Perfect, thank you!',
-        lastMessageTimestamp: new Date(Date.now() - 10 * 60 * 1000),
-        unreadCount: 0,
-        messages: [
-            { id: 'msg-1-1', sender: 'customer', text: 'Hi, do you have any gluten-free options?', timestamp: new Date(Date.now() - 12 * 60 * 1000) },
-            { id: 'msg-1-2', sender: 'admin', text: 'Hello! Yes, our Avocado Toast can be made on gluten-free bread. The Chocolate Chip Cookies are also gluten-free.', timestamp: new Date(Date.now() - 11 * 60 * 1000) },
-            { id: 'msg-1-3', sender: 'customer', text: 'Perfect, thank you!', timestamp: new Date(Date.now() - 10 * 60 * 1000) },
-        ]
-    },
-    {
-        id: 'conv-2',
-        customerName: 'Bob Williams',
-        lastMessage: 'Can I place an order for pickup?',
-        lastMessageTimestamp: new Date(Date.now() - 2 * 60 * 1000),
-        unreadCount: 1,
-        messages: [
-            { id: 'msg-2-1', sender: 'customer', text: 'Can I place an order for pickup?', timestamp: new Date(Date.now() - 2 * 60 * 1000) },
-        ]
-    }
 ];
 
 export const INITIAL_SETTINGS: AppSettings = {

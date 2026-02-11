@@ -1,17 +1,17 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, PaymentMethod, OrderType, Personalization, Promotion, PersonalizationOption, Schedule, ShippingCostType } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconStore, IconCheck, IconUpload, IconReceipt, IconSparkles, IconClock, IconLocationMarker } from '../constants';
-import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
+import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconStore, IconCheck, IconUpload, IconReceipt, IconSparkles, IconClock, IconLocationMarker, FadeInImage } from '../constants';
+import { getProducts, getCategories, getAppSettings, saveOrder, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import { getPairingSuggestion } from '../services/geminiService';
 import { CURRENCIES } from '../constants';
 import Chatbot from './Chatbot';
 
-// --- Sub-componentes ---
+// --- Sub-componentes Memoizados ---
 
-const Header: React.FC<{ title: string; onBack?: () => void }> = ({ title, onBack }) => (
-    <header className="p-4 flex justify-between items-center sticky top-0 bg-[#0f172a]/95 backdrop-blur-md z-30 border-b border-gray-800">
+const Header: React.FC<{ title: string; onBack?: () => void }> = React.memo(({ title, onBack }) => (
+    <header className="p-4 flex justify-between items-center sticky top-0 bg-[#0f172a]/95 backdrop-blur-md z-30 border-b border-gray-800 transition-all duration-300">
         {onBack ? (
              <button onClick={onBack} className="p-2 -ml-2 text-gray-200 hover:bg-gray-800 rounded-full transition-colors" aria-label="Volver">
                 <IconArrowLeft className="h-6 w-6" />
@@ -20,7 +20,7 @@ const Header: React.FC<{ title: string; onBack?: () => void }> = ({ title, onBac
         <h1 className="text-lg font-black text-white uppercase tracking-tight text-center flex-1">{title}</h1>
         <div className="w-10 h-10" /> 
     </header>
-);
+));
 
 const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price: number, promotion?: Promotion } => {
     const now = new Date();
@@ -48,6 +48,38 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
     return { price: bestPrice, promotion: bestPromo };
 };
 
+const MemoizedProductCard: React.FC<{ 
+    product: Product, 
+    onSelect: (p: Product) => void, 
+    currencyDisplay: string,
+    promotions: Promotion[]
+}> = React.memo(({ product, onSelect, currencyDisplay, promotions }) => {
+    
+    const { price: displayPrice, promotion } = useMemo(() => {
+        return getDiscountedPrice(product, promotions);
+    }, [product, promotions]);
+
+    return (
+        <div onClick={() => onSelect(product)} className="bg-[#1e293b]/50 p-3 rounded-2xl border border-gray-800/60 flex gap-4 active:scale-[0.98] transition-all cursor-pointer hover:bg-[#1e293b]/80 group relative overflow-hidden will-change-transform">
+            {promotion && <div className="absolute top-0 left-0 bg-rose-500 text-white text-[9px] font-black px-2 py-1 rounded-br-xl z-10 shadow-lg">-{promotion.discountType === 'percentage' ? `${promotion.discountValue}%` : `${currencyDisplay}${promotion.discountValue}`}</div>}
+            <div className="relative shrink-0 w-24 h-24 rounded-xl overflow-hidden shadow-lg group-hover:scale-105 transition-transform duration-300">
+                <FadeInImage src={product.imageUrl} alt={product.name} className="w-full h-full" />
+            </div>
+            <div className="flex-1 flex flex-col justify-center">
+                <h4 className="font-bold text-gray-100 group-hover:text-emerald-400 transition-colors leading-snug">{product.name}</h4>
+                <p className="text-[11px] text-gray-500 line-clamp-2 mt-1 leading-relaxed">{product.description}</p>
+                <div className="mt-2 flex flex-col">
+                    {promotion && <span className="text-[10px] text-gray-600 line-through font-bold">{currencyDisplay}{product.price.toFixed(2)}</span>}
+                    <span className="font-black text-emerald-400 text-base">{currencyDisplay}{displayPrice.toFixed(2)}</span>
+                </div>
+            </div>
+            <div className="absolute bottom-3 right-3 bg-gray-800 p-1.5 rounded-lg text-emerald-400 border border-gray-700 shadow-xl group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                <IconPlus className="h-4 w-4" />
+            </div>
+        </div>
+    );
+});
+
 export default function CustomerView() {
     const [view, setView] = useState<'menu' | 'cart' | 'checkout' | 'confirmation' | 'account'>('menu');
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -60,10 +92,9 @@ export default function CustomerView() {
     const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('Efectivo');
     const [paymentProof, setPaymentProof] = useState<string | null>(null);
     const [tipAmount, setTipAmount] = useState<number>(0);
-
     const [isGettingLocation, setIsGettingLocation] = useState(false);
 
-    // --- ESTADO PERSISTENTE DE MESA ---
+    // Persistent State
     const [tableInfo, setTableInfo] = useState<{ table: string; zone: string } | null>(() => {
         const saved = localStorage.getItem('altoque_table_info');
         return saved ? JSON.parse(saved) : null;
@@ -89,9 +120,7 @@ export default function CustomerView() {
 
     const currencyDisplay = useMemo(() => {
         if (!settings) return '$';
-        // Check for symbol in settings, then fallback to looking up code in constants, then fallback to $
         if ((settings.company.currency as any).symbol) return (settings.company.currency as any).symbol;
-        
         const foundCurrency = CURRENCIES.find(c => c.code === settings.company.currency.code);
         return foundCurrency ? foundCurrency.symbol : '$';
     }, [settings]);
@@ -102,11 +131,21 @@ export default function CustomerView() {
         return sessionItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     }, [sessionItems]);
 
-    // Total Calculation including Tips
     const baseTotal = isFinalClosing ? sessionTotal : cartTotal;
     const finalTotal = useMemo(() => baseTotal + tipAmount, [baseTotal, tipAmount]);
 
-    // Sincronización con LocalStorage para Modo Mesa
+    // Derived state for categories to avoid unnecessary filtering during render
+    const filteredCategories = useMemo(() => {
+        if (!searchTerm) return allCategories;
+        // Keep categories that have matching products
+        const matchingProductCategoryIds = new Set(
+            allProducts
+                .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                .map(p => p.categoryId)
+        );
+        return allCategories.filter(c => matchingProductCategoryIds.has(c.id));
+    }, [allCategories, allProducts, searchTerm]);
+
     useEffect(() => {
         if (isTableSession) {
             localStorage.setItem('altoque_consumed_items', JSON.stringify(sessionItems));
@@ -115,24 +154,21 @@ export default function CustomerView() {
         }
     }, [sessionItems, tableInfo, customerName, isTableSession]);
 
-    // Carga de Datos
     useEffect(() => {
         const fetchData = async () => {
-            try {
-                const [s, p, c, proms] = await Promise.all([
-                    getAppSettings(), getProducts(), getCategories(), getPromotions()
-                ]);
-                setSettings(s); 
-                setAllProducts(p); 
-                setAllCategories(c); 
-                setAllPromotions(proms);
-                if (c.length > 0) setActiveCategory(c[0].id);
-            } finally {
-                setIsLoading(false);
-            }
+            // Because we implemented in-memory cache in supabaseService, these calls are instant on subsequent loads
+            const [s, p, c, proms] = await Promise.all([
+                getAppSettings(), getProducts(), getCategories(), getPromotions()
+            ]);
+            setSettings(s); 
+            setAllProducts(p); 
+            setAllCategories(c); 
+            setAllPromotions(proms);
+            if (c.length > 0 && !activeCategory) setActiveCategory(c[0].id);
+            setIsLoading(false);
         };
         fetchData();
-        subscribeToMenuUpdates(fetchData);
+        subscribeToMenuUpdates(fetchData); // Realtime listener
 
         const params = new URLSearchParams(window.location.hash.split('?')[1]);
         const table = params.get('table');
@@ -148,7 +184,8 @@ export default function CustomerView() {
         return () => unsubscribeFromChannel();
     }, []);
 
-    const handleGetLocation = () => {
+    // Handlers
+    const handleGetLocation = useCallback(() => {
         if (!navigator.geolocation) return alert("La geolocalización no es compatible.");
         setIsGettingLocation(true);
         navigator.geolocation.getCurrentPosition(
@@ -167,16 +204,13 @@ export default function CustomerView() {
                 setIsGettingLocation(false);
             }
         );
-    };
+    }, []);
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
             const reader = new FileReader();
-            reader.onload = (res) => {
-                setPaymentProof(res.target?.result as string);
-                alert("Captura de pago cargada con éxito.");
-            };
+            reader.onload = (res) => setPaymentProof(res.target?.result as string);
             reader.readAsDataURL(file);
         }
     };
@@ -199,97 +233,56 @@ export default function CustomerView() {
         const customer: Customer = { name, phone, address: addressData, paymentProof: paymentProof || undefined };
 
         try {
-            if (!isFinalClosing) {
-                if (cartItems.length > 0) {
-                    const newOrderData: Omit<Order, 'id' | 'createdAt'> = {
-                        customer, 
-                        items: cartItems, 
-                        total: finalTotal,
-                        status: OrderStatus.Pending, 
-                        orderType,
-                        tableId: isTableSession ? `${tableInfo?.zone} - ${tableInfo?.table}` : undefined,
-                        paymentStatus: 'pending',
-                        tip: tipAmount
-                    };
-                    await saveOrder(newOrderData);
-                }
+            if (!isFinalClosing && cartItems.length > 0) {
+                const newOrderData: any = {
+                    customer, 
+                    items: cartItems, 
+                    total: finalTotal,
+                    status: OrderStatus.Pending, 
+                    orderType,
+                    tableId: isTableSession ? `${tableInfo?.zone} - ${tableInfo?.table}` : undefined,
+                    paymentStatus: 'pending',
+                    tip: tipAmount
+                };
+                await saveOrder(newOrderData);
             }
 
+            // WhatsApp Message Logic
+            let msg = "";
             if (isFinalClosing && isTableSession) {
-                const msg = [
-                    `💰 *SOLICITUD DE CIERRE DE CUENTA*`,
-                    `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
-                    `🪑 Mesa: ${tableInfo?.table} (${tableInfo?.zone})`, `👤 Cliente: ${name}`, `--------------------------------`,
-                    `💵 Subtotal: ${currencyDisplay}${sessionTotal.toFixed(2)}`,
-                    tipAmount > 0 ? `✨ Propina: ${currencyDisplay}${tipAmount.toFixed(2)}` : '',
-                    `⭐ *TOTAL A PAGAR: ${currencyDisplay}${finalTotal.toFixed(2)}*`, `💳 Método: ${selectedPayment}`,
-                    paymentProof ? '✅ Comprobante adjunto' : '', 
-                    `_Cliente solicita la cuenta para retirarse._`
-                ].filter(Boolean).join('\n');
-
-                window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
-                
-                localStorage.removeItem('altoque_consumed_items');
-                localStorage.removeItem('altoque_table_info');
-                localStorage.removeItem('altoque_customer_name');
-                setSessionItems([]);
-                setTableInfo(null);
-                setCustomerName('');
-                clearCart();
-                setPaymentProof(null);
-                setTipAmount(0);
-                setView('confirmation');
-
+                 msg = `💰 *SOLICITUD DE CIERRE DE CUENTA*\n📍 *${settings.company.name.toUpperCase()}*\n--------------------------------\n🪑 Mesa: ${tableInfo?.table} (${tableInfo?.zone})\n👤 Cliente: ${name}\n--------------------------------\n💵 Subtotal: ${currencyDisplay}${sessionTotal.toFixed(2)}\n${tipAmount > 0 ? `✨ Propina: ${currencyDisplay}${tipAmount.toFixed(2)}\n` : ''}⭐ *TOTAL A PAGAR: ${currencyDisplay}${finalTotal.toFixed(2)}*\n💳 Método: ${selectedPayment}\n${paymentProof ? '✅ Comprobante adjunto\n' : ''}_Cliente solicita la cuenta para retirarse._`;
+                 localStorage.removeItem('altoque_consumed_items');
+                 localStorage.removeItem('altoque_table_info');
+                 localStorage.removeItem('altoque_customer_name');
+                 setSessionItems([]);
+                 setTableInfo(null);
+                 setCustomerName('');
             } else {
                 if (isTableSession) {
                     setSessionItems(prev => [...prev, ...cartItems]);
                     setCustomerName(name);
                 }
-
                 const itemsStr = cartItems.map(i => `• ${i.quantity}x ${i.name}`).join('\n');
-                let msg: string;
-                
-                if (isTableSession) {
-                    msg = [
-                        `🧾 *🔥 NUEVA RONDA A COCINA*`,
-                        `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
-                        `🪑 MESA: ${tableInfo!.table} (${tableInfo!.zone})`, `👤 Cliente: ${name}`, `--------------------------------`, itemsStr, `--------------------------------`,
-                        `💰 Subtotal Ronda: ${currencyDisplay}${cartTotal.toFixed(2)}`,
-                        tipAmount > 0 ? `✨ Propina Ronda: ${currencyDisplay}${tipAmount.toFixed(2)}` : '',
-                        `💵 *Total Ronda + Propina: ${currencyDisplay}${finalTotal.toFixed(2)}*`,
-                        (sessionItems.length > 0) ? `📈 *Total Acumulado Mesa: ${currencyDisplay}${(sessionTotal + cartTotal).toFixed(2)}*` : '',
-                        paymentProof ? '✅ Comprobante adjunto' : ''
-                    ].filter(Boolean).join('\n');
+                if(isTableSession) {
+                    msg = `🧾 *🔥 NUEVA RONDA A COCINA*\n📍 *${settings.company.name.toUpperCase()}*\n--------------------------------\n🪑 MESA: ${tableInfo!.table} (${tableInfo!.zone})\n👤 Cliente: ${name}\n--------------------------------\n${itemsStr}\n--------------------------------\n💰 Subtotal Ronda: ${currencyDisplay}${cartTotal.toFixed(2)}\n${tipAmount > 0 ? `✨ Propina Ronda: ${currencyDisplay}${tipAmount.toFixed(2)}\n` : ''}💵 *Total Ronda + Propina: ${currencyDisplay}${finalTotal.toFixed(2)}*\n${(sessionItems.length > 0) ? `📈 *Total Acumulado Mesa: ${currencyDisplay}${(sessionTotal + cartTotal).toFixed(2)}*\n` : ''}${paymentProof ? '✅ Comprobante adjunto' : ''}`;
                 } else {
-                    msg = [
-                        orderType === OrderType.Delivery ? `🧾 *PEDIDO A DOMICILIO*` : `🥡 *PEDIDO PARA RECOGER*`, 
-                        `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
-                        `👤 Cliente: ${name}`, `📱 Tel: ${phone}`,
-                        orderType === OrderType.Delivery ? `🏠 Dir: ${addressData.calle} ${addressData.numero}, ${addressData.colonia}` : '',
-                        orderType === OrderType.Delivery && addressData.referencias ? `👀 Ref: ${addressData.referencias}` : '',
-                        orderType === OrderType.Delivery && addressData.googleMapsLink ? `📍 GPS: ${addressData.googleMapsLink}` : '',
-                        `--------------------------------`, itemsStr, `--------------------------------`,
-                        `💰 Subtotal: ${currencyDisplay}${cartTotal.toFixed(2)}`,
-                        tipAmount > 0 ? `✨ Propina: ${currencyDisplay}${tipAmount.toFixed(2)}` : '',
-                        `💵 *TOTAL A PAGAR: ${currencyDisplay}${finalTotal.toFixed(2)}*`, 
-                        `💳 Método: ${selectedPayment}`,
-                        paymentProof ? '✅ Comprobante adjunto' : ''
-                    ].filter(Boolean).join('\n');
+                    msg = `${orderType === OrderType.Delivery ? `🧾 *PEDIDO A DOMICILIO*` : `🥡 *PEDIDO PARA RECOGER*`}\n📍 *${settings.company.name.toUpperCase()}*\n--------------------------------\n👤 Cliente: ${name}\n📱 Tel: ${phone}\n${orderType === OrderType.Delivery ? `🏠 Dir: ${addressData.calle} ${addressData.numero}, ${addressData.colonia}\n` : ''}${orderType === OrderType.Delivery && addressData.referencias ? `👀 Ref: ${addressData.referencias}\n` : ''}${orderType === OrderType.Delivery && addressData.googleMapsLink ? `📍 GPS: ${addressData.googleMapsLink}\n` : ''}--------------------------------\n${itemsStr}\n--------------------------------\n💰 Subtotal: ${currencyDisplay}${cartTotal.toFixed(2)}\n${tipAmount > 0 ? `✨ Propina: ${currencyDisplay}${tipAmount.toFixed(2)}\n` : ''}💵 *TOTAL A PAGAR: ${currencyDisplay}${finalTotal.toFixed(2)}*\n💳 Método: ${selectedPayment}\n${paymentProof ? '✅ Comprobante adjunto' : ''}`;
                 }
-
-                window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
-                clearCart();
-                setPaymentProof(null);
-                setTipAmount(0);
-                setView('confirmation');
             }
+            
+            window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+            clearCart();
+            setPaymentProof(null);
+            setTipAmount(0);
+            setView('confirmation');
+
         } catch(e) {
             console.error("Error al procesar el pedido:", e);
             alert("Error al procesar el pedido. Intenta de nuevo.");
         }
     };
 
-    const scrollToCategory = (id: string) => {
+    const scrollToCategory = useCallback((id: string) => {
         setActiveCategory(id);
         const el = document.getElementById(`cat-${id}`);
         if (el) {
@@ -300,16 +293,14 @@ export default function CustomerView() {
             const offsetPosition = elementPosition - offset;
             window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
         }
-    };
+    }, []);
 
     if (isLoading || !settings) return (
         <div className="h-screen bg-gray-950 flex flex-col items-center justify-center">
             <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
-            <p className="text-emerald-500 font-black uppercase tracking-widest text-xs animate-pulse">Iniciando menú...</p>
+            <p className="text-emerald-500 font-black uppercase tracking-widest text-xs animate-pulse">Cargando menú...</p>
         </div>
     );
-
-    const isBankPayment = ['Pago Móvil', 'Transferencia', 'Zelle'].includes(selectedPayment);
 
     return (
         <div className="bg-[#0f172a] min-h-screen text-gray-100 font-sans selection:bg-emerald-500/20 pb-safe">
@@ -333,7 +324,7 @@ export default function CustomerView() {
                         <div className="animate-fade-in">
                             <div className="relative pt-12 pb-8 flex flex-col items-center text-center">
                                 <div className="w-24 h-24 bg-black rounded-full flex items-center justify-center border-4 border-gray-800 mb-4 overflow-hidden shadow-2xl">
-                                    {settings.branch.logoUrl ? <img src={settings.branch.logoUrl} className="w-full h-full object-cover" /> : <span className="text-emerald-500 font-bold text-2xl">AN</span>}
+                                    {settings.branch.logoUrl ? <FadeInImage src={settings.branch.logoUrl} alt="Logo" className="w-full h-full object-cover" priority /> : <span className="text-emerald-500 font-bold text-2xl">AN</span>}
                                 </div>
                                 <h1 className="text-2xl font-black text-white uppercase tracking-tight">{settings.company.name}</h1>
                                 <p className="text-xs text-gray-400 font-medium mt-1">{settings.branch.alias}</p>
@@ -360,7 +351,7 @@ export default function CustomerView() {
                                     <input type="text" placeholder="Buscar productos..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[#1e293b] border-none rounded-xl py-3.5 pl-12 pr-4 text-sm focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder-gray-500 font-medium" />
                                 </div>
                                 <div className="flex overflow-x-auto gap-2 no-scrollbar pb-1">
-                                    {allCategories.map(cat => (
+                                    {filteredCategories.map(cat => (
                                         <button key={cat.id} onClick={() => scrollToCategory(cat.id)} className={`whitespace-nowrap px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${activeCategory === cat.id ? 'bg-white text-gray-900 border-white' : 'bg-transparent text-gray-400 border-gray-800 hover:border-gray-600'}`}>
                                             {cat.name}
                                         </button>
@@ -369,57 +360,27 @@ export default function CustomerView() {
                             </div>
 
                             <div className="p-4 space-y-8 mt-4">
-                                {allCategories.map(cat => {
+                                {filteredCategories.map(cat => {
                                     const products = allProducts.filter(p => p.categoryId === cat.id && p.available && p.name.toLowerCase().includes(searchTerm.toLowerCase()));
                                     if (products.length === 0) return null;
                                     return (
                                         <div key={cat.id} id={`cat-${cat.id}`}>
                                             <h3 className="text-lg font-black text-white uppercase tracking-tighter mb-4 flex items-center gap-2">{cat.name}</h3>
                                             <div className="grid gap-3">
-                                                {products.map(p => {
-                                                    const { price: displayPrice, promotion } = getDiscountedPrice(p, allPromotions);
-                                                    return (
-                                                        <div key={p.id} onClick={() => setSelectedProduct(p)} className="bg-[#1e293b]/50 p-3 rounded-2xl border border-gray-800/60 flex gap-4 active:scale-[0.98] transition-all cursor-pointer hover:bg-[#1e293b]/80 group relative overflow-hidden">
-                                                            {promotion && <div className="absolute top-0 left-0 bg-rose-500 text-white text-[9px] font-black px-2 py-1 rounded-br-xl z-10 shadow-lg">-{promotion.discountType === 'percentage' ? `${promotion.discountValue}%` : `${currencyDisplay}${promotion.discountValue}`}</div>}
-                                                            <div className="relative shrink-0">
-                                                                <img src={p.imageUrl} className="w-24 h-24 rounded-xl object-cover shadow-lg group-hover:scale-105 transition-transform" />
-                                                            </div>
-                                                            <div className="flex-1 flex flex-col justify-center">
-                                                                <h4 className="font-bold text-gray-100 group-hover:text-emerald-400 transition-colors leading-snug">{p.name}</h4>
-                                                                <p className="text-[11px] text-gray-500 line-clamp-2 mt-1 leading-relaxed">{p.description}</p>
-                                                                <div className="mt-2 flex flex-col">
-                                                                    {promotion && <span className="text-[10px] text-gray-600 line-through font-bold">{currencyDisplay}{p.price.toFixed(2)}</span>}
-                                                                    <span className="font-black text-emerald-400 text-base">{currencyDisplay}{displayPrice.toFixed(2)}</span>
-                                                                </div>
-                                                            </div>
-                                                            <div className="absolute bottom-3 right-3 bg-gray-800 p-1.5 rounded-lg text-emerald-400 border border-gray-700 shadow-xl group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                                                                <IconPlus className="h-4 w-4" />
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
+                                                {products.map(p => (
+                                                    <MemoizedProductCard 
+                                                        key={p.id} 
+                                                        product={p} 
+                                                        onSelect={setSelectedProduct} 
+                                                        currencyDisplay={currencyDisplay}
+                                                        promotions={allPromotions}
+                                                    />
+                                                ))}
                                             </div>
                                         </div>
                                     );
                                 })}
                             </div>
-                        </div>
-                    )}
-                    
-                    {view === 'confirmation' && (
-                        <div className="p-12 text-center h-full flex flex-col items-center justify-center gap-8 animate-fade-in min-h-[60vh]">
-                            <div className="w-24 h-24 bg-emerald-500/10 rounded-full flex items-center justify-center border-2 border-emerald-500/20 shadow-inner">
-                                <IconCheck className="w-12 h-12 text-emerald-500"/>
-                            </div>
-                            <div className="space-y-4">
-                                <h2 className="text-4xl font-black text-white uppercase tracking-tighter leading-none">{isFinalClosing ? '¡HASTA PRONTO!' : '¡A COCINA!'}</h2>
-                                <p className="text-gray-500 text-sm leading-relaxed max-w-xs mx-auto font-medium">
-                                    {isFinalClosing ? 'Hemos enviado tu solicitud. Un mesero pasará a confirmar el pago.' : 'Tu ronda ha sido enviada. Puedes seguir pidiendo más cosas.'}
-                                </p>
-                            </div>
-                            <button onClick={() => { setIsFinalClosing(false); setView('menu'); }} className="w-full max-w-xs bg-gray-800 text-white py-4 rounded-xl font-bold hover:bg-gray-700 transition-colors border border-gray-700 uppercase tracking-widest text-xs">
-                                {isFinalClosing ? 'NUEVO PEDIDO' : 'SEGUIR PIDIENDO'}
-                            </button>
                         </div>
                     )}
                     
@@ -429,7 +390,7 @@ export default function CustomerView() {
                             <div className="space-y-4"> 
                                 {cartItems.map(i => ( 
                                     <div key={i.cartItemId} className="flex gap-4 bg-gray-800/40 p-4 rounded-2xl border border-gray-800/60"> 
-                                        <img src={i.imageUrl} className="w-20 h-20 rounded-xl object-cover" /> 
+                                        <FadeInImage src={i.imageUrl} alt={i.name} className="w-20 h-20 rounded-xl" />
                                         <div className="flex-1 flex flex-col justify-center"> 
                                             <div className="flex justify-between items-start mb-2"> 
                                                 <span className="font-bold text-sm text-gray-100">{i.name}</span> 
@@ -458,7 +419,22 @@ export default function CustomerView() {
                             </div> 
                         </div> 
                     )}
-
+                    {view === 'confirmation' && (
+                        <div className="p-12 text-center h-full flex flex-col items-center justify-center gap-8 animate-fade-in min-h-[60vh]">
+                            <div className="w-24 h-24 bg-emerald-500/10 rounded-full flex items-center justify-center border-2 border-emerald-500/20 shadow-inner">
+                                <IconCheck className="w-12 h-12 text-emerald-500"/>
+                            </div>
+                            <div className="space-y-4">
+                                <h2 className="text-4xl font-black text-white uppercase tracking-tighter leading-none">{isFinalClosing ? '¡HASTA PRONTO!' : '¡A COCINA!'}</h2>
+                                <p className="text-gray-500 text-sm leading-relaxed max-w-xs mx-auto font-medium">
+                                    {isFinalClosing ? 'Hemos enviado tu solicitud. Un mesero pasará a confirmar el pago.' : 'Tu ronda ha sido enviada. Puedes seguir pidiendo más cosas.'}
+                                </p>
+                            </div>
+                            <button onClick={() => { setIsFinalClosing(false); setView('menu'); }} className="w-full max-w-xs bg-gray-800 text-white py-4 rounded-xl font-bold hover:bg-gray-700 transition-colors border border-gray-700 uppercase tracking-widest text-xs">
+                                {isFinalClosing ? 'NUEVO PEDIDO' : 'SEGUIR PIDIENDO'}
+                            </button>
+                        </div>
+                    )}
                     {view === 'account' && ( 
                         <div className="p-6 animate-fade-in"> 
                             <div className="bg-gray-800/30 p-7 rounded-[2.5rem] border border-gray-800 mb-6 shadow-xl"> 
@@ -486,18 +462,15 @@ export default function CustomerView() {
                             </button> 
                         </div> 
                     )}
-
-                    {view === 'checkout' && ( 
-                        <form id="checkout-form" onSubmit={handleOrderAction} className="p-6 space-y-6 animate-fade-in pb-20"> 
-                            
-                            {(!customerName || !isTableSession) && (
+                    {view === 'checkout' && (
+                        <form id="checkout-form" onSubmit={handleOrderAction} className="p-6 space-y-6 animate-fade-in pb-20">
+                             {(!customerName || !isTableSession) && (
                                 <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]">
                                     <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">TUS DATOS</h3>
                                     <input name="name" type="text" defaultValue={customerName} className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="Nombre completo" required />
                                     {!isTableSession && <input name="phone" type="tel" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="WhatsApp" required />}
                                 </div>
                             )}
-
                             {!isTableSession && orderType === OrderType.Delivery && (
                                 <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]">
                                     <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">DIRECCIÓN DE ENTREGA</h3>
@@ -511,7 +484,6 @@ export default function CustomerView() {
                                     </button>
                                 </div>
                             )}
-
                             {settings.payment.showTipField && (
                                 <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]">
                                     <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">¿PROPINA PARA EL EQUIPO?</h3>
@@ -528,30 +500,20 @@ export default function CustomerView() {
                                     <input type="number" step="0.01" value={tipAmount || ''} onChange={e => setTipAmount(parseFloat(e.target.value) || 0)} className="w-full bg-gray-800 border border-gray-700 rounded-xl py-3 px-4 text-sm font-bold text-white outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Monto personalizado" />
                                 </div>
                             )}
-                            
                             <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem] overflow-hidden relative">
                                 <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-4">MÉTODO DE PAGO</h3>
                                 <div className="grid grid-cols-1 gap-2">
                                     {['Efectivo', 'Pago Móvil', 'Transferencia', 'Zelle'].map(m => (
                                         <label key={m} className={`flex justify-between items-center p-4 bg-gray-800/50 border rounded-xl cursor-pointer transition-all ${selectedPayment === m ? 'border-emerald-500 bg-emerald-500/10' : 'border-gray-700 hover:border-gray-500'}`}>
                                             <span className="text-sm font-bold text-gray-300">{m}</span>
-                                            <input 
-                                                type="radio" 
-                                                name="payment" 
-                                                value={m} 
-                                                checked={selectedPayment === m}
-                                                onChange={() => { setSelectedPayment(m as PaymentMethod); setPaymentProof(null); }}
-                                                className="accent-emerald-500 h-5 w-5" 
-                                            />
+                                            <input type="radio" name="payment" value={m} checked={selectedPayment === m} onChange={() => { setSelectedPayment(m as PaymentMethod); setPaymentProof(null); }} className="accent-emerald-500 h-5 w-5" />
                                         </label>
                                     ))}
                                 </div>
-                                
-                                {isBankPayment && (
+                                {['Pago Móvil', 'Transferencia', 'Zelle'].includes(selectedPayment) && (
                                     <div className="mt-4 p-5 bg-gray-900 rounded-2xl border border-gray-700 space-y-4 animate-fade-in relative overflow-hidden">
                                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent opacity-50"></div>
                                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center border-b border-gray-800 pb-2 mb-2">DATOS PARA EL PAGO</p>
-                                        
                                         {selectedPayment === 'Pago Móvil' && settings.payment.pagoMovil && (
                                             <div className="space-y-2 text-xs">
                                                 <div className="flex justify-between"><span className="text-gray-500">Banco:</span><span className="font-bold text-white uppercase">{settings.payment.pagoMovil.bank || '---'}</span></div>
@@ -573,7 +535,6 @@ export default function CustomerView() {
                                                 <div className="flex justify-between"><span className="text-gray-500">Titular:</span><span className="font-bold text-white uppercase">{settings.payment.zelle.holder || '---'}</span></div>
                                             </div>
                                         )}
-
                                         <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:bg-gray-800 transition-colors mt-6 bg-black/20">
                                             {paymentProof ? (
                                                 <div className="flex flex-col items-center gap-1 text-emerald-400 animate-bounce">
@@ -591,7 +552,6 @@ export default function CustomerView() {
                                     </div>
                                 )}
                             </div>
-
                             <div className="pt-2 pb-6">
                                 <div className="space-y-2 mb-6 px-2">
                                     <div className="flex justify-between text-xs text-gray-400 font-bold uppercase tracking-wider">
@@ -614,7 +574,7 @@ export default function CustomerView() {
                                     {isFinalClosing ? 'ENVIAR COMPROBANTE' : (isTableSession ? 'ENVIAR A COCINA' : 'REALIZAR PEDIDO')}
                                 </button>
                             </div>
-                        </form> 
+                        </form>
                     )}
                 </div>
 
@@ -623,7 +583,7 @@ export default function CustomerView() {
                         <div className="absolute inset-0 bg-black/85 backdrop-blur-sm" onClick={() => setSelectedProduct(null)}></div>
                         <div className="bg-gray-900 w-full max-w-sm rounded-[2.5rem] overflow-hidden relative z-10 animate-slide-up border border-gray-800 shadow-2xl">
                             <div className="h-64 relative overflow-hidden">
-                                <img src={selectedProduct.imageUrl} className="w-full h-full object-cover" />
+                                <FadeInImage src={selectedProduct.imageUrl} alt={selectedProduct.name} className="w-full h-full object-cover" />
                                 <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent"></div>
                                 <button onClick={() => setSelectedProduct(null)} className="absolute top-6 right-6 bg-black/40 p-2 rounded-full text-white backdrop-blur-md border border-white/10 transition-colors hover:bg-black/60"><IconX/></button>
                             </div>
@@ -681,15 +641,6 @@ export default function CustomerView() {
                 )}
                 <Chatbot />
             </div>
-            <style>{`
-                .no-scrollbar::-webkit-scrollbar { display: none; }
-                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-                @keyframes slide-up {
-                    from { transform: translateY(100%); opacity: 0; }
-                    to { transform: translateY(0); opacity: 1; }
-                }
-                .animate-slide-up { animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-            `}</style>
         </div>
     );
 }
