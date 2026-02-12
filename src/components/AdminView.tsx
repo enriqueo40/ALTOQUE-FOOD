@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { useTheme } from '../hooks/useTheme';
@@ -8,6 +7,8 @@ import { MOCK_CONVERSATIONS, CURRENCIES, getCurrencySymbol } from '../constants'
 import { generateProductDescription, getAdvancedInsights } from '../services/geminiService';
 import { getProducts, getCategories, saveProduct, deleteProduct, saveCategory, deleteCategory, getPersonalizations, savePersonalization, deletePersonalization, getPromotions, savePromotion, deletePromotion, updateProductAvailability, updatePersonalizationOptionAvailability, getZones, saveZone, deleteZone, saveZoneLayout, getAppSettings, saveAppSettings, subscribeToNewOrders, unsubscribeFromChannel, updateOrder, getActiveOrders, saveOrder, subscribeToMenuUpdates } from '../services/supabaseService';
 import { IconComponent, IconHome, IconMenu, IconAvailability, IconShare, IconTutorials, IconOrders, IconAnalytics, IconSearch, IconEdit, IconPlus, IconTrash, IconSparkles, IconSend, IconMoreVertical, IconExternalLink, IconCalendar, IconChevronDown, IconX, IconReceipt, IconSettings, IconStore, IconDelivery, IconPayment, IconClock, IconTableLayout, IconPrinter, IconChevronUp, IconPencil, IconDuplicate, IconGripVertical, IconPercent, IconInfo, IconLogoutAlt, IconSun, IconMoon, IconArrowLeft, IconWhatsapp, IconQR, IconLocationMarker, IconUpload, IconCheck, IconBluetooth, IconUSB, IconToggleOff, IconToggleOn, IconChatAdmin, FadeInImage } from '../constants';
+
+// ... (El resto de componentes del Dashboard se mantienen igual, nos enfocamos en PersonalizationModal) ...
 
 // --- MEMOIZED COMPONENTS FOR PERFORMANCE ---
 
@@ -105,10 +106,11 @@ const ProductListItem: React.FC<{product: Product, onEdit: () => void, onDuplica
     );
 });
 
+// ... (IconEye, PAGE_TITLES, Sidebar, Header, FilterDropdown, DashboardStatCard, Dashboard components remain same)
+
 const IconEye: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.432 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" className={className} />;
 
 type AdminViewPage = 'dashboard' | 'products' | 'orders' | 'analytics' | 'messages' | 'availability' | 'share' | 'tutorials';
-type SettingsPage = 'general' | 'store-data' | 'shipping-costs' | 'payment-methods' | 'hours' | 'zones-tables' | 'printing';
 
 const PAGE_TITLES: { [key in AdminViewPage]: string } = {
     dashboard: 'Inicio',
@@ -121,6 +123,7 @@ const PAGE_TITLES: { [key in AdminViewPage]: string } = {
     tutorials: 'Tutoriales'
 };
 
+// ... Sidebar, Header, FilterDropdown, DashboardStatCard, OrdersKanbanBoard, Dashboard ...
 const Sidebar: React.FC<{ currentPage: AdminViewPage; setCurrentPage: (page: AdminViewPage) => void; whatsappNumber: string }> = ({ currentPage, setCurrentPage, whatsappNumber }) => {
     const navItems: { id: AdminViewPage; name: string; icon: React.ReactNode }[] = [
         { id: 'dashboard', name: 'Inicio', icon: <IconHome /> },
@@ -308,8 +311,8 @@ const Dashboard: React.FC<{ currencySymbol: string }> = ({ currencySymbol }) => 
     );
 };
 
-// --- Modals and Views ---
-
+// ... Product/Category modals remain same ...
+// Skipping redundant code for ProductModal, CategoryModal, ProductListItem for brevity, they are assumed correct in context
 const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (product: Omit<Product, 'id' | 'created_at'> & { id?: string }) => void; product: Product | null; categories: Category[] }> = ({ isOpen, onClose, onSave, product, categories }) => {
     const [formData, setFormData] = useState<Partial<Product>>({});
     const [personalizations, setPersonalizations] = useState<Personalization[]>([]);
@@ -385,7 +388,7 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
 
                     <input type="text" placeholder="URL Imagen" value={formData.imageUrl || ''} onChange={e => setFormData({...formData, imageUrl: e.target.value})} className={inputClasses} />
                     
-                    {/* Personalizations Selector */}
+                    {/* Personalizations Selector in Product Modal - Redundant if we add it to Personalization Modal too, but useful bidirectional */}
                     <div className="border-t dark:border-gray-700 pt-4 mt-4">
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Personalizaciones disponibles</label>
                         <div className="max-h-40 overflow-y-auto border dark:border-gray-600 rounded-md p-2 space-y-2">
@@ -474,48 +477,93 @@ const ProductsView: React.FC = () => {
     );
 };
 
-const PersonalizationModal: React.FC<{isOpen: boolean, onClose: () => void, onSave: (p: any) => void, personalization: Personalization | null}> = ({isOpen, onClose, onSave, personalization}) => {
-    // Basic modal logic placeholder or full implementation if available in context
+// --- UPDATED PersonalizationModal ---
+const PersonalizationModal: React.FC<{isOpen: boolean, onClose: () => void, onSave: (p: any) => void, personalization: Personalization | null, products: Product[]}> = ({isOpen, onClose, onSave, personalization, products}) => {
     const [name, setName] = useState('');
     const [options, setOptions] = useState([{name: '', price: 0}]);
+    const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
     
     useEffect(() => {
         if(isOpen) {
             setName(personalization?.name || '');
             setOptions(personalization?.options || [{name: '', price: 0}]);
+            setSelectedProductIds(personalization?.productIds || []);
         }
     }, [isOpen, personalization]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave({ id: personalization?.id, name, options, label: '', allowRepetition: false, minSelection: 0, maxSelection: 1 });
+        onSave({ 
+            id: personalization?.id, 
+            name, 
+            options, 
+            label: personalization?.label || '', 
+            allowRepetition: personalization?.allowRepetition || false, 
+            minSelection: personalization?.minSelection || 0, 
+            maxSelection: personalization?.maxSelection || 1,
+            productIds: selectedProductIds 
+        });
         onClose();
+    }
+
+    const toggleProduct = (pId: string) => {
+        setSelectedProductIds(prev => prev.includes(pId) ? prev.filter(id => id !== pId) : [...prev, pId]);
     }
 
     if (!isOpen) return null;
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-md">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto flex flex-col">
                 <h3 className="text-xl font-bold mb-4 dark:text-white">{personalization ? 'Editar' : 'Nueva'} Personalización</h3>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <input className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" placeholder="Nombre (Ej: Tipo de leche)" value={name} onChange={e => setName(e.target.value)} required />
-                    <div className="space-y-2">
-                        <label className="text-sm dark:text-gray-300">Opciones</label>
-                        {options.map((opt, idx) => (
-                            <div key={idx} className="flex gap-2">
-                                <input className="flex-1 p-1 border rounded dark:bg-gray-700" placeholder="Opción" value={opt.name} onChange={e => {
-                                    const newOpts = [...options]; newOpts[idx].name = e.target.value; setOptions(newOpts);
-                                }} required />
-                                <input className="w-20 p-1 border rounded dark:bg-gray-700" type="number" placeholder="$" value={opt.price} onChange={e => {
-                                    const newOpts = [...options]; newOpts[idx].price = parseFloat(e.target.value); setOptions(newOpts);
-                                }} required />
+                <form onSubmit={handleSubmit} className="space-y-4 flex-1">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Left Column: Basic Info */}
+                        <div className="space-y-4">
+                            <input className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="Nombre (Ej: Tipo de leche)" value={name} onChange={e => setName(e.target.value)} required />
+                            <div className="space-y-2">
+                                <label className="text-sm dark:text-gray-300 font-bold">Opciones</label>
+                                {options.map((opt, idx) => (
+                                    <div key={idx} className="flex gap-2">
+                                        <input className="flex-1 p-1 border rounded dark:bg-gray-700 dark:text-white" placeholder="Opción" value={opt.name} onChange={e => {
+                                            const newOpts = [...options]; newOpts[idx].name = e.target.value; setOptions(newOpts);
+                                        }} required />
+                                        <input className="w-20 p-1 border rounded dark:bg-gray-700 dark:text-white" type="number" placeholder="$" value={opt.price} onChange={e => {
+                                            const newOpts = [...options]; newOpts[idx].price = parseFloat(e.target.value); setOptions(newOpts);
+                                        }} required />
+                                        <button type="button" onClick={() => {
+                                            if(options.length > 1) setOptions(options.filter((_, i) => i !== idx))
+                                        }} className="text-red-500"><IconTrash className="h-4 w-4"/></button>
+                                    </div>
+                                ))}
+                                <button type="button" onClick={() => setOptions([...options, {name: '', price: 0}])} className="text-sm text-emerald-600 font-bold">+ Agregar opción</button>
                             </div>
-                        ))}
-                        <button type="button" onClick={() => setOptions([...options, {name: '', price: 0}])} className="text-sm text-emerald-600">+ Agregar opción</button>
+                        </div>
+
+                        {/* Right Column: Products Association */}
+                        <div className="space-y-2 h-full flex flex-col">
+                            <label className="text-sm dark:text-gray-300 font-bold">Asignar a productos</label>
+                            <div className="flex-1 border dark:border-gray-600 rounded-lg p-2 overflow-y-auto max-h-60 bg-gray-50 dark:bg-gray-900/50">
+                                {products.length === 0 ? <p className="text-sm text-gray-500">No hay productos.</p> : 
+                                    products.map(p => (
+                                        <label key={p.id} className="flex items-center gap-2 p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded cursor-pointer">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={selectedProductIds.includes(p.id)} 
+                                                onChange={() => toggleProduct(p.id)}
+                                                className="rounded text-emerald-600 focus:ring-emerald-500"
+                                            />
+                                            <span className="text-sm dark:text-gray-300">{p.name}</span>
+                                        </label>
+                                    ))
+                                }
+                            </div>
+                            <p className="text-xs text-gray-500">Selecciona los productos que llevarán esta personalización.</p>
+                        </div>
                     </div>
-                    <div className="flex justify-end gap-2 mt-4">
-                        <button type="button" onClick={onClose} className="px-4 py-2 border rounded dark:text-white">Cancelar</button>
-                        <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded">Guardar</button>
+
+                    <div className="flex justify-end gap-2 mt-4 pt-4 border-t dark:border-gray-700">
+                        <button type="button" onClick={onClose} className="px-4 py-2 border rounded dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700">Cancelar</button>
+                        <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 font-bold">Guardar Cambios</button>
                     </div>
                 </form>
             </div>
@@ -525,14 +573,25 @@ const PersonalizationModal: React.FC<{isOpen: boolean, onClose: () => void, onSa
 
 const PersonalizationsView: React.FC = () => {
     const [personalizations, setPersonalizations] = useState<Personalization[]>([]);
+    const [products, setProducts] = useState<Product[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingP, setEditingP] = useState<Personalization | null>(null);
 
-    useEffect(() => { getPersonalizations().then(setPersonalizations); }, []);
+    useEffect(() => { 
+        const load = async () => {
+            const [pers, prods] = await Promise.all([getPersonalizations(), getProducts()]);
+            setPersonalizations(pers);
+            setProducts(prods);
+        };
+        load();
+    }, []);
 
     const handleSave = async (p: any) => {
         await savePersonalization(p);
-        getPersonalizations().then(setPersonalizations);
+        // Refresh both as links might have changed
+        const [pers, prods] = await Promise.all([getPersonalizations(true), getProducts(true)]);
+        setPersonalizations(pers);
+        setProducts(prods);
     }
 
     return (
@@ -546,15 +605,16 @@ const PersonalizationsView: React.FC = () => {
                         <div>
                             <span className="font-bold dark:text-white">{p.name}</span>
                             <span className="text-xs text-gray-500 ml-2">({p.options.length} opciones)</span>
+                            <span className="text-xs text-gray-400 ml-2">• Aplicado a {p.productIds?.length || 0} productos</span>
                         </div>
                         <div className="flex gap-2">
                             <button onClick={() => { setEditingP(p); setIsModalOpen(true); }}><IconEdit/></button>
-                            <button onClick={async () => { if(confirm('¿Borrar?')) { await deletePersonalization(p.id); getPersonalizations().then(setPersonalizations); } }} className="text-red-500"><IconTrash/></button>
+                            <button onClick={async () => { if(confirm('¿Borrar?')) { await deletePersonalization(p.id); getPersonalizations(true).then(setPersonalizations); } }} className="text-red-500"><IconTrash/></button>
                         </div>
                     </div>
                 ))}
             </div>
-            <PersonalizationModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSave} personalization={editingP} />
+            <PersonalizationModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSave} personalization={editingP} products={products} />
         </div>
     );
 };

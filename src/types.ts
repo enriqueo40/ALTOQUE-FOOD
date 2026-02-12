@@ -111,6 +111,7 @@ export interface Personalization {
   allowRepetition: boolean;
   minSelection?: number;
   maxSelection?: number | null;
+  productIds?: string[]; // New field to link to products from the personalization side
 }
 
 export enum DiscountType {

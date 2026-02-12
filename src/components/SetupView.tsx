@@ -196,7 +196,8 @@ CREATE POLICY "Allow all users to manage orders" ON public.orders FOR ALL USING 
 CREATE POLICY "Allow all users to manage app_settings" ON public.app_settings FOR ALL USING (true) WITH CHECK (true);
 `;
 
-const PATCH_SQL = `-- Parche SQL: Crear tabla 'product_personalizations' si no existe
+const PATCH_SQL = `-- Parche SQL: Crear tabla 'product_personalizations'
+-- IMPORTANTE: Ejecuta esto si no quieres perder datos existentes.
 CREATE TABLE IF NOT EXISTS public.product_personalizations (
     product_id uuid NOT NULL,
     personalization_id uuid NOT NULL,
@@ -246,24 +247,25 @@ const SetupView: React.FC = () => {
         <div className="p-8 max-w-4xl mx-auto">
             <h1 className="text-3xl font-bold mb-4 text-gray-800 dark:text-gray-100">Instalación de Base de Datos</h1>
             <p className="text-gray-600 dark:text-gray-300 mb-6">
-                Copia y ejecuta estos comandos en el editor SQL de tu panel de Supabase para configurar la base de datos necesaria para la aplicación.
+                Para que las personalizaciones funcionen correctamente, necesitas crear la tabla intermedia. 
+                Si estás empezando, usa el script completo. Si ya tienes datos, usa el parche.
             </p>
 
-            <CodeBlock title="Script de Instalación Completa" code={COMPLETE_SQL_SETUP} />
+            <CodeBlock title="Opción 1: Instalación Completa (Borra datos existentes)" code={COMPLETE_SQL_SETUP} />
             
             <div className="mt-8 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                 <div className="flex items-start gap-3">
                     <IconInfo className="h-6 w-6 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
                     <div>
-                        <h4 className="font-bold text-yellow-800 dark:text-yellow-200">¿Ya tienes datos?</h4>
+                        <h4 className="font-bold text-yellow-800 dark:text-yellow-200">¿Falta la tabla de personalizaciones?</h4>
                         <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                            Si ya usaste el script anterior y solo necesitas agregar la funcionalidad de personalizaciones sin borrar tus productos existentes, usa el siguiente parche:
+                            Usa este parche SQL para crear la tabla <code>product_personalizations</code> sin borrar tus productos.
                         </p>
                     </div>
                 </div>
             </div>
 
-            <CodeBlock title="Parche: Tabla de Personalizaciones por Producto" code={PATCH_SQL} />
+            <CodeBlock title="Opción 2: Parche (Conserva datos)" code={PATCH_SQL} />
         </div>
     );
 };

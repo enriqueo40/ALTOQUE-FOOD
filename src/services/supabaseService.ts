@@ -11,7 +11,6 @@ let ordersChannel: RealtimeChannel | null = null;
 let menuChannel: RealtimeChannel | null = null;
 
 // --- IN-MEMORY CACHE ---
-// Used to store static data and avoid re-fetching on every component mount.
 const cache: {
     categories: Category[] | null;
     products: Product[] | null;
@@ -36,7 +35,6 @@ const getClient = (): SupabaseClient => {
 
 // --- Settings Functions ---
 export const getAppSettings = async (): Promise<AppSettings> => {
-    // Return cached settings instantly if available
     if (cache.settings) return cache.settings;
 
     const { data, error } = await getClient().from('app_settings').select('settings').eq('id', 1).single();
@@ -55,12 +53,12 @@ export const getAppSettings = async (): Promise<AppSettings> => {
         result = deepMerge(result, data.settings);
     }
     
-    cache.settings = result; // Cache result
+    cache.settings = result;
     return result;
 };
 
 export const saveAppSettings = async (settings: AppSettings): Promise<void> => {
-    cache.settings = settings; // Optimistic cache update
+    cache.settings = settings;
     await getClient().from('app_settings').update({ settings, updated_at: new Date().toISOString() }).eq('id', 1);
 };
 
@@ -76,7 +74,6 @@ export const saveCategory = async (category: Omit<Category, 'id' | 'created_at'>
     const { id, ...categoryData } = category;
     const { data, error } = await getClient().from('categories').upsert({ id, ...categoryData }).select().single();
     if (error || !data) throw new Error(error?.message || "Could not save category.");
-    // Invalidate cache
     cache.categories = null; 
     return data;
 };
@@ -91,7 +88,7 @@ export const deleteCategory = async (categoryId: string): Promise<void> => {
 export const getProducts = async (forceRefresh = false): Promise<Product[]> => {
     if (cache.products && !forceRefresh) return cache.products;
     
-    // Join with product_personalizations to get the IDs
+    // Attempt to join with product_personalizations if the table exists
     const { data, error } = await getClient()
         .from('products')
         .select('*, product_personalizations(personalization_id)')
@@ -99,12 +96,13 @@ export const getProducts = async (forceRefresh = false): Promise<Product[]> => {
         
     if (error) {
         console.error("Error fetching products:", error);
-        throw error;
+        // Fallback if table doesn't exist yet to prevent app crash
+        const { data: simpleData } = await getClient().from('products').select('*').order('name');
+        return simpleData || [];
     }
 
     const mappedProducts = (data || []).map((p: any) => ({
         ...p,
-        // Flatten the relationship to a simple array of IDs
         personalizationIds: p.product_personalizations?.map((pp: any) => pp.personalization_id) || []
     }));
 
@@ -115,7 +113,6 @@ export const getProducts = async (forceRefresh = false): Promise<Product[]> => {
 export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & { id?: string }): Promise<Product> => {
     const { id, personalizationIds, ...productData } = product;
     
-    // 1. Save the product info
     const { data: savedProduct, error } = await getClient()
         .from('products')
         .upsert({ id, ...productData })
@@ -124,38 +121,28 @@ export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & 
 
     if (error || !savedProduct) throw new Error(error?.message || "Could not save product.");
 
-    // 2. Manage Product <-> Personalization links
-    // First, remove existing links for this product
-    const { error: deleteError } = await getClient()
-        .from('product_personalizations')
-        .delete()
-        .eq('product_id', savedProduct.id);
+    // Manage relationships
+    if (personalizationIds !== undefined) {
+        // Safe delete
+        await getClient().from('product_personalizations').delete().eq('product_id', savedProduct.id);
         
-    if (deleteError) throw deleteError;
-
-    // Then, insert new links if any
-    if (personalizationIds && personalizationIds.length > 0) {
-        const links = personalizationIds.map(pId => ({
-            product_id: savedProduct.id,
-            personalization_id: pId
-        }));
-        const { error: insertError } = await getClient()
-            .from('product_personalizations')
-            .insert(links);
-            
-        if (insertError) throw insertError;
+        if (personalizationIds.length > 0) {
+            const links = personalizationIds.map(pId => ({
+                product_id: savedProduct.id,
+                personalization_id: pId
+            }));
+            await getClient().from('product_personalizations').insert(links);
+        }
     }
 
-    cache.products = null; // Invalidate cache to refresh links
+    cache.products = null;
     return { ...savedProduct, personalizationIds: personalizationIds || [] };
 };
 
 export const updateProductAvailability = async (productId: string, available: boolean): Promise<Product> => {
-    // Optimistic update in cache if exists
     if (cache.products) {
         cache.products = cache.products.map(p => p.id === productId ? { ...p, available } : p);
     }
-    
     const { data, error } = await getClient().from('products').update({ available }).eq('id', productId).select().single();
     if (error || !data) throw new Error("Could not update product availability.");
     return data;
@@ -171,14 +158,20 @@ export const deleteProduct = async (productId: string): Promise<void> => {
 export const getPersonalizations = async (forceRefresh = false): Promise<Personalization[]> => {
     if (cache.personalizations && !forceRefresh) return cache.personalizations;
     
-    const { data, error } = await getClient().from('personalizations').select('*, options:personalization_options(*)');
-    if (error) throw error;
+    // Fetch with product relations
+    const { data, error } = await getClient().from('personalizations').select('*, options:personalization_options(*), product_personalizations(product_id)');
+    
+    if (error) {
+        console.error("Error fetching personalizations", error);
+        throw error;
+    }
     
     const result = (data?.map(p => ({
         ...p,
         allowRepetition: p.allow_repetition,
         minSelection: p.min_selection,
-        maxSelection: p.max_selection
+        maxSelection: p.max_selection,
+        productIds: p.product_personalizations?.map((pp: any) => pp.product_id) || []
     })) || []) as Personalization[];
     
     cache.personalizations = result;
@@ -188,23 +181,46 @@ export const getPersonalizations = async (forceRefresh = false): Promise<Persona
 export const updatePersonalizationOptionAvailability = async (optionId: string, available: boolean): Promise<PersonalizationOption> => {
     const { data, error } = await getClient().from('personalization_options').update({ available }).eq('id', optionId).select().single();
     if (error || !data) throw new Error("Could not update option availability.");
-    cache.personalizations = null; // Invalidate deep nested structure
+    cache.personalizations = null;
     return data;
 };
 
 export const savePersonalization = async (personalization: Omit<Personalization, 'id' | 'created_at'> & { id?: string }): Promise<Personalization> => {
-    const { options, ...personalizationData } = personalization;
+    const { options, productIds, ...personalizationData } = personalization;
+    
     const { data: savedP, error } = await getClient().from('personalizations').upsert({
         id: personalizationData.id, name: personalizationData.name, label: personalizationData.label,
         allow_repetition: personalizationData.allowRepetition, min_selection: personalizationData.minSelection,
         max_selection: personalizationData.maxSelection
     }).select().single();
+    
     if (error || !savedP) throw error;
+    
+    // Update options
     await getClient().from('personalization_options').delete().eq('personalization_id', savedP.id);
     if (options && options.length > 0) {
-        await getClient().from('personalization_options').insert(options.map(o => ({ personalization_id: savedP.id, name: o.name, price: o.price, available: true })));
+        await getClient().from('personalization_options').insert(options.map(o => ({ 
+            personalization_id: savedP.id, name: o.name, price: o.price, available: true 
+        })));
     }
+
+    // Update Product Links (The functionality you asked for)
+    if (productIds !== undefined) {
+        // First delete all links for this personalization
+        await getClient().from('product_personalizations').delete().eq('personalization_id', savedP.id);
+        
+        // Then add selected links
+        if (productIds.length > 0) {
+            const links = productIds.map(prodId => ({
+                personalization_id: savedP.id,
+                product_id: prodId
+            }));
+            await getClient().from('product_personalizations').insert(links);
+        }
+    }
+
     cache.personalizations = null;
+    cache.products = null; // Invalidate products too as their relations changed
     return (await getPersonalizations(true)).find(p => p.id === savedP.id)!;
 };
 
@@ -316,7 +332,6 @@ export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt'>): Promise
         return { ...order, id: data.id, createdAt: new Date(data.created_at) } as Order;
     } catch (error: any) {
         if (error.code === 'PGRST204') {
-            console.warn("Database schema mismatch. Retrying save without problematic columns.");
             const { tip, payment_status, ...safePayload } = payload;
             const { data: retryData, error: retryError } = await getClient().from('orders').insert(safePayload).select().single();
             if (retryError) throw retryError;
@@ -364,7 +379,7 @@ export const subscribeToMenuUpdates = (onUpdate: () => void) => {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'promotions' }, () => { cache.promotions = null; onUpdate(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'personalizations' }, () => { cache.personalizations = null; onUpdate(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => { cache.settings = null; onUpdate(); })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'product_personalizations' }, () => { cache.products = null; onUpdate(); }) // Listen to relation changes
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'product_personalizations' }, () => { cache.products = null; cache.personalizations = null; onUpdate(); })
         .subscribe();
 };
 
