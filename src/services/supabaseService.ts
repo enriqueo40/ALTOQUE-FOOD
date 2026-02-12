@@ -90,17 +90,64 @@ export const deleteCategory = async (categoryId: string): Promise<void> => {
 // --- Products Functions ---
 export const getProducts = async (forceRefresh = false): Promise<Product[]> => {
     if (cache.products && !forceRefresh) return cache.products;
-    const { data } = await getClient().from('products').select('*').order('name');
-    cache.products = data || [];
-    return cache.products;
+    
+    // Join with product_personalizations to get the IDs
+    const { data, error } = await getClient()
+        .from('products')
+        .select('*, product_personalizations(personalization_id)')
+        .order('name');
+        
+    if (error) {
+        console.error("Error fetching products:", error);
+        throw error;
+    }
+
+    const mappedProducts = (data || []).map((p: any) => ({
+        ...p,
+        // Flatten the relationship to a simple array of IDs
+        personalizationIds: p.product_personalizations?.map((pp: any) => pp.personalization_id) || []
+    }));
+
+    cache.products = mappedProducts;
+    return cache.products || [];
 };
 
 export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & { id?: string }): Promise<Product> => {
-    const { id, ...productData } = product;
-    const { data, error } = await getClient().from('products').upsert({ id, ...productData }).select().single();
-    if (error || !data) throw new Error(error?.message || "Could not save product.");
-    cache.products = null;
-    return data;
+    const { id, personalizationIds, ...productData } = product;
+    
+    // 1. Save the product info
+    const { data: savedProduct, error } = await getClient()
+        .from('products')
+        .upsert({ id, ...productData })
+        .select()
+        .single();
+
+    if (error || !savedProduct) throw new Error(error?.message || "Could not save product.");
+
+    // 2. Manage Product <-> Personalization links
+    // First, remove existing links for this product
+    const { error: deleteError } = await getClient()
+        .from('product_personalizations')
+        .delete()
+        .eq('product_id', savedProduct.id);
+        
+    if (deleteError) throw deleteError;
+
+    // Then, insert new links if any
+    if (personalizationIds && personalizationIds.length > 0) {
+        const links = personalizationIds.map(pId => ({
+            product_id: savedProduct.id,
+            personalization_id: pId
+        }));
+        const { error: insertError } = await getClient()
+            .from('product_personalizations')
+            .insert(links);
+            
+        if (insertError) throw insertError;
+    }
+
+    cache.products = null; // Invalidate cache to refresh links
+    return { ...savedProduct, personalizationIds: personalizationIds || [] };
 };
 
 export const updateProductAvailability = async (productId: string, available: boolean): Promise<Product> => {
@@ -317,6 +364,7 @@ export const subscribeToMenuUpdates = (onUpdate: () => void) => {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'promotions' }, () => { cache.promotions = null; onUpdate(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'personalizations' }, () => { cache.personalizations = null; onUpdate(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => { cache.settings = null; onUpdate(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'product_personalizations' }, () => { cache.products = null; onUpdate(); }) // Listen to relation changes
         .subscribe();
 };
 

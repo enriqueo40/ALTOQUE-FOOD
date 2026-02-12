@@ -12,6 +12,7 @@ DROP TABLE IF EXISTS public.app_settings CASCADE;
 DROP TABLE IF EXISTS public.orders CASCADE;
 DROP TABLE IF EXISTS public.promotion_products CASCADE;
 DROP TABLE IF EXISTS public.promotions CASCADE;
+DROP TABLE IF EXISTS public.product_personalizations CASCADE;
 DROP TABLE IF EXISTS public.personalization_options CASCADE;
 DROP TABLE IF EXISTS public.personalizations CASCADE;
 DROP TABLE IF EXISTS public.tables CASCADE;
@@ -68,7 +69,16 @@ CREATE TABLE public.personalization_options (
     CONSTRAINT personalization_options_personalization_id_fkey FOREIGN KEY (personalization_id) REFERENCES public.personalizations(id) ON DELETE CASCADE
 );
 
--- 5. Create promotions table
+-- 5. Create product_personalizations join table (NEW)
+CREATE TABLE public.product_personalizations (
+    product_id uuid NOT NULL,
+    personalization_id uuid NOT NULL,
+    CONSTRAINT product_personalizations_pkey PRIMARY KEY (product_id, personalization_id),
+    CONSTRAINT fk_product FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE,
+    CONSTRAINT fk_personalization FOREIGN KEY (personalization_id) REFERENCES public.personalizations(id) ON DELETE CASCADE
+);
+
+-- 6. Create promotions table
 CREATE TABLE public.promotions (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     created_at timestamp with time zone NOT NULL DEFAULT now(),
@@ -81,7 +91,7 @@ CREATE TABLE public.promotions (
     CONSTRAINT promotions_pkey PRIMARY KEY (id)
 );
 
--- 6. Create promotion_products join table
+-- 7. Create promotion_products join table
 CREATE TABLE public.promotion_products (
     promotion_id uuid NOT NULL,
     product_id uuid NOT NULL,
@@ -90,7 +100,7 @@ CREATE TABLE public.promotion_products (
     CONSTRAINT promotion_products_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE
 );
 
--- 7. Create zones table
+-- 8. Create zones table
 CREATE TABLE public.zones (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   created_at timestamp with time zone NOT NULL DEFAULT now(),
@@ -100,7 +110,7 @@ CREATE TABLE public.zones (
   CONSTRAINT zones_pkey PRIMARY KEY (id)
 );
 
--- 8. Create tables table
+-- 9. Create tables table
 CREATE TABLE public.tables (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   created_at timestamp with time zone NOT NULL DEFAULT now(),
@@ -116,7 +126,7 @@ CREATE TABLE public.tables (
   CONSTRAINT tables_zone_id_fkey FOREIGN KEY (zone_id) REFERENCES public.zones(id) ON DELETE CASCADE
 );
 
--- 9. Create orders table
+-- 10. Create orders table
 CREATE TABLE public.orders (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     created_at timestamp with time zone NOT NULL DEFAULT now(),
@@ -133,7 +143,7 @@ CREATE TABLE public.orders (
     CONSTRAINT orders_pkey PRIMARY KEY (id)
 );
 
--- 10. Create app_settings table (single row)
+-- 11. Create app_settings table (single row)
 CREATE TABLE public.app_settings (
   id int8 NOT NULL,
   settings jsonb NOT NULL,
@@ -141,7 +151,7 @@ CREATE TABLE public.app_settings (
   CONSTRAINT app_settings_pkey PRIMARY KEY (id)
 );
 
--- 11. Insert the single row for settings
+-- 12. Insert the single row for settings
 INSERT INTO public.app_settings (id, settings) VALUES (1, '{}'::jsonb);
 
 
@@ -151,6 +161,7 @@ ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.personalizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.personalization_options ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.product_personalizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.promotions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.promotion_products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.zones ENABLE ROW LEVEL SECURITY;
@@ -162,6 +173,7 @@ CREATE POLICY "Allow public read access to categories" ON public.categories FOR 
 CREATE POLICY "Allow public read access to products" ON public.products FOR SELECT USING (true);
 CREATE POLICY "Allow public read access to personalizations" ON public.personalizations FOR SELECT USING (true);
 CREATE POLICY "Allow public read access to personalization_options" ON public.personalization_options FOR SELECT USING (true);
+CREATE POLICY "Allow public read access to product_personalizations" ON public.product_personalizations FOR SELECT USING (true);
 CREATE POLICY "Allow public read access to promotions" ON public.promotions FOR SELECT USING (true);
 CREATE POLICY "Allow public read access to promotion_products" ON public.promotion_products FOR SELECT USING (true);
 CREATE POLICY "Allow public read access to zones" ON public.zones FOR SELECT USING (true);
@@ -175,6 +187,7 @@ CREATE POLICY "Allow all users to manage categories" ON public.categories FOR AL
 CREATE POLICY "Allow all users to manage products" ON public.products FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all users to manage personalizations" ON public.personalizations FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all users to manage personalization_options" ON public.personalization_options FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all users to manage product_personalizations" ON public.product_personalizations FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all users to manage promotions" ON public.promotions FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all users to manage promotion_products" ON public.promotion_products FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all users to manage zones" ON public.zones FOR ALL USING (true) WITH CHECK (true);
@@ -183,14 +196,20 @@ CREATE POLICY "Allow all users to manage orders" ON public.orders FOR ALL USING 
 CREATE POLICY "Allow all users to manage app_settings" ON public.app_settings FOR ALL USING (true) WITH CHECK (true);
 `;
 
-const PATCH_SQL = `-- Parche SQL: Agregar columnas faltantes a la tabla 'orders'
--- Ejecuta esto si ya tienes una base de datos existente y no quieres reiniciarla.
+const PATCH_SQL = `-- Parche SQL: Crear tabla 'product_personalizations' si no existe
+CREATE TABLE IF NOT EXISTS public.product_personalizations (
+    product_id uuid NOT NULL,
+    personalization_id uuid NOT NULL,
+    CONSTRAINT product_personalizations_pkey PRIMARY KEY (product_id, personalization_id),
+    CONSTRAINT fk_product FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE,
+    CONSTRAINT fk_personalization FOREIGN KEY (personalization_id) REFERENCES public.personalizations(id) ON DELETE CASCADE
+);
 
--- Agregar columna 'payment_status' si no existe (de una actualización anterior)
-ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS payment_status text NOT NULL DEFAULT 'pending';
-
--- Agregar columna 'tip' para propinas si no existe
-ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS tip numeric NULL DEFAULT 0;
+ALTER TABLE public.product_personalizations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public read access to product_personalizations" ON public.product_personalizations;
+CREATE POLICY "Allow public read access to product_personalizations" ON public.product_personalizations FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow all users to manage product_personalizations" ON public.product_personalizations;
+CREATE POLICY "Allow all users to manage product_personalizations" ON public.product_personalizations FOR ALL USING (true) WITH CHECK (true);
 `;
 
 const CodeBlock: React.FC<{ title: string; code: string; }> = ({ title, code }) => {
@@ -221,3 +240,32 @@ const CodeBlock: React.FC<{ title: string; code: string; }> = ({ title, code }) 
         </div>
     );
 };
+
+const SetupView: React.FC = () => {
+    return (
+        <div className="p-8 max-w-4xl mx-auto">
+            <h1 className="text-3xl font-bold mb-4 text-gray-800 dark:text-gray-100">Instalación de Base de Datos</h1>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
+                Copia y ejecuta estos comandos en el editor SQL de tu panel de Supabase para configurar la base de datos necesaria para la aplicación.
+            </p>
+
+            <CodeBlock title="Script de Instalación Completa" code={COMPLETE_SQL_SETUP} />
+            
+            <div className="mt-8 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <div className="flex items-start gap-3">
+                    <IconInfo className="h-6 w-6 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                        <h4 className="font-bold text-yellow-800 dark:text-yellow-200">¿Ya tienes datos?</h4>
+                        <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                            Si ya usaste el script anterior y solo necesitas agregar la funcionalidad de personalizaciones sin borrar tus productos existentes, usa el siguiente parche:
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <CodeBlock title="Parche: Tabla de Personalizaciones por Producto" code={PATCH_SQL} />
+        </div>
+    );
+};
+
+export default SetupView;

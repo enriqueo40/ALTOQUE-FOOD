@@ -7,6 +7,7 @@ export interface Product {
     imageUrl: string;
     categoryId: string;
     available: boolean;
+    personalizationIds?: string[]; // New field to link personalizations
     created_at?: string;
 }
 

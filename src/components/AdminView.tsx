@@ -310,14 +310,25 @@ const Dashboard: React.FC<{ currencySymbol: string }> = ({ currencySymbol }) => 
 
 // --- Modals and Views ---
 
-// ... ProductModal, CategoryModal, etc. implementations ...
-// Since the file was truncated in previous context, I need to provide full implementations for required components.
-
 const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (product: Omit<Product, 'id' | 'created_at'> & { id?: string }) => void; product: Product | null; categories: Category[] }> = ({ isOpen, onClose, onSave, product, categories }) => {
-    // ... (Simplified implementation for brevity, assuming existing logic)
     const [formData, setFormData] = useState<Partial<Product>>({});
+    const [personalizations, setPersonalizations] = useState<Personalization[]>([]);
+    const [isGenerating, setIsGenerating] = useState(false);
+    
     useEffect(() => {
-        if(isOpen) setFormData(product || { name: '', description: '', price: 0, imageUrl: '', categoryId: categories[0]?.id || '', available: true });
+        if(isOpen) {
+            setFormData(product || { 
+                name: '', 
+                description: '', 
+                price: 0, 
+                imageUrl: '', 
+                categoryId: categories[0]?.id || '', 
+                available: true,
+                personalizationIds: [] // Initialize with empty array
+            });
+            // Fetch available personalizations when opening
+            getPersonalizations().then(setPersonalizations);
+        }
     }, [isOpen, product, categories]);
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -326,16 +337,81 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
         onClose();
     };
 
+    const handleGenerateDescription = async () => {
+        if (!formData.name) return;
+        setIsGenerating(true);
+        try {
+            const catName = categories.find(c => c.id === formData.categoryId)?.name || '';
+            const desc = await generateProductDescription(formData.name, catName, formData.description || '');
+            setFormData(prev => ({ ...prev, description: desc }));
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    const togglePersonalization = (pId: string) => {
+        setFormData(prev => {
+            const currentIds = prev.personalizationIds || [];
+            const newIds = currentIds.includes(pId) 
+                ? currentIds.filter(id => id !== pId) 
+                : [...currentIds, pId];
+            return { ...prev, personalizationIds: newIds };
+        });
+    };
+
+    const inputClasses = "mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 placeholder-gray-400 dark:placeholder-gray-400 dark:text-white";
+
     if (!isOpen) return null;
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                <h2 className="text-xl font-bold mb-4 dark:text-white">{product ? 'Editar Producto' : 'Nuevo Producto'}</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <input type="text" placeholder="Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full p-2 border rounded dark:bg-gray-700" required />
-                    <input type="number" placeholder="Price" value={formData.price} onChange={e => setFormData({...formData, price: parseFloat(e.target.value)})} className="w-full p-2 border rounded dark:bg-gray-700" required />
-                    <div className="flex justify-end gap-2">
-                        <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
-                        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+                    <input type="text" placeholder="Nombre" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} className={inputClasses} required />
+                    
+                    <div className="relative">
+                        <textarea placeholder="Descripción" value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} className={inputClasses} rows={3} />
+                        <button type="button" onClick={handleGenerateDescription} disabled={isGenerating} className="absolute bottom-2 right-2 text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded hover:bg-emerald-200 flex items-center gap-1">
+                            <IconSparkles className="h-3 w-3"/> {isGenerating ? '...' : 'IA'}
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <input type="number" placeholder="Precio" value={formData.price || 0} onChange={e => setFormData({...formData, price: parseFloat(e.target.value)})} className={inputClasses} required step="0.01"/>
+                        <select value={formData.categoryId} onChange={e => setFormData({...formData, categoryId: e.target.value})} className={inputClasses}>
+                            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                    </div>
+
+                    <input type="text" placeholder="URL Imagen" value={formData.imageUrl || ''} onChange={e => setFormData({...formData, imageUrl: e.target.value})} className={inputClasses} />
+                    
+                    {/* Personalizations Selector */}
+                    <div className="border-t dark:border-gray-700 pt-4 mt-4">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Personalizaciones disponibles</label>
+                        <div className="max-h-40 overflow-y-auto border dark:border-gray-600 rounded-md p-2 space-y-2">
+                            {personalizations.length === 0 && <p className="text-sm text-gray-500">No hay personalizaciones creadas.</p>}
+                            {personalizations.map(p => (
+                                <label key={p.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 p-1 rounded">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={(formData.personalizationIds || []).includes(p.id)} 
+                                        onChange={() => togglePersonalization(p.id)}
+                                        className="rounded text-emerald-600 focus:ring-emerald-500 bg-gray-100 border-gray-300 dark:bg-gray-600 dark:border-gray-500"
+                                    />
+                                    <span className="text-sm text-gray-700 dark:text-gray-200">{p.name}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="flex items-center pt-2">
+                        <input type="checkbox" checked={formData.available} onChange={e => setFormData({...formData, available: e.target.checked})} className="rounded text-emerald-600" />
+                        <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Disponible para venta</span>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-4">
+                        <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 dark:bg-gray-700 dark:text-gray-200 rounded">Cancelar</button>
+                        <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700">Guardar</button>
                     </div>
                 </form>
             </div>
@@ -343,36 +419,156 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
     );
 };
 
-// Reuse this pattern for other simple modals or use placeholders if specific logic isn't critical for "Cannot find name" error.
-// However, MenuManagement relies on these.
-
-const ProductsView: React.FC = () => {
-    const [products, setProducts] = useState<Product[]>([]);
-    const [categories, setCategories] = useState<Category[]>([]);
-    useEffect(() => {
-        getProducts().then(setProducts);
-        getCategories().then(setCategories);
-    }, []);
+const CategoryModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (cat: any) => void; category: Category | null }> = ({ isOpen, onClose, onSave, category }) => {
+    const [name, setName] = useState('');
+    useEffect(() => { if (isOpen) setName(category?.name || ''); }, [isOpen, category]);
+    if (!isOpen) return null;
     return (
-        <div className="space-y-4">
-            <h3 className="font-bold text-xl">Productos</h3>
-            {/* Simple list logic */}
-            {products.map(p => <div key={p.id}>{p.name}</div>)}
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <form onSubmit={(e) => { e.preventDefault(); onSave({ id: category?.id, name }); onClose(); }} className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+                <h2 className="text-xl font-bold mb-4 dark:text-white">{category ? 'Editar' : 'Nueva'} Categoría</h2>
+                <input className="w-full p-2 border rounded mb-4 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="Nombre" value={name} onChange={e => setName(e.target.value)} required />
+                <div className="flex justify-end gap-2">
+                    <button type="button" onClick={onClose} className="px-4 py-2 border rounded dark:text-white dark:border-gray-600">Cancelar</button>
+                    <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded">Guardar</button>
+                </div>
+            </form>
         </div>
     );
 };
 
-const PersonalizationsView: React.FC = () => <div>Gestión de Personalizaciones (Próximamente)</div>;
+const ProductsView: React.FC = () => {
+    const [products, setProducts] = useState<Product[]>([]);
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [isProdModal, setIsProdModal] = useState(false);
+    const [isCatModal, setIsCatModal] = useState(false);
+    const [editingProd, setEditingProd] = useState<Product | null>(null);
+    const [editingCat, setEditingCat] = useState<Category | null>(null);
+
+    const load = async () => {
+        const [p, c] = await Promise.all([getProducts(), getCategories()]);
+        setProducts(p); setCategories(c);
+    };
+    useEffect(() => { load(); }, []);
+
+    return (
+        <div>
+            <div className="flex justify-end gap-2 mb-4">
+                <button onClick={() => { setEditingCat(null); setIsCatModal(true); }} className="px-4 py-2 border rounded dark:text-white dark:border-gray-600">Nueva Categoría</button>
+                <button onClick={() => { setEditingProd(null); setIsProdModal(true); }} className="px-4 py-2 bg-emerald-600 text-white rounded">Nuevo Producto</button>
+            </div>
+            {categories.map(c => (
+                <div key={c.id} className="mb-6 bg-white dark:bg-gray-800 p-4 rounded shadow">
+                    <div className="flex justify-between items-center mb-2">
+                        <h3 className="font-bold text-lg dark:text-white">{c.name}</h3>
+                        <button onClick={() => { setEditingCat(c); setIsCatModal(true); }}><IconEdit /></button>
+                    </div>
+                    {products.filter(p => p.categoryId === c.id).map(p => (
+                        <ProductListItem key={p.id} product={p} onEdit={() => { setEditingProd(p); setIsProdModal(true); }} onDelete={() => deleteProduct(p.id).then(load)} onDuplicate={() => saveProduct({...p, name: p.name + ' (Copy)'}).then(load)} />
+                    ))}
+                </div>
+            ))}
+            <ProductModal isOpen={isProdModal} onClose={() => setIsProdModal(false)} onSave={async (p) => { await saveProduct(p); load(); }} product={editingProd} categories={categories} />
+            <CategoryModal isOpen={isCatModal} onClose={() => setIsCatModal(false)} onSave={async (c) => { await saveCategory(c); load(); }} category={editingCat} />
+        </div>
+    );
+};
+
+const PersonalizationModal: React.FC<{isOpen: boolean, onClose: () => void, onSave: (p: any) => void, personalization: Personalization | null}> = ({isOpen, onClose, onSave, personalization}) => {
+    // Basic modal logic placeholder or full implementation if available in context
+    const [name, setName] = useState('');
+    const [options, setOptions] = useState([{name: '', price: 0}]);
+    
+    useEffect(() => {
+        if(isOpen) {
+            setName(personalization?.name || '');
+            setOptions(personalization?.options || [{name: '', price: 0}]);
+        }
+    }, [isOpen, personalization]);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSave({ id: personalization?.id, name, options, label: '', allowRepetition: false, minSelection: 0, maxSelection: 1 });
+        onClose();
+    }
+
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-md">
+                <h3 className="text-xl font-bold mb-4 dark:text-white">{personalization ? 'Editar' : 'Nueva'} Personalización</h3>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <input className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" placeholder="Nombre (Ej: Tipo de leche)" value={name} onChange={e => setName(e.target.value)} required />
+                    <div className="space-y-2">
+                        <label className="text-sm dark:text-gray-300">Opciones</label>
+                        {options.map((opt, idx) => (
+                            <div key={idx} className="flex gap-2">
+                                <input className="flex-1 p-1 border rounded dark:bg-gray-700" placeholder="Opción" value={opt.name} onChange={e => {
+                                    const newOpts = [...options]; newOpts[idx].name = e.target.value; setOptions(newOpts);
+                                }} required />
+                                <input className="w-20 p-1 border rounded dark:bg-gray-700" type="number" placeholder="$" value={opt.price} onChange={e => {
+                                    const newOpts = [...options]; newOpts[idx].price = parseFloat(e.target.value); setOptions(newOpts);
+                                }} required />
+                            </div>
+                        ))}
+                        <button type="button" onClick={() => setOptions([...options, {name: '', price: 0}])} className="text-sm text-emerald-600">+ Agregar opción</button>
+                    </div>
+                    <div className="flex justify-end gap-2 mt-4">
+                        <button type="button" onClick={onClose} className="px-4 py-2 border rounded dark:text-white">Cancelar</button>
+                        <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+const PersonalizationsView: React.FC = () => {
+    const [personalizations, setPersonalizations] = useState<Personalization[]>([]);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingP, setEditingP] = useState<Personalization | null>(null);
+
+    useEffect(() => { getPersonalizations().then(setPersonalizations); }, []);
+
+    const handleSave = async (p: any) => {
+        await savePersonalization(p);
+        getPersonalizations().then(setPersonalizations);
+    }
+
+    return (
+        <div>
+            <div className="flex justify-end mb-4">
+                <button onClick={() => { setEditingP(null); setIsModalOpen(true); }} className="px-4 py-2 bg-emerald-600 text-white rounded">Nueva Personalización</button>
+            </div>
+            <div className="space-y-2">
+                {personalizations.map(p => (
+                    <div key={p.id} className="p-3 border rounded bg-white dark:bg-gray-800 dark:border-gray-700 flex justify-between items-center">
+                        <div>
+                            <span className="font-bold dark:text-white">{p.name}</span>
+                            <span className="text-xs text-gray-500 ml-2">({p.options.length} opciones)</span>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={() => { setEditingP(p); setIsModalOpen(true); }}><IconEdit/></button>
+                            <button onClick={async () => { if(confirm('¿Borrar?')) { await deletePersonalization(p.id); getPersonalizations().then(setPersonalizations); } }} className="text-red-500"><IconTrash/></button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+            <PersonalizationModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSave} personalization={editingP} />
+        </div>
+    );
+};
+
 const PromotionsView: React.FC = () => <div>Gestión de Promociones (Próximamente)</div>;
 
 const MenuManagement: React.FC = () => {
     const [tab, setTab] = useState('products');
     return (
         <div>
-            <div className="flex gap-4 mb-4 border-b">
-                <button onClick={() => setTab('products')} className={`pb-2 ${tab === 'products' ? 'border-b-2 border-blue-500' : ''}`}>Productos</button>
-                <button onClick={() => setTab('personalizations')} className={`pb-2 ${tab === 'personalizations' ? 'border-b-2 border-blue-500' : ''}`}>Personalizaciones</button>
-                <button onClick={() => setTab('promotions')} className={`pb-2 ${tab === 'promotions' ? 'border-b-2 border-blue-500' : ''}`}>Promociones</button>
+            <div className="flex gap-4 mb-4 border-b dark:border-gray-700">
+                <button onClick={() => setTab('products')} className={`pb-2 ${tab === 'products' ? 'border-b-2 border-emerald-500 text-emerald-600' : 'text-gray-500'}`}>Productos</button>
+                <button onClick={() => setTab('personalizations')} className={`pb-2 ${tab === 'personalizations' ? 'border-b-2 border-emerald-500 text-emerald-600' : 'text-gray-500'}`}>Personalizaciones</button>
+                <button onClick={() => setTab('promotions')} className={`pb-2 ${tab === 'promotions' ? 'border-b-2 border-emerald-500 text-emerald-600' : 'text-gray-500'}`}>Promociones</button>
             </div>
             {tab === 'products' && <ProductsView />}
             {tab === 'personalizations' && <PersonalizationsView />}
@@ -386,10 +582,10 @@ const MenuManagement: React.FC = () => {
 const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onUpdateStatus: (id: string, s: OrderStatus) => void; onUpdatePayment: (id: string, s: PaymentStatus) => void }> = ({ order, onClose }) => {
     if (!order) return null;
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg">
-                <h2 className="text-xl font-bold">Pedido #{order.id.slice(0,4)}</h2>
-                <button onClick={onClose} className="mt-4 px-4 py-2 bg-gray-200 rounded">Cerrar</button>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-lg">
+                <h2 className="text-xl font-bold dark:text-white">Pedido #{order.id.slice(0,4)}</h2>
+                <button onClick={onClose} className="mt-4 px-4 py-2 bg-gray-200 rounded text-gray-800">Cerrar</button>
             </div>
         </div>
     );
@@ -418,30 +614,30 @@ const Analytics: React.FC = () => {
         setResult(res);
     };
     return (
-        <div className="p-4">
-            <h2 className="text-xl font-bold mb-4">Analítica IA</h2>
-            <input className="border p-2 rounded w-full" value={query} onChange={e => setQuery(e.target.value)} placeholder="Pregunta sobre tus ventas..." />
-            <button onClick={handleAsk} className="mt-2 bg-blue-600 text-white px-4 py-2 rounded">Analizar</button>
-            <div className="mt-4 whitespace-pre-wrap">{result}</div>
+        <div className="p-4 bg-white dark:bg-gray-800 rounded shadow">
+            <h2 className="text-xl font-bold mb-4 dark:text-white">Analítica IA</h2>
+            <input className="border p-2 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white" value={query} onChange={e => setQuery(e.target.value)} placeholder="Pregunta sobre tus ventas..." />
+            <button onClick={handleAsk} className="mt-2 bg-emerald-600 text-white px-4 py-2 rounded">Analizar</button>
+            <div className="mt-4 whitespace-pre-wrap dark:text-gray-300">{result}</div>
         </div>
     );
 };
 
-const Messages: React.FC = () => <div>Mensajes (Próximamente)</div>;
-const AvailabilityView: React.FC = () => <div>Disponibilidad (Próximamente)</div>;
+const Messages: React.FC = () => <div className="text-center p-10 dark:text-gray-400">Mensajes (Próximamente)</div>;
+const AvailabilityView: React.FC = () => <div className="text-center p-10 dark:text-gray-400">Disponibilidad (Próximamente)</div>;
 
 const ShareView: React.FC<{ onGoToTableSettings: () => void }> = ({ onGoToTableSettings }) => (
-    <div className="p-4">
-        <h2 className="text-xl font-bold mb-4">Compartir Menú</h2>
-        <button onClick={onGoToTableSettings} className="text-blue-600 underline">Ir a configuración de mesas</button>
+    <div className="p-4 bg-white dark:bg-gray-800 rounded shadow">
+        <h2 className="text-xl font-bold mb-4 dark:text-white">Compartir Menú</h2>
+        <button onClick={onGoToTableSettings} className="text-emerald-600 underline">Ir a configuración de mesas</button>
     </div>
 );
 
 // --- Settings ---
 
 const ZoneEditor: React.FC<{ initialZone: Zone; onSave: (z: Zone) => void; onExit: () => void }> = ({ initialZone, onExit }) => (
-    <div className="fixed inset-0 bg-white z-50 p-4">
-        <h2 className="text-xl font-bold">Editor de Zona: {initialZone.name}</h2>
+    <div className="fixed inset-0 bg-white dark:bg-gray-900 z-50 p-4">
+        <h2 className="text-xl font-bold dark:text-white">Editor de Zona: {initialZone.name}</h2>
         <button onClick={onExit} className="mt-4 px-4 py-2 bg-gray-200 rounded">Salir</button>
     </div>
 );
@@ -449,9 +645,9 @@ const ZoneEditor: React.FC<{ initialZone: Zone; onSave: (z: Zone) => void; onExi
 const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; onEditZoneLayout: (z: Zone) => void }> = ({ isOpen, onClose }) => {
     if (!isOpen) return null;
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-2xl h-[80vh] overflow-y-auto">
-                <h2 className="text-xl font-bold mb-4">Configuración</h2>
+                <h2 className="text-xl font-bold mb-4 dark:text-white">Configuración</h2>
                 <button onClick={onClose} className="px-4 py-2 bg-gray-200 rounded">Cerrar</button>
             </div>
         </div>
@@ -492,12 +688,9 @@ const AdminView: React.FC = () => {
     };
 
     const renderPage = () => {
-        // Use centralized helper
         const currentCurrencySymbol = getCurrencySymbol(settings);
-        
         switch (currentPage) {
-            case 'dashboard': 
-                return <Dashboard currencySymbol={currentCurrencySymbol} />;
+            case 'dashboard': return <Dashboard currencySymbol={currentCurrencySymbol} />;
             case 'products': return <MenuManagement />;
             case 'orders': return <OrderManagement onSettingsClick={openTableSettings} currencySymbol={currentCurrencySymbol} />;
             case 'analytics': return <Analytics />;
