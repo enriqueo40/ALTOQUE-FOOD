@@ -7,7 +7,7 @@ export interface Product {
     imageUrl: string;
     categoryId: string;
     available: boolean;
-    personalizationIds?: string[]; // New field to link personalizations
+    personalizationIds?: string[]; // IDs de personalizaciones vinculadas
     created_at?: string;
 }
 
@@ -111,7 +111,7 @@ export interface Personalization {
   allowRepetition: boolean;
   minSelection?: number;
   maxSelection?: number | null;
-  productIds?: string[]; // New field to link to products from the personalization side
+  productIds?: string[]; // IDs de productos a los que se aplica
 }
 
 export enum DiscountType {
