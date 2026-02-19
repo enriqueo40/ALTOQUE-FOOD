@@ -8,6 +8,8 @@ export interface Product {
     categoryId: string;
     available: boolean;
     created_at?: string;
+    // Added personalizationIds to fix TypeScript error in CustomerView.tsx line 431
+    personalizationIds?: string[];
 }
 
 export interface Category {
