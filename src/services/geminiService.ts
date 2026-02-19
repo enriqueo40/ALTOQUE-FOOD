@@ -55,8 +55,8 @@ export const getChatbotResponse = async (history: ChatMessage[], newMessage: str
 };
 
 export const getAdvancedInsights = async (query: string, orders: Order[]): Promise<string> => {
-    const prompt = `Como analista experto en gestión de restaurantes, analiza los siguientes datos de ventas y proporciona insights estratégicos.
-    Identifica patrones de consumo, productos estrella y oportunidades de mejora.
+    const prompt = `Como analista experto en gestión de restaurantes de clase mundial, analiza los siguientes datos de ventas y proporciona insights estratégicos profundos.
+    Identifica patrones de consumo complejos, optimización de menú y predicciones de demanda.
 
     **Datos de Pedidos (JSON):**
     ${JSON.stringify(orders, null, 2)}
@@ -66,17 +66,17 @@ export const getAdvancedInsights = async (query: string, orders: Order[]): Promi
     `;
     
     try {
-        // Uso de gemini-3-pro-preview con Pensamiento Profundo para análisis complejo
+        // Uso de gemini-3-pro-preview con Pensamiento Profundo para análisis complejo y estratégico
         const response = await ai.models.generateContent({
             model: 'gemini-3-pro-preview',
             contents: prompt,
             config: {
                 thinkingConfig: { 
-                    thinkingBudget: 32768 // Máximo razonamiento para análisis de negocio
+                    thinkingBudget: 32768 // Máximo presupuesto para análisis profundo de negocio
                 }
             }
         });
-        return response.text || "No se pudieron generar insights detallados en este momento.";
+        return response.text || "No se pudieron generar insights estratégicos en este momento.";
     } catch (error) {
         console.error("Error getting advanced insights:", error);
         return `Ocurrió un error en el análisis estratégico: ${error instanceof Error ? error.message : String(error)}`;
