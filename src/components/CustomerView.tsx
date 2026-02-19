@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, PaymentMethod, OrderType, Personalization, Promotion, PersonalizationOption, Schedule, ShippingCostType, DiscountType, PromotionAppliesTo } from '../types';
+import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, PaymentMethod, OrderType, Personalization, Promotion, PersonalizationOption, DiscountType, PromotionAppliesTo, ShippingCostType } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconStore, IconCheck, IconUpload, IconReceipt, IconSparkles, IconClock, IconLocationMarker } from '../constants';
+import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconCheck, IconUpload, IconReceipt, IconClock, IconStore, IconLocationMarker } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
@@ -54,12 +54,13 @@ export default function CustomerView() {
     const [activeCategory, setActiveCategory] = useState<string>('');
     const [searchTerm, setSearchTerm] = useState('');
     
-    // Payment States
+    // Estados de Pago y Propinas
     const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('Efectivo');
     const [paymentProof, setPaymentProof] = useState<string | null>(null);
     const [tipAmount, setTipAmount] = useState<number>(0);
 
     // --- LÓGICA DE PERSISTENCIA PARA MESA (QR) ---
+    // Recuperamos el estado de la mesa, el nombre del cliente y lo consumido (Mi Cuenta)
     const [tableInfo, setTableInfo] = useState<{ table: string; zone: string } | null>(() => {
         const saved = localStorage.getItem('altoque_table_info');
         return saved ? JSON.parse(saved) : null;
@@ -86,6 +87,7 @@ export default function CustomerView() {
 
     const isTableSession = !!tableInfo;
 
+    // Total acumulado de lo que ya se ha pedido (Cuenta total)
     const sessionTotal = useMemo(() => {
         return sessionItems.reduce((acc, item) => {
             const optsPrice = item.selectedOptions ? item.selectedOptions.reduce((s, o) => s + (Number(o.price) || 0), 0) : 0;
@@ -93,10 +95,11 @@ export default function CustomerView() {
         }, 0);
     }, [sessionItems]);
 
+    // El total a pagar en el checkout depende de si es una ronda o el cierre final
     const baseTotal = isFinalClosing ? sessionTotal : cartTotal;
     const finalTotal = useMemo(() => baseTotal + tipAmount, [baseTotal, tipAmount]);
 
-    // Sincronización automática con LocalStorage
+    // Persistencia automática en localStorage cuando cambian los datos de la mesa
     useEffect(() => {
         if (isTableSession) {
             localStorage.setItem('altoque_consumed_items', JSON.stringify(sessionItems));
@@ -105,7 +108,7 @@ export default function CustomerView() {
         }
     }, [sessionItems, tableInfo, customerName, isTableSession]);
 
-    // Carga inicial y detección de QR
+    // Carga inicial y detección proactiva de mesa por URL
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -125,7 +128,7 @@ export default function CustomerView() {
         fetchData();
         subscribeToMenuUpdates(fetchData);
 
-        // Detectar QR por URL
+        // Detectar si venimos de un QR con mesa y zona
         const params = new URLSearchParams(window.location.hash.split('?')[1]);
         const table = params.get('table');
         const zone = params.get('zone');
@@ -146,7 +149,7 @@ export default function CustomerView() {
             const reader = new FileReader();
             reader.onload = (res) => {
                 setPaymentProof(res.target?.result as string);
-                alert("Comprobante cargado.");
+                alert("Comprobante de pago cargado exitosamente.");
             };
             reader.readAsDataURL(file);
         }
@@ -169,17 +172,17 @@ export default function CustomerView() {
         const customer: Customer = { name, phone, address: addressData, paymentProof: paymentProof || undefined };
 
         try {
+            // Si NO es el cierre final, procesamos la ronda actual
             if (!isFinalClosing) {
-                // FLUJO: ENVIAR RONDA
                 if (cartItems.length > 0) {
                     const newOrderData: any = {
                         customer, 
                         items: cartItems, 
-                        total: finalTotal,
+                        total: cartTotal + tipAmount,
                         status: OrderStatus.Pending, 
                         orderType,
                         tableId: isTableSession ? `${tableInfo?.zone} - ${tableInfo?.table}` : undefined,
-                        paymentStatus: (selectedPayment === 'Efectivo') ? 'pending' : 'paid',
+                        paymentStatus: 'pending',
                         tip: tipAmount
                     };
                     await saveOrder(newOrderData);
@@ -191,21 +194,25 @@ export default function CustomerView() {
                 }
             }
 
-            // Construir mensaje de WhatsApp contextual
+            // Construir mensaje de WhatsApp contextualizado
             const itemsStr = cartItems.map(i => `• ${i.quantity}x ${i.name}`).join('\n');
             let msg: string;
             
             if (isFinalClosing && isTableSession) {
+                // Mensaje de Cierre Final
                 msg = [
                     `💰 *CIERRE DE CUENTA - MESA ${tableInfo!.table}*`,
                     `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
-                    `👤 Cliente: ${name}`, `💵 Total Acumulado: $${sessionTotal.toFixed(2)}`,
+                    `👤 Cliente: ${name}`, 
+                    `💵 Total Acumulado: $${sessionTotal.toFixed(2)}`,
                     tipAmount > 0 ? `✨ Propina: $${tipAmount.toFixed(2)}` : '',
-                    `⭐ *FINAL A PAGAR: $${finalTotal.toFixed(2)}*`,
-                    paymentProof ? '✅ Comprobante adjunto' : ''
+                    `⭐ *TOTAL FINAL: $${finalTotal.toFixed(2)}*`,
+                    `💳 Método: ${selectedPayment}`,
+                    paymentProof ? '✅ Comprobante adjunto' : '',
+                    `_Solicito la cuenta para retirarme._`
                 ].filter(Boolean).join('\n');
                 
-                // Limpiar sesión al cerrar cuenta
+                // LIMPIEZA DE SESIÓN (Solo al cerrar cuenta)
                 localStorage.removeItem('altoque_consumed_items');
                 localStorage.removeItem('altoque_table_info');
                 localStorage.removeItem('altoque_customer_name');
@@ -213,18 +220,28 @@ export default function CustomerView() {
                 setTableInfo(null);
                 setCustomerName('');
             } else if (isTableSession) {
+                // Mensaje de Nueva Ronda
                 msg = [
                     `🧾 *🔥 NUEVA RONDA A COCINA*`,
+                    `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
                     `🪑 MESA: ${tableInfo!.table} (${tableInfo!.zone})`, `👤 Cliente: ${name}`, `--------------------------------`, itemsStr, `--------------------------------`,
                     `💵 Subtotal Ronda: $${cartTotal.toFixed(2)}`,
-                    `📈 *Acumulado Mesa: $${(sessionTotal + cartTotal).toFixed(2)}*`
+                    `📈 *Total Acumulado Mesa: $${(sessionTotal + cartTotal).toFixed(2)}*`,
+                    paymentProof ? '✅ Comprobante enviado' : ''
                 ].filter(Boolean).join('\n');
             } else {
-                // FLUJO ORIGINAL: DELIVERY / RECOGER
+                // Flujo normal Delivery/Recoger
+                const shippingCost = (orderType === OrderType.Delivery && settings.shipping.costType === ShippingCostType.Fixed) ? (Number(settings.shipping.fixedCost) || 0) : 0;
                 msg = [
                     orderType === OrderType.Delivery ? `🧾 *PEDIDO A DOMICILIO*` : `🥡 *PEDIDO PARA RECOGER*`, 
+                    `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
                     `👤 Cliente: ${name}`, `📱 Tel: ${phone}`,
-                    `💰 Total: $${finalTotal.toFixed(2)}`, `💳 Método: ${selectedPayment}`
+                    orderType === OrderType.Delivery ? `🏠 Dir: ${addressData.calle} ${addressData.numero}, ${addressData.colonia}` : '',
+                    `--------------------------------`, itemsStr, `--------------------------------`,
+                    `💰 Subtotal: $${cartTotal.toFixed(2)}`,
+                    shippingCost > 0 ? `🚚 Envío: $${shippingCost.toFixed(2)}` : '',
+                    `💵 *TOTAL: $${(cartTotal + shippingCost + tipAmount).toFixed(2)}*`, 
+                    `💳 Método: ${selectedPayment}`
                 ].filter(Boolean).join('\n');
             }
 
@@ -235,8 +252,8 @@ export default function CustomerView() {
             setView('confirmation');
             
         } catch(e) {
-            console.error("Error:", e);
-            alert("Error al procesar. Reintente.");
+            console.error("Error al procesar pedido:", e);
+            alert("Ocurrió un error. Por favor intenta de nuevo.");
         }
     };
 
@@ -256,19 +273,19 @@ export default function CustomerView() {
     if (isLoading || !settings) return (
         <div className="h-screen bg-[#0f172a] flex flex-col items-center justify-center">
             <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
-            <p className="text-emerald-500 font-black uppercase tracking-widest text-xs animate-pulse">Cargando menú...</p>
+            <p className="text-emerald-500 font-black uppercase tracking-widest text-xs animate-pulse">Sincronizando mesa...</p>
         </div>
     );
 
     const isBankPayment = ['Pago Móvil', 'Transferencia', 'Zelle'].includes(selectedPayment);
 
     return (
-        <div className="bg-[#0f172a] min-h-screen text-gray-100 font-sans selection:bg-emerald-500/20 pb-safe">
+        <div className="bg-[#0f172a] min-h-screen text-gray-100 font-sans selection:bg-emerald-500/20 pb-safe overflow-x-hidden">
             <div className="container mx-auto max-w-md bg-[#0f172a] min-h-screen relative shadow-2xl border-x border-gray-800 flex flex-col">
                 
                 {view !== 'menu' && (
                     <Header 
-                        title={view === 'cart' ? 'MI RONDA ACTUAL' : view === 'account' ? 'MI CUENTA ACUMULADA' : (isFinalClosing ? 'SOLICITAR CUENTA' : 'CONFIRMAR')} 
+                        title={view === 'cart' ? 'MI RONDA ACTUAL' : view === 'account' ? 'MI CUENTA TOTAL' : (isFinalClosing ? 'PEDIR LA CUENTA' : 'CONFIRMAR')} 
                         onBack={() => {
                             if (view === 'checkout') {
                                 isFinalClosing ? setView('account') : setView('cart');
@@ -282,10 +299,10 @@ export default function CustomerView() {
                 <div className="flex-1 overflow-y-auto pb-48">
                     {view === 'menu' && (
                         <div className="animate-fade-in">
-                            {/* Hero Dine-In vs Online */}
+                            {/* Visual Hero */}
                             <div className="relative pt-12 pb-8 flex flex-col items-center text-center">
-                                <div className="w-24 h-24 bg-black rounded-full flex items-center justify-center border-4 border-gray-800 mb-4 overflow-hidden shadow-2xl">
-                                    {settings.branch.logoUrl ? <img src={settings.branch.logoUrl} className="w-full h-full object-cover" /> : <span className="text-emerald-500 font-bold text-2xl">AN</span>}
+                                <div className="w-24 h-24 bg-black rounded-full flex items-center justify-center border-4 border-gray-800 mb-4 shadow-2xl overflow-hidden">
+                                    {settings.branch.logoUrl ? <img src={settings.branch.logoUrl} className="w-full h-full object-cover" /> : <span className="text-emerald-500 font-bold text-2xl">AF</span>}
                                 </div>
                                 <h1 className="text-2xl font-black text-white uppercase tracking-tight">{settings.company.name}</h1>
                                 <p className="text-xs text-gray-400 font-medium mt-1">{settings.branch.alias}</p>
@@ -293,7 +310,7 @@ export default function CustomerView() {
                                 {!isTableSession ? (
                                     <div className="w-[85%] bg-gray-800/40 rounded-xl p-1 flex mt-6 border border-gray-700">
                                         <button onClick={() => setOrderType(OrderType.Delivery)} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${orderType === OrderType.Delivery ? 'bg-gray-700 text-emerald-400 shadow-lg' : 'text-gray-500'}`}>A domicilio</button>
-                                        <button onClick={() => setOrderType(OrderType.TakeAway)} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${orderType === OrderType.TakeAway ? 'bg-gray-700 text-emerald-400 shadow-lg' : 'text-gray-500'}`}>Para recoger</button>
+                                        <button onClick={() => setOrderType(OrderType.TakeAway)} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${orderType === OrderType.TakeAway ? 'bg-gray-700 text-emerald-400 shadow-lg' : 'text-gray-500'}`}>Recoger</button>
                                     </div>
                                 ) : (
                                     <div className="mt-6 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-6 py-2 rounded-full text-[10px] font-black tracking-widest flex items-center gap-2">
@@ -302,11 +319,11 @@ export default function CustomerView() {
                                 )}
                             </div>
 
-                            {/* Buscador y Categorías */}
+                            {/* Buscador Sticky */}
                             <div className="sticky top-0 z-20 bg-[#0f172a]/95 backdrop-blur-md px-4 py-4 space-y-4 border-b border-gray-800/50">
                                 <div className="relative">
                                     <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 h-5 w-5" />
-                                    <input type="text" placeholder="Buscar en el menú..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[#1e293b] border-none rounded-xl py-3.5 pl-12 pr-4 text-sm focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder-gray-500 font-medium" />
+                                    <input type="text" placeholder="Buscar algo delicioso..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[#1e293b] border-none rounded-xl py-3.5 pl-12 pr-4 text-sm focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder-gray-500 font-medium" />
                                 </div>
                                 <div className="flex overflow-x-auto gap-2 no-scrollbar pb-1">
                                     {allCategories.map(cat => (
@@ -317,7 +334,7 @@ export default function CustomerView() {
                                 </div>
                             </div>
 
-                            {/* Listado de Productos */}
+                            {/* Productos */}
                             <div className="p-4 space-y-8 mt-4">
                                 {allCategories.map(cat => {
                                     const products = allProducts.filter(p => p.categoryId === cat.id && p.available && p.name.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -357,11 +374,11 @@ export default function CustomerView() {
                             <div className="space-y-4">
                                 <h2 className="text-4xl font-black text-white uppercase tracking-tighter leading-none">{isFinalClosing ? '¡HASTA PRONTO!' : '¡A COCINA!'}</h2>
                                 <p className="text-gray-500 text-sm leading-relaxed max-w-xs mx-auto font-medium">
-                                    {isFinalClosing ? 'Hemos enviado tu solicitud. ¡Gracias por visitarnos!' : 'Tu ronda ha sido enviada. Puedes seguir pidiendo más cosas.'}
+                                    {isFinalClosing ? 'Gracias por visitarnos. El personal pasará a retirar tu ticket.' : 'Hemos enviado tu ronda. Sigue disfrutando de nuestra propuesta gastronómica.'}
                                 </p>
                             </div>
-                            <button onClick={() => { setIsFinalClosing(false); setView('menu'); }} className="w-full max-w-xs bg-gray-800 text-white py-4 rounded-xl font-bold hover:bg-gray-700 transition-colors border border-gray-700 uppercase tracking-widest text-xs">
-                                {isFinalClosing ? 'INICIAR NUEVO PEDIDO' : 'SEGUIR PIDIENDO'}
+                            <button onClick={() => { setIsFinalClosing(false); setView('menu'); }} className="w-full max-w-xs bg-emerald-600 text-white py-5 rounded-2xl font-black transition-all hover:bg-emerald-700 shadow-xl shadow-emerald-900/40 uppercase tracking-widest text-xs">
+                                {isFinalClosing ? 'NUEVO PEDIDO' : 'SEGUIR PIDIENDO'}
                             </button>
                         </div>
                     )}
@@ -405,7 +422,7 @@ export default function CustomerView() {
                         <div className="p-6 animate-fade-in"> 
                             <div className="bg-gray-800/30 p-7 rounded-[2.5rem] border border-gray-800 mb-6 shadow-xl"> 
                                 <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-8 flex items-center gap-3"> 
-                                    <IconReceipt className="h-4 w-4"/> MI CONSUMO TOTAL 
+                                    <IconReceipt className="h-4 w-4"/> CONSUMO ACUMULADO 
                                 </h3> 
                                 <div className="space-y-4"> 
                                     {sessionItems.map((item, idx) => ( 
@@ -417,7 +434,7 @@ export default function CustomerView() {
                                             <span className="font-bold text-white">${(item.price * item.quantity).toFixed(2)}</span> 
                                         </div> 
                                     ))} 
-                                    {sessionItems.length === 0 && <p className="text-center text-gray-500 text-xs py-10">Aún no has consumido nada.</p>}
+                                    {sessionItems.length === 0 && <p className="text-center text-gray-500 text-xs py-10">Aún no has consumido nada en esta mesa.</p>}
                                 </div> 
                                 <div className="mt-6 pt-6 border-t border-gray-700/50 flex justify-between items-center"> 
                                     <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">TOTAL ACUMULADO</span> 
@@ -435,16 +452,16 @@ export default function CustomerView() {
                             <form onSubmit={handleOrderAction} className="space-y-6">
                                 <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]">
                                     <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">TUS DATOS</h3>
-                                    <input name="name" type="text" defaultValue={customerName} className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="Nombre completo" required />
+                                    <input name="name" type="text" defaultValue={customerName} className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="Tu Nombre" required />
                                     {!isTableSession && <input name="phone" type="tel" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="WhatsApp" required />}
                                 </div>
                                 
                                 {orderType === OrderType.Delivery && (
                                     <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]">
                                         <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">DIRECCIÓN DE ENTREGA</h3>
-                                        <input name="calle" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="Calle" required />
-                                        <input name="numero" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="Nro de Casa/Apto" required />
-                                        <input name="colonia" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="Colonia" required />
+                                        <input name="calle" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="Calle / Avenida" required />
+                                        <input name="numero" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="Número" required />
+                                        <input name="colonia" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="Sector / Urbanización" required />
                                     </div>
                                 )}
 
@@ -468,16 +485,16 @@ export default function CustomerView() {
 
                                     {isBankPayment && (
                                         <div className="mt-4 p-4 bg-gray-900 rounded-2xl border border-gray-700 space-y-4 animate-fade-in">
-                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">SUBIR COMPROBANTE</p>
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">ANEXAR COMPROBANTE</p>
                                             <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:bg-gray-800 transition-colors">
                                                 {paymentProof ? (
                                                     <div className="flex items-center gap-2 text-emerald-400">
-                                                        <IconCheck className="h-5 w-5"/> <span className="text-xs font-bold">Cargado</span>
+                                                        <IconCheck className="h-5 w-5"/> <span className="text-xs font-bold">Documento cargado</span>
                                                     </div>
                                                 ) : (
                                                     <div className="flex flex-col items-center text-gray-500">
                                                         <IconUpload className="h-6 w-6 mb-1"/>
-                                                        <span className="text-[10px] font-bold">Toca para cargar captura</span>
+                                                        <span className="text-[10px] font-bold">Haz clic para subir captura</span>
                                                     </div>
                                                 )}
                                                 <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
@@ -493,7 +510,7 @@ export default function CustomerView() {
                                     </div>
                                     <button type="submit" className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex items-center justify-center gap-4 active:scale-95 transition-all text-xs uppercase tracking-[0.2em] shadow-2xl shadow-emerald-900/30">
                                         <IconWhatsapp className="h-5 w-5" /> 
-                                        {isFinalClosing ? 'SOLICITAR CUENTA FINAL' : (isTableSession ? 'ENVIAR RONDA A COCINA' : 'REALIZAR PEDIDO')}
+                                        {isFinalClosing ? 'SOLICITAR CUENTA FINAL' : (isTableSession ? 'ENVIAR RONDA A COCINA' : 'PROCESAR PEDIDO')}
                                     </button>
                                 </div>
                             </form> 
@@ -539,7 +556,7 @@ export default function CustomerView() {
                                     }}
                                     className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex justify-between px-8 items-center active:scale-95 transition-all shadow-xl shadow-emerald-900/40"
                                 >
-                                    <span className="uppercase tracking-widest text-[10px]">Añadir a la Ronda</span>
+                                    <span className="uppercase tracking-widest text-[10px]">Agregar a la Ronda</span>
                                     <span className="text-xl font-black">${getDiscountedPrice(selectedProduct, allPromotions).price.toFixed(2)}</span>
                                 </button>
                             </div>
@@ -549,7 +566,7 @@ export default function CustomerView() {
                 
                 {view === 'menu' && (
                     <div className="fixed bottom-6 left-4 right-4 max-w-md mx-auto z-40 flex flex-col gap-3">
-                        {isTableSession && (
+                        {isTableSession && sessionItems.length > 0 && (
                             <button 
                                 onClick={() => setView('account')} 
                                 className="w-full bg-gray-800/90 backdrop-blur-xl text-white font-black py-4 px-6 rounded-2xl flex justify-between items-center border border-emerald-500/30 shadow-2xl transition-transform active:scale-95 group"
@@ -573,7 +590,7 @@ export default function CustomerView() {
                             >
                                 <div className="flex items-center gap-3">
                                     <div className="bg-emerald-800 px-3 py-1 rounded-lg text-sm font-black border border-emerald-400/30 shadow-inner">{itemCount}</div>
-                                    <span className="tracking-[0.1em] uppercase text-xs font-black">{isTableSession ? 'Ver Ronda Actual' : 'Ver Mi Pedido'}</span>
+                                    <span className="tracking-[0.1em] uppercase text-xs font-black">{isTableSession ? 'Revisar Ronda Actual' : 'Ver Pedido'}</span>
                                 </div>
                                 <span className="font-black text-xl">${cartTotal.toFixed(2)}</span>
                             </button>
