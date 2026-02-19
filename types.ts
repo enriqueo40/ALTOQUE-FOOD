@@ -47,7 +47,6 @@ export interface Address {
     numero: string;
     entreCalles?: string;
     referencias?: string;
-    googleMapsLink?: string;
 }
 
 export interface Customer {
@@ -65,7 +64,6 @@ export interface Order {
     paymentStatus?: PaymentStatus;
     paymentProof?: string;
     total: number;
-    tip?: number;
     createdAt: Date;
     branchId?: string;
     orderType?: OrderType;
@@ -202,7 +200,6 @@ export interface PagoMovilDetails {
     bank: string;
     phone: string;
     idNumber: string; // C.I. or RIF
-    accountNumber?: string;
 }
 
 export interface TransferDetails {
@@ -212,18 +209,12 @@ export interface TransferDetails {
     idNumber: string; // C.I. or RIF
 }
 
-export interface ZelleDetails {
-    email: string;
-    holder: string;
-}
-
 export interface PaymentSettings {
   deliveryMethods: PaymentMethod[];
   pickupMethods: PaymentMethod[];
   showTipField: boolean;
   pagoMovil?: PagoMovilDetails;
   transfer?: TransferDetails;
-  zelle?: ZelleDetails;
 }
 
 export interface TimeRange {

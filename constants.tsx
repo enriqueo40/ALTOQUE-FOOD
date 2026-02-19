@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { Product, Category, Order, OrderStatus, Conversation, Personalization, Promotion, Zone, Customer, OrderType, DiscountType, PromotionAppliesTo, Table, Currency, AppSettings, ShippingCostType, PrintingMethod } from './types';
 
@@ -248,12 +249,9 @@ export const INITIAL_SETTINGS: AppSettings = {
         pickupTime: { min: 15 },
     },
     payment: {
-        deliveryMethods: ['Efectivo', 'Pago Móvil'],
-        pickupMethods: ['Efectivo', 'Pago Móvil'],
-        showTipField: true,
-        pagoMovil: { bank: '', phone: '', idNumber: '', accountNumber: '' },
-        transfer: { bank: '', accountNumber: '', accountHolder: '', idNumber: '' },
-        zelle: { email: '', holder: '' }
+        deliveryMethods: ['Efectivo'],
+        pickupMethods: ['Efectivo'],
+        showTipField: false,
     },
     schedules: [
         {
