@@ -4,10 +4,9 @@ import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings,
 import { useCart } from '../hooks/useCart';
 import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconStore, IconCheck, IconUpload, IconReceipt, IconSparkles, IconClock, IconLocationMarker } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
-// Fix: Import Chatbot component to resolve "Cannot find name 'Chatbot'" error
 import Chatbot from './Chatbot';
 
-// --- Sub-componentes ---
+// --- Sub-componentes Visuales ---
 
 const Header: React.FC<{ title: string; onBack?: () => void }> = ({ title, onBack }) => (
     <header className="p-4 flex justify-between items-center sticky top-0 bg-[#0f172a]/95 backdrop-blur-md z-30 border-b border-gray-800">
@@ -60,7 +59,7 @@ export default function CustomerView() {
     const [paymentProof, setPaymentProof] = useState<string | null>(null);
     const [tipAmount, setTipAmount] = useState<number>(0);
 
-    // --- ESTADO PERSISTENTE DE MESA ---
+    // --- LÓGICA DE PERSISTENCIA PARA MESA (QR) ---
     const [tableInfo, setTableInfo] = useState<{ table: string; zone: string } | null>(() => {
         const saved = localStorage.getItem('altoque_table_info');
         return saved ? JSON.parse(saved) : null;
@@ -94,11 +93,10 @@ export default function CustomerView() {
         }, 0);
     }, [sessionItems]);
 
-    // Total Calculation including Tips
     const baseTotal = isFinalClosing ? sessionTotal : cartTotal;
     const finalTotal = useMemo(() => baseTotal + tipAmount, [baseTotal, tipAmount]);
 
-    // Sincronización con LocalStorage para Modo Mesa
+    // Sincronización automática con LocalStorage
     useEffect(() => {
         if (isTableSession) {
             localStorage.setItem('altoque_consumed_items', JSON.stringify(sessionItems));
@@ -107,7 +105,7 @@ export default function CustomerView() {
         }
     }, [sessionItems, tableInfo, customerName, isTableSession]);
 
-    // Carga de Datos
+    // Carga inicial y detección de QR
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -127,11 +125,12 @@ export default function CustomerView() {
         fetchData();
         subscribeToMenuUpdates(fetchData);
 
+        // Detectar QR por URL
         const params = new URLSearchParams(window.location.hash.split('?')[1]);
         const table = params.get('table');
         const zone = params.get('zone');
         
-        if (table && zone && !localStorage.getItem('altoque_table_info')) {
+        if (table && zone) {
             const info = { table, zone };
             setTableInfo(info);
             setOrderType(OrderType.DineIn);
@@ -147,7 +146,7 @@ export default function CustomerView() {
             const reader = new FileReader();
             reader.onload = (res) => {
                 setPaymentProof(res.target?.result as string);
-                alert("Captura de pago cargada con éxito.");
+                alert("Comprobante cargado.");
             };
             reader.readAsDataURL(file);
         }
@@ -171,7 +170,7 @@ export default function CustomerView() {
 
         try {
             if (!isFinalClosing) {
-                // FLUJO RONDA NUEVA O PEDIDO NORMAL
+                // FLUJO: ENVIAR RONDA
                 if (cartItems.length > 0) {
                     const newOrderData: any = {
                         customer, 
@@ -184,80 +183,60 @@ export default function CustomerView() {
                         tip: tipAmount
                     };
                     await saveOrder(newOrderData);
+                    
+                    if (isTableSession) {
+                        setSessionItems(prev => [...prev, ...cartItems]);
+                        setCustomerName(name);
+                    }
                 }
             }
 
+            // Construir mensaje de WhatsApp contextual
+            const itemsStr = cartItems.map(i => `• ${i.quantity}x ${i.name}`).join('\n');
+            let msg: string;
+            
             if (isFinalClosing && isTableSession) {
-                // FLUJO CIERRE DE CUENTA
-                const msg = [
-                    `💰 *SOLICITUD DE CIERRE DE CUENTA*`,
+                msg = [
+                    `💰 *CIERRE DE CUENTA - MESA ${tableInfo!.table}*`,
                     `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
-                    `🪑 Mesa: ${tableInfo?.table} (${tableInfo?.zone})`, `👤 Cliente: ${name}`, `--------------------------------`,
-                    `💵 Subtotal: $${sessionTotal.toFixed(2)}`,
+                    `👤 Cliente: ${name}`, `💵 Total Acumulado: $${sessionTotal.toFixed(2)}`,
                     tipAmount > 0 ? `✨ Propina: $${tipAmount.toFixed(2)}` : '',
-                    `⭐ *TOTAL A PAGAR: $${finalTotal.toFixed(2)}*`, `💳 Método: ${selectedPayment}`,
-                    paymentProof ? '✅ Comprobante adjunto' : '', 
-                    `_Cliente solicita la cuenta para retirarse._`
+                    `⭐ *FINAL A PAGAR: $${finalTotal.toFixed(2)}*`,
+                    paymentProof ? '✅ Comprobante adjunto' : ''
                 ].filter(Boolean).join('\n');
-
-                window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
                 
+                // Limpiar sesión al cerrar cuenta
                 localStorage.removeItem('altoque_consumed_items');
                 localStorage.removeItem('altoque_table_info');
                 localStorage.removeItem('altoque_customer_name');
                 setSessionItems([]);
                 setTableInfo(null);
                 setCustomerName('');
-                clearCart();
-                setPaymentProof(null);
-                setTipAmount(0);
-                setView('confirmation');
-
+            } else if (isTableSession) {
+                msg = [
+                    `🧾 *🔥 NUEVA RONDA A COCINA*`,
+                    `🪑 MESA: ${tableInfo!.table} (${tableInfo!.zone})`, `👤 Cliente: ${name}`, `--------------------------------`, itemsStr, `--------------------------------`,
+                    `💵 Subtotal Ronda: $${cartTotal.toFixed(2)}`,
+                    `📈 *Acumulado Mesa: $${(sessionTotal + cartTotal).toFixed(2)}*`
+                ].filter(Boolean).join('\n');
             } else {
-                // FLUJO DE RONDA EN MESA O PEDIDO DELIVERY
-                if (isTableSession) {
-                    setSessionItems(prev => [...prev, ...cartItems]);
-                    setCustomerName(name);
-                }
-
-                const itemsStr = cartItems.map(i => `• ${i.quantity}x ${i.name}`).join('\n');
-                let msg: string;
-                
-                if (isTableSession) {
-                    msg = [
-                        `🧾 *🔥 NUEVA RONDA A COCINA*`,
-                        `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
-                        `🪑 MESA: ${tableInfo!.table} (${tableInfo!.zone})`, `👤 Cliente: ${name}`, `--------------------------------`, itemsStr, `--------------------------------`,
-                        `💰 Subtotal Ronda: $${cartTotal.toFixed(2)}`,
-                        tipAmount > 0 ? `✨ Propina Ronda: $${tipAmount.toFixed(2)}` : '',
-                        `💵 *Total Ronda + Propina: $${finalTotal.toFixed(2)}*`,
-                        (sessionItems.length > 0) ? `📈 *Total Acumulado Mesa: $${(sessionTotal + cartTotal).toFixed(2)}*` : '',
-                        paymentProof ? '✅ Comprobante adjunto' : ''
-                    ].filter(Boolean).join('\n');
-                } else {
-                    msg = [
-                        orderType === OrderType.Delivery ? `🧾 *PEDIDO A DOMICILIO*` : `🥡 *PEDIDO PARA RECOGER*`, 
-                        `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
-                        `👤 Cliente: ${name}`, `📱 Tel: ${phone}`,
-                        orderType === OrderType.Delivery ? `🏠 Dir: ${addressData.calle} ${addressData.numero}, ${addressData.colonia}` : '',
-                        `--------------------------------`, itemsStr, `--------------------------------`,
-                        `💰 Subtotal: $${cartTotal.toFixed(2)}`,
-                        tipAmount > 0 ? `✨ Propina: $${tipAmount.toFixed(2)}` : '',
-                        `💵 *TOTAL A PAGAR: $${finalTotal.toFixed(2)}*`, 
-                        `💳 Método: ${selectedPayment}`,
-                        paymentProof ? '✅ Comprobante adjunto' : ''
-                    ].filter(Boolean).join('\n');
-                }
-
-                window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
-                clearCart();
-                setPaymentProof(null);
-                setTipAmount(0);
-                setView('confirmation');
+                // FLUJO ORIGINAL: DELIVERY / RECOGER
+                msg = [
+                    orderType === OrderType.Delivery ? `🧾 *PEDIDO A DOMICILIO*` : `🥡 *PEDIDO PARA RECOGER*`, 
+                    `👤 Cliente: ${name}`, `📱 Tel: ${phone}`,
+                    `💰 Total: $${finalTotal.toFixed(2)}`, `💳 Método: ${selectedPayment}`
+                ].filter(Boolean).join('\n');
             }
+
+            window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+            clearCart();
+            setPaymentProof(null);
+            setTipAmount(0);
+            setView('confirmation');
+            
         } catch(e) {
-            console.error("Error al procesar el pedido:", e);
-            alert("Error al procesar el pedido. Intenta de nuevo.");
+            console.error("Error:", e);
+            alert("Error al procesar. Reintente.");
         }
     };
 
@@ -275,9 +254,9 @@ export default function CustomerView() {
     };
 
     if (isLoading || !settings) return (
-        <div className="h-screen bg-gray-950 flex flex-col items-center justify-center">
+        <div className="h-screen bg-[#0f172a] flex flex-col items-center justify-center">
             <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
-            <p className="text-emerald-500 font-black uppercase tracking-widest text-xs animate-pulse">Iniciando menú...</p>
+            <p className="text-emerald-500 font-black uppercase tracking-widest text-xs animate-pulse">Cargando menú...</p>
         </div>
     );
 
@@ -303,16 +282,13 @@ export default function CustomerView() {
                 <div className="flex-1 overflow-y-auto pb-48">
                     {view === 'menu' && (
                         <div className="animate-fade-in">
+                            {/* Hero Dine-In vs Online */}
                             <div className="relative pt-12 pb-8 flex flex-col items-center text-center">
                                 <div className="w-24 h-24 bg-black rounded-full flex items-center justify-center border-4 border-gray-800 mb-4 overflow-hidden shadow-2xl">
                                     {settings.branch.logoUrl ? <img src={settings.branch.logoUrl} className="w-full h-full object-cover" /> : <span className="text-emerald-500 font-bold text-2xl">AN</span>}
                                 </div>
                                 <h1 className="text-2xl font-black text-white uppercase tracking-tight">{settings.company.name}</h1>
                                 <p className="text-xs text-gray-400 font-medium mt-1">{settings.branch.alias}</p>
-                                <div className="flex items-center gap-2 mt-2">
-                                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                                    <span className="text-emerald-500 text-[10px] font-bold uppercase tracking-widest">Abierto Ahora</span>
-                                </div>
 
                                 {!isTableSession ? (
                                     <div className="w-[85%] bg-gray-800/40 rounded-xl p-1 flex mt-6 border border-gray-700">
@@ -326,10 +302,11 @@ export default function CustomerView() {
                                 )}
                             </div>
 
+                            {/* Buscador y Categorías */}
                             <div className="sticky top-0 z-20 bg-[#0f172a]/95 backdrop-blur-md px-4 py-4 space-y-4 border-b border-gray-800/50">
                                 <div className="relative">
                                     <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 h-5 w-5" />
-                                    <input type="text" placeholder="Buscar productos..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[#1e293b] border-none rounded-xl py-3.5 pl-12 pr-4 text-sm focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder-gray-500 font-medium" />
+                                    <input type="text" placeholder="Buscar en el menú..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[#1e293b] border-none rounded-xl py-3.5 pl-12 pr-4 text-sm focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder-gray-500 font-medium" />
                                 </div>
                                 <div className="flex overflow-x-auto gap-2 no-scrollbar pb-1">
                                     {allCategories.map(cat => (
@@ -340,6 +317,7 @@ export default function CustomerView() {
                                 </div>
                             </div>
 
+                            {/* Listado de Productos */}
                             <div className="p-4 space-y-8 mt-4">
                                 {allCategories.map(cat => {
                                     const products = allProducts.filter(p => p.categoryId === cat.id && p.available && p.name.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -379,23 +357,22 @@ export default function CustomerView() {
                             <div className="space-y-4">
                                 <h2 className="text-4xl font-black text-white uppercase tracking-tighter leading-none">{isFinalClosing ? '¡HASTA PRONTO!' : '¡A COCINA!'}</h2>
                                 <p className="text-gray-500 text-sm leading-relaxed max-w-xs mx-auto font-medium">
-                                    {isFinalClosing ? 'Hemos enviado tu solicitud. Un mesero pasará a confirmar el pago.' : 'Tu ronda ha sido enviada. Puedes seguir pidiendo más cosas.'}
+                                    {isFinalClosing ? 'Hemos enviado tu solicitud. ¡Gracias por visitarnos!' : 'Tu ronda ha sido enviada. Puedes seguir pidiendo más cosas.'}
                                 </p>
                             </div>
                             <button onClick={() => { setIsFinalClosing(false); setView('menu'); }} className="w-full max-w-xs bg-gray-800 text-white py-4 rounded-xl font-bold hover:bg-gray-700 transition-colors border border-gray-700 uppercase tracking-widest text-xs">
-                                {isFinalClosing ? 'NUEVO PEDIDO' : 'SEGUIR PIDIENDO'}
+                                {isFinalClosing ? 'INICIAR NUEVO PEDIDO' : 'SEGUIR PIDIENDO'}
                             </button>
                         </div>
                     )}
                     
                     {view === 'cart' && ( 
                         <div className="p-5 animate-fade-in"> 
-                            <h2 className="text-xl font-black text-white mb-6 uppercase tracking-tight">Mi Ronda Actual</h2> 
                             <div className="space-y-4"> 
                                 {cartItems.map(i => ( 
                                     <div key={i.cartItemId} className="flex gap-4 bg-gray-800/40 p-4 rounded-2xl border border-gray-800/60"> 
                                         <img src={i.imageUrl} className="w-20 h-20 rounded-xl object-cover" /> 
-                                        <div className="flex-1 flex flex-col justify-center"> 
+                                        <div className="flex-1"> 
                                             <div className="flex justify-between items-start mb-2"> 
                                                 <span className="font-bold text-sm text-gray-100">{i.name}</span> 
                                                 <span className="font-black text-emerald-400 text-sm">${(i.price * i.quantity).toFixed(2)}</span> 
@@ -440,13 +417,14 @@ export default function CustomerView() {
                                             <span className="font-bold text-white">${(item.price * item.quantity).toFixed(2)}</span> 
                                         </div> 
                                     ))} 
+                                    {sessionItems.length === 0 && <p className="text-center text-gray-500 text-xs py-10">Aún no has consumido nada.</p>}
                                 </div> 
                                 <div className="mt-6 pt-6 border-t border-gray-700/50 flex justify-between items-center"> 
                                     <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">TOTAL ACUMULADO</span> 
                                     <span className="text-2xl font-black text-white">${sessionTotal.toFixed(2)}</span> 
                                 </div> 
                             </div> 
-                            <button onClick={() => { setIsFinalClosing(true); setView('checkout'); }} className="w-full bg-white text-gray-900 py-5 rounded-2xl font-black shadow-2xl active:scale-[0.98] transition-all uppercase tracking-[0.2em] text-sm"> 
+                            <button disabled={sessionItems.length === 0} onClick={() => { setIsFinalClosing(true); setView('checkout'); }} className="w-full bg-white text-gray-900 py-5 rounded-2xl font-black shadow-2xl active:scale-[0.98] transition-all uppercase tracking-[0.2em] text-sm disabled:opacity-50"> 
                                 PEDIR LA CUENTA / PAGAR 
                             </button> 
                         </div> 
@@ -515,7 +493,7 @@ export default function CustomerView() {
                                     </div>
                                     <button type="submit" className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex items-center justify-center gap-4 active:scale-95 transition-all text-xs uppercase tracking-[0.2em] shadow-2xl shadow-emerald-900/30">
                                         <IconWhatsapp className="h-5 w-5" /> 
-                                        {isFinalClosing ? 'ENVIAR COMPROBANTE' : (isTableSession ? 'ENVIAR A COCINA' : 'REALIZAR PEDIDO')}
+                                        {isFinalClosing ? 'SOLICITAR CUENTA FINAL' : (isTableSession ? 'ENVIAR RONDA A COCINA' : 'REALIZAR PEDIDO')}
                                     </button>
                                 </div>
                             </form> 
@@ -536,7 +514,6 @@ export default function CustomerView() {
                                 <h2 className="text-3xl font-black mb-2 text-white leading-none">{selectedProduct.name}</h2>
                                 <p className="text-gray-400 text-sm mb-6 leading-relaxed font-medium mt-4">{selectedProduct.description}</p>
                                 
-                                {/* Personalizaciones Filtradas */}
                                 {allPersonalizations
                                     .filter(pers => selectedProduct.personalizationIds?.includes(pers.id))
                                     .map(pers => (
@@ -572,7 +549,7 @@ export default function CustomerView() {
                 
                 {view === 'menu' && (
                     <div className="fixed bottom-6 left-4 right-4 max-w-md mx-auto z-40 flex flex-col gap-3">
-                        {sessionItems.length > 0 && isTableSession && (
+                        {isTableSession && (
                             <button 
                                 onClick={() => setView('account')} 
                                 className="w-full bg-gray-800/90 backdrop-blur-xl text-white font-black py-4 px-6 rounded-2xl flex justify-between items-center border border-emerald-500/30 shadow-2xl transition-transform active:scale-95 group"
@@ -583,7 +560,7 @@ export default function CustomerView() {
                                     </div>
                                     <div className="text-left leading-none">
                                         <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-500 font-black mb-1">Mi Cuenta</p>
-                                        <p className="text-xs text-gray-400 font-bold">Ver acumulado</p>
+                                        <p className="text-xs text-gray-400 font-bold">Consumo acumulado</p>
                                     </div>
                                 </div>
                                 <span className="text-xl font-black">${sessionTotal.toFixed(2)}</span>
@@ -596,7 +573,7 @@ export default function CustomerView() {
                             >
                                 <div className="flex items-center gap-3">
                                     <div className="bg-emerald-800 px-3 py-1 rounded-lg text-sm font-black border border-emerald-400/30 shadow-inner">{itemCount}</div>
-                                    <span className="tracking-[0.1em] uppercase text-xs font-black">{isTableSession ? 'Ver Ronda Actual' : 'Ver Pedido'}</span>
+                                    <span className="tracking-[0.1em] uppercase text-xs font-black">{isTableSession ? 'Ver Ronda Actual' : 'Ver Mi Pedido'}</span>
                                 </div>
                                 <span className="font-black text-xl">${cartTotal.toFixed(2)}</span>
                             </button>

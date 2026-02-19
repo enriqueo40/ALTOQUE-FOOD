@@ -64,13 +64,13 @@ export const getAdvancedInsights = async (query: string, orders: Order[]): Promi
     `;
     
     try {
-        // Implementación de Gemini 3.1 Pro con Pensamiento Profundo (Thinking Mode) de alto nivel
+        // Uso de gemini-3.1-pro-preview para razonamiento avanzado
         const response = await ai.models.generateContent({
             model: 'gemini-3.1-pro-preview',
             contents: prompt,
             config: {
                 thinkingConfig: { 
-                    thinkingBudget: 32768 
+                    thinkingBudget: 32768 // Máximo presupuesto para análisis profundo de negocio
                 }
             }
         });
