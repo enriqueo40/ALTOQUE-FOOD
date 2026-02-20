@@ -6,7 +6,7 @@ import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, Ico
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 import Chatbot from './Chatbot';
 
-// --- Sub-componentes Visuales ---
+// --- Componentes de UI Auxiliares ---
 
 const Header: React.FC<{ title: string; onBack?: () => void }> = ({ title, onBack }) => (
     <header className="p-4 flex justify-between items-center sticky top-0 bg-[#0f172a]/95 backdrop-blur-md z-30 border-b border-gray-800">
@@ -54,12 +54,13 @@ export default function CustomerView() {
     const [activeCategory, setActiveCategory] = useState<string>('');
     const [searchTerm, setSearchTerm] = useState('');
     
-    // Estados de Pago
+    // Estados de Pago y UI
     const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('Efectivo');
     const [paymentProof, setPaymentProof] = useState<string | null>(null);
     const [tipAmount, setTipAmount] = useState<number>(0);
+    const [isFinalClosing, setIsFinalClosing] = useState(false);
 
-    // --- NÚCLEO DE PERSISTENCIA (localStorage) ---
+    // --- LÓGICA DE PERSISTENCIA PARA MESA (DINE-IN) ---
     const [tableInfo, setTableInfo] = useState<{ table: string; zone: string } | null>(() => {
         const saved = localStorage.getItem('altoque_table_info');
         return saved ? JSON.parse(saved) : null;
@@ -71,13 +72,11 @@ export default function CustomerView() {
     });
     
     const [customerName, setCustomerName] = useState<string>(() => localStorage.getItem('altoque_customer_name') || '');
-    
     const [orderType, setOrderType] = useState<OrderType>(() => {
         const savedTable = localStorage.getItem('altoque_table_info');
         return savedTable ? OrderType.DineIn : OrderType.Delivery;
     });
 
-    const [isFinalClosing, setIsFinalClosing] = useState(false);
     const { cartItems, addToCart, removeFromCart, updateQuantity, clearCart, cartTotal, itemCount } = useCart();
     
     const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -87,7 +86,7 @@ export default function CustomerView() {
 
     const isTableSession = !!tableInfo;
 
-    // Cálculo de Totales
+    // Cálculo de Totales Acumulados
     const sessionTotal = useMemo(() => {
         return sessionItems.reduce((acc, item) => {
             const optsPrice = item.selectedOptions ? item.selectedOptions.reduce((s, o) => s + (Number(o.price) || 0), 0) : 0;
@@ -95,10 +94,11 @@ export default function CustomerView() {
         }, 0);
     }, [sessionItems]);
 
+    // El total a pagar en checkout depende de si es una ronda nueva o el cierre final
     const baseTotal = isFinalClosing ? sessionTotal : cartTotal;
     const finalTotal = useMemo(() => baseTotal + tipAmount, [baseTotal, tipAmount]);
 
-    // Persistencia Automática
+    // Persistencia Automática cada vez que cambia la cuenta o info de mesa
     useEffect(() => {
         if (isTableSession) {
             localStorage.setItem('altoque_consumed_items', JSON.stringify(sessionItems));
@@ -107,7 +107,7 @@ export default function CustomerView() {
         }
     }, [sessionItems, tableInfo, customerName, isTableSession]);
 
-    // Carga Inicial y Detección de QR
+    // Carga inicial y detección de QR
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -127,7 +127,7 @@ export default function CustomerView() {
         fetchData();
         subscribeToMenuUpdates(fetchData);
 
-        // Captura proactiva de mesa desde URL
+        // Captura de parámetros QR de la URL
         const params = new URLSearchParams(window.location.hash.split('?')[1]);
         const table = params.get('table');
         const zone = params.get('zone');
@@ -169,7 +169,7 @@ export default function CustomerView() {
 
         try {
             if (!isFinalClosing) {
-                // FLUJO: ENVIAR RONDA A COCINA
+                // FLUJO: ENVIAR RONDA A COCINA (No limpia sesión, la acumula)
                 if (cartItems.length > 0) {
                     const newOrderData: any = {
                         customer, 
@@ -190,22 +190,24 @@ export default function CustomerView() {
                 }
             }
 
-            // Mensajes de WhatsApp Contextualizados
+            // Construcción de Ticket para WhatsApp
             const itemsStr = cartItems.map(i => `• ${i.quantity}x ${i.name}`).join('\n');
             let msg: string;
             
             if (isFinalClosing && isTableSession) {
+                // Mensaje de Cierre Total
                 msg = [
-                    `💰 *SOLICITUD DE CUENTA - MESA ${tableInfo!.table}*`,
+                    `💰 *CIERRE DE CUENTA - MESA ${tableInfo!.table}*`,
                     `📍 *${settings.company.name.toUpperCase()}*`, `--------------------------------`,
-                    `👤 Cliente: ${name}`, `💵 Total Consumido: $${sessionTotal.toFixed(2)}`,
+                    `👤 Cliente: ${name}`, 
+                    `💵 Total Acumulado: $${sessionTotal.toFixed(2)}`,
                     tipAmount > 0 ? `✨ Propina: $${tipAmount.toFixed(2)}` : '',
                     `⭐ *FINAL A PAGAR: $${finalTotal.toFixed(2)}*`,
                     `💳 Método: ${selectedPayment}`,
-                    paymentProof ? '✅ Comprobante adjunto' : '_Solicita cobrar en mesa_'
+                    paymentProof ? '✅ Comprobante adjunto' : '_Solicito cobrar en mesa_'
                 ].filter(Boolean).join('\n');
                 
-                // LIMPIEZA EXPLÍCITA DE SESIÓN
+                // LIMPIEZA DE SESIÓN (Solo al finalizar cuenta)
                 localStorage.removeItem('altoque_consumed_items');
                 localStorage.removeItem('altoque_table_info');
                 localStorage.removeItem('altoque_customer_name');
@@ -213,6 +215,7 @@ export default function CustomerView() {
                 setTableInfo(null);
                 setCustomerName('');
             } else if (isTableSession) {
+                // Mensaje de Nueva Ronda
                 msg = [
                     `🧾 *🔥 NUEVA RONDA A COCINA - MESA ${tableInfo!.table}*`,
                     `👤 Cliente: ${name}`, `--------------------------------`, itemsStr, `--------------------------------`,
@@ -220,7 +223,7 @@ export default function CustomerView() {
                     `📈 *Total Acumulado Mesa: $${(sessionTotal + cartTotal).toFixed(2)}*`
                 ].filter(Boolean).join('\n');
             } else {
-                // Flujo Original de Delivery (Sin persistencia de sesión)
+                // Modo Delivery / Recoger normal
                 msg = [
                     orderType === OrderType.Delivery ? `🧾 *PEDIDO A DOMICILIO*` : `🥡 *PEDIDO PARA RECOGER*`, 
                     `👤 Cliente: ${name}`, `📱 Tel: ${phone}`,
@@ -235,7 +238,7 @@ export default function CustomerView() {
             setView('confirmation');
             
         } catch(e) {
-            alert("Error al procesar la solicitud.");
+            alert("Error al procesar el pedido.");
         }
     };
 
@@ -255,7 +258,7 @@ export default function CustomerView() {
     if (isLoading || !settings) return (
         <div className="h-screen bg-[#0f172a] flex flex-col items-center justify-center">
             <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
-            <p className="text-emerald-500 font-black uppercase tracking-widest text-xs animate-pulse">Iniciando sistema...</p>
+            <p className="text-emerald-500 font-black uppercase tracking-widest text-xs animate-pulse">Sincronizando mesa...</p>
         </div>
     );
 
@@ -267,7 +270,7 @@ export default function CustomerView() {
                 
                 {view !== 'menu' && (
                     <Header 
-                        title={view === 'cart' ? 'MI RONDA ACTUAL' : view === 'account' ? 'MI CONSUMO TOTAL' : (isFinalClosing ? 'PEDIR CUENTA' : 'CONFIRMACIÓN')} 
+                        title={view === 'cart' ? 'MI RONDA ACTUAL' : view === 'account' ? 'MI CUENTA ACUMULADA' : (isFinalClosing ? 'CERRAR CUENTA' : 'CONFIRMAR')} 
                         onBack={() => {
                             if (view === 'checkout') {
                                 isFinalClosing ? setView('account') : setView('cart');
@@ -291,10 +294,10 @@ export default function CustomerView() {
                                 {!isTableSession ? (
                                     <div className="w-[85%] bg-gray-800/40 rounded-xl p-1 flex mt-6 border border-gray-700">
                                         <button onClick={() => setOrderType(OrderType.Delivery)} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${orderType === OrderType.Delivery ? 'bg-gray-700 text-emerald-400 shadow-lg' : 'text-gray-500'}`}>A domicilio</button>
-                                        <button onClick={() => setOrderType(OrderType.TakeAway)} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${orderType === OrderType.TakeAway ? 'bg-gray-700 text-emerald-400 shadow-lg' : 'text-gray-500'}`}>Para recoger</button>
+                                        <button onClick={() => setOrderType(OrderType.TakeAway)} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${orderType === OrderType.TakeAway ? 'bg-gray-700 text-emerald-400 shadow-lg' : 'text-gray-500'}`}>Recoger</button>
                                     </div>
                                 ) : (
-                                    <div className="mt-6 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-6 py-2 rounded-full text-[10px] font-black tracking-widest flex items-center gap-2">
+                                    <div className="mt-6 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-6 py-2 rounded-full text-[10px] font-black tracking-widest flex items-center gap-2 animate-bounce-subtle">
                                         <IconTableLayout className="h-3 w-3"/> MESA {tableInfo!.table} • {tableInfo!.zone}
                                     </div>
                                 )}
@@ -353,10 +356,10 @@ export default function CustomerView() {
                             <div className="space-y-4">
                                 <h2 className="text-4xl font-black text-white uppercase tracking-tighter leading-none">{isFinalClosing ? '¡HASTA PRONTO!' : '¡A COCINA!'}</h2>
                                 <p className="text-gray-500 text-sm leading-relaxed max-w-xs mx-auto font-medium">
-                                    {isFinalClosing ? 'Hemos enviado tu solicitud. ¡Gracias por elegirnos!' : 'Tu ronda ha sido enviada. Puedes seguir pidiendo más cosas cuando gustes.'}
+                                    {isFinalClosing ? 'Gracias por visitarnos. El personal de sala cerrará tu ticket en breve.' : 'Hemos enviado tu ronda. Sigue disfrutando y pide lo que quieras cuando gustes.'}
                                 </p>
                             </div>
-                            <button onClick={() => { setIsFinalClosing(false); setView('menu'); }} className="w-full max-w-xs bg-emerald-600 text-white py-5 rounded-2xl font-black shadow-xl shadow-emerald-900/40 uppercase tracking-widest text-xs">
+                            <button onClick={() => { setIsFinalClosing(false); setView('menu'); }} className="w-full max-w-xs bg-emerald-600 text-white py-5 rounded-2xl font-black transition-all hover:bg-emerald-700 shadow-xl shadow-emerald-900/40 uppercase tracking-widest text-xs">
                                 {isFinalClosing ? 'NUEVO PEDIDO' : 'SEGUIR PIDIENDO'}
                             </button>
                         </div>
@@ -391,7 +394,7 @@ export default function CustomerView() {
                                     <span className="text-emerald-400 text-3xl font-black">${cartTotal.toFixed(2)}</span> 
                                 </div> 
                                 <button disabled={cartItems.length === 0} onClick={() => { setIsFinalClosing(false); setView('checkout'); }} className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white shadow-2xl active:scale-[0.98] transition-all disabled:opacity-30 uppercase tracking-[0.2em] text-sm"> 
-                                    {isTableSession ? 'ENVIAR A COCINA' : 'IR A PAGAR'} 
+                                    {isTableSession ? 'ENVIAR RONDA A COCINA' : 'IR A PAGAR'} 
                                 </button> 
                             </div> 
                         </div> 
@@ -413,7 +416,7 @@ export default function CustomerView() {
                                             <span className="font-bold text-white">${(item.price * item.quantity).toFixed(2)}</span> 
                                         </div> 
                                     ))} 
-                                    {sessionItems.length === 0 && <p className="text-center text-gray-500 text-xs py-10">No hay pedidos confirmados aún.</p>}
+                                    {sessionItems.length === 0 && <p className="text-center text-gray-500 text-xs py-10">Aún no has enviado nada en esta sesión.</p>}
                                 </div> 
                                 <div className="mt-6 pt-6 border-t border-gray-700/50 flex justify-between items-center"> 
                                     <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">TOTAL ACUMULADO</span> 
@@ -421,7 +424,7 @@ export default function CustomerView() {
                                 </div> 
                             </div> 
                             <button disabled={sessionItems.length === 0} onClick={() => { setIsFinalClosing(true); setView('checkout'); }} className="w-full bg-white text-gray-900 py-5 rounded-2xl font-black shadow-2xl active:scale-[0.98] transition-all uppercase tracking-[0.2em] text-sm disabled:opacity-50"> 
-                                PEDIR LA CUENTA / PAGAR 
+                                PAGAR / PEDIR LA CUENTA 
                             </button> 
                         </div> 
                     )}
@@ -431,16 +434,16 @@ export default function CustomerView() {
                             <form onSubmit={handleOrderAction} className="space-y-6">
                                 <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]">
                                     <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">TUS DATOS</h3>
-                                    <input name="name" type="text" defaultValue={customerName} className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="Tu Nombre" required />
-                                    {!isTableSession && <input name="phone" type="tel" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="WhatsApp" required />}
+                                    <input name="name" type="text" defaultValue={customerName} className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white placeholder:text-gray-600" placeholder="Tu Nombre" required />
+                                    {!isTableSession && <input name="phone" type="tel" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white placeholder:text-gray-600" placeholder="WhatsApp" required />}
                                 </div>
                                 
                                 {orderType === OrderType.Delivery && (
                                     <div className="space-y-4 p-6 bg-gray-800/30 border border-gray-800 rounded-[2rem]">
                                         <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">DIRECCIÓN DE ENTREGA</h3>
-                                        <input name="calle" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="Calle / Av." required />
-                                        <input name="numero" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="Nro" required />
-                                        <input name="colonia" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white" placeholder="Urbanización / Colonia" required />
+                                        <input name="calle" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white placeholder:text-gray-600" placeholder="Calle / Av." required />
+                                        <input name="numero" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white placeholder:text-gray-600" placeholder="Número" required />
+                                        <input name="colonia" className="w-full bg-gray-800 border-gray-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500/40 text-sm font-bold text-white placeholder:text-gray-600" placeholder="Sector / Urb." required />
                                     </div>
                                 )}
 
@@ -473,7 +476,7 @@ export default function CustomerView() {
                                                 ) : (
                                                     <div className="flex flex-col items-center text-gray-500">
                                                         <IconUpload className="h-6 w-6 mb-1"/>
-                                                        <span className="text-[10px] font-bold">Toca para subir captura</span>
+                                                        <span className="text-[10px] font-bold">Toca para cargar</span>
                                                     </div>
                                                 )}
                                                 <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
@@ -548,15 +551,15 @@ export default function CustomerView() {
                         {isTableSession && sessionItems.length > 0 && (
                             <button 
                                 onClick={() => setView('account')} 
-                                className="w-full bg-gray-800/90 backdrop-blur-xl text-white font-black py-4 px-6 rounded-2xl flex justify-between items-center border border-emerald-500/30 shadow-2xl transition-transform active:scale-95 group"
+                                className="w-full bg-[#1e293b]/90 backdrop-blur-xl text-white font-black py-4 px-6 rounded-2xl flex justify-between items-center border border-gray-700 shadow-2xl transition-transform active:scale-95 group"
                             >
                                 <div className="flex items-center gap-3">
-                                    <div className="bg-emerald-500/20 p-2 rounded-lg text-emerald-400 group-hover:text-emerald-300 transition-colors">
+                                    <div className="bg-white/10 p-2 rounded-lg text-white/60 group-hover:text-emerald-400 transition-colors">
                                         <IconReceipt className="h-5 w-5"/>
                                     </div>
                                     <div className="text-left leading-none">
-                                        <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-500 font-black mb-1">Mi Cuenta</p>
-                                        <p className="text-xs text-gray-400 font-bold">Consumo acumulado</p>
+                                        <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-black mb-1">Mi Cuenta</p>
+                                        <p className="text-xs text-gray-400 font-bold">Ver consumo total</p>
                                     </div>
                                 </div>
                                 <span className="text-xl font-black">${sessionTotal.toFixed(2)}</span>
@@ -586,6 +589,11 @@ export default function CustomerView() {
                     to { transform: translateY(0); opacity: 1; }
                 }
                 .animate-slide-up { animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+                @keyframes bounce-subtle {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-4px); }
+                }
+                .animate-bounce-subtle { animation: bounce-subtle 2s infinite ease-in-out; }
             `}</style>
         </div>
     );

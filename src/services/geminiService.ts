@@ -7,12 +7,12 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const generateProductDescription = async (productName: string, categoryName: string, currentDescription: string): Promise<string> => {
     try {
-        const prompt = `Genera una descripción chic, minimalista y tentadora para un menú de restaurante.
+        const prompt = `Genera una descripción chic, minimalista y tentadora para un menú de restaurante profesional.
         Producto: ${productName}
         Categoría: ${categoryName}
         Descripción actual: ${currentDescription}
         
-        Enfoque en ingredientes frescos y experiencia sensorial. Máximo 15 palabras.`;
+        Enfoque en frescura y experiencia sensorial. Máximo 15 palabras.`;
 
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
@@ -22,15 +22,14 @@ export const generateProductDescription = async (productName: string, categoryNa
         return response.text?.trim() || "Una experiencia única para tu paladar.";
     } catch (error) {
         console.error("Error generating product description:", error);
-        return "Descripción deliciosa en proceso...";
+        return "Descripción en proceso...";
     }
 };
 
 export const getChatbotResponse = async (history: ChatMessage[], newMessage: string): Promise<string> => {
-    const systemInstruction = `Eres "AltoqueBot", el asistente inteligente de un restaurante de alta gama. 
+    const systemInstruction = `Eres "AltoqueBot", el asistente experto de un restaurante moderno. 
     Tu personalidad es amable, profesional y eficiente.
-    Responde dudas sobre el menú, horarios y procesos de pedido.
-    Si te preguntan por pedidos en mesa, explica que pueden pedir por rondas y pagar al final.
+    Responde dudas sobre el menú, horarios y cómo pedir en mesa (por rondas).
     Mantén las respuestas concisas.`;
 
     const contents = history.map(msg => ({
@@ -46,17 +45,17 @@ export const getChatbotResponse = async (history: ChatMessage[], newMessage: str
         });
 
         const response = await chat.sendMessage({ message: newMessage });
-        return response.text?.trim() || "Lo siento, no pude procesar tu solicitud.";
+        return response.text?.trim() || "Lo siento, no pude procesar eso.";
 
     } catch (error) {
         console.error("Error getting chatbot response:", error);
-        return "Tengo problemas de conexión. Por favor, intenta de nuevo en un momento.";
+        return "Tengo problemas de conexión. Intenta de nuevo.";
     }
 };
 
 export const getAdvancedInsights = async (query: string, orders: Order[]): Promise<string> => {
-    const prompt = `Como analista experto en gestión de restaurantes de clase mundial, analiza los siguientes datos de ventas y proporciona insights estratégicos profundos.
-    Identifica patrones de consumo complejos, optimización de menú y predicciones de demanda.
+    const prompt = `Como analista de negocios experto en alta gastronomía, analiza estos pedidos. 
+    Busca patrones de consumo en mesa, platos más pedidos por ronda y optimización de ticket promedio.
 
     **Datos de Pedidos (JSON):**
     ${JSON.stringify(orders, null, 2)}
@@ -66,19 +65,18 @@ export const getAdvancedInsights = async (query: string, orders: Order[]): Promi
     `;
     
     try {
-        // Uso de gemini-3-pro-preview con Pensamiento Profundo para análisis complejo y estratégico
         const response = await ai.models.generateContent({
             model: 'gemini-3-pro-preview',
             contents: prompt,
             config: {
                 thinkingConfig: { 
-                    thinkingBudget: 32768 // Máximo presupuesto para análisis profundo de negocio
+                    thinkingBudget: 32768 
                 }
             }
         });
-        return response.text || "No se pudieron generar insights estratégicos en este momento.";
+        return response.text || "No se pudieron generar insights estratégicos.";
     } catch (error) {
         console.error("Error getting advanced insights:", error);
-        return `Ocurrió un error en el análisis estratégico: ${error instanceof Error ? error.message : String(error)}`;
+        return `Error en el análisis: ${error instanceof Error ? error.message : String(error)}`;
     }
 };
