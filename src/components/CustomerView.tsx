@@ -1,12 +1,174 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, PaymentMethod, OrderType, Personalization, Promotion, PersonalizationOption, DiscountType, PromotionAppliesTo, ShippingCostType } from '../types';
+import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, PaymentMethod, OrderType, Personalization, Promotion, PersonalizationOption, DiscountType, PromotionAppliesTo, ShippingCostType, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
 import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconCheck, IconUpload, IconReceipt, IconClock, IconStore, IconLocationMarker } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
-import Chatbot from './Chatbot';
 
 // --- Componentes de UI Auxiliares ---
+
+const ScheduleModal: React.FC<{ isOpen: boolean; onClose: () => void; schedule: Schedule }> = ({ isOpen, onClose, schedule }) => {
+    if (!isOpen) return null;
+    const daysOrder = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+    const todayIndex = new Date().getDay();
+    const adjustedTodayIndex = todayIndex === 0 ? 6 : todayIndex - 1; 
+    const todayName = daysOrder[adjustedTodayIndex];
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm"></div>
+            <div className="bg-[#1e293b] w-full max-w-sm rounded-[2.5rem] shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[80vh] border border-gray-800" onClick={e => e.stopPropagation()}>
+                <div className="p-8 border-b border-gray-800 bg-gray-800/20 flex justify-between items-center">
+                    <h3 className="text-xl font-black text-white uppercase tracking-tighter">Horarios</h3>
+                    <button onClick={onClose} className="p-2 bg-gray-800 rounded-full text-gray-400 hover:text-white transition-colors"><IconX className="h-5 w-5"/></button>
+                </div>
+                <div className="p-6 overflow-y-auto space-y-2">
+                    {schedule.days.map((day) => {
+                        const isToday = day.day === todayName;
+                        return (
+                            <div key={day.day} className={`flex justify-between items-center py-4 px-5 rounded-2xl ${isToday ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-gray-800/30 border border-gray-800'}`}>
+                                <span className={`text-xs font-black uppercase tracking-widest ${isToday ? 'text-emerald-400' : 'text-gray-400'}`}>
+                                    {day.day} {isToday && <span className="ml-2 bg-emerald-500 text-white px-2 py-0.5 rounded-full text-[8px] align-middle">HOY</span>}
+                                </span>
+                                <div className="text-right">
+                                    {day.isOpen && day.shifts.length > 0 ? (
+                                        day.shifts.map((shift, i) => (
+                                            <div key={i} className="text-xs text-gray-200 font-bold">
+                                                {shift.start} - {shift.end}
+                                            </div>
+                                        ))
+                                    ) : (
+                                        day.isOpen && day.shifts.length === 0 ? (
+                                            <span className="text-xs text-emerald-400 font-black uppercase tracking-widest">Abierto 24h</span>
+                                        ) : (
+                                            <span className="text-xs text-rose-500 font-black uppercase tracking-widest">Cerrado</span>
+                                        )
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+                <div className="p-6 border-t border-gray-800 bg-gray-900/50">
+                    <button onClick={onClose} className="w-full py-4 bg-gray-800 hover:bg-gray-700 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all border border-gray-700">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const RestaurantHero: React.FC<{ 
+    settings: AppSettings, 
+    tableInfo: { table: string, zone: string } | null,
+    orderType: OrderType,
+    setOrderType: (type: OrderType) => void
+}> = ({ settings, tableInfo, orderType, setOrderType }) => {
+    const { branch, company, shipping, schedules } = settings;
+    const [showSchedule, setShowSchedule] = useState(false);
+    const [isOpenNow, setIsOpenNow] = useState(false);
+    const currentSchedule = schedules[0];
+
+    useEffect(() => {
+        if (!currentSchedule) return;
+        const now = new Date();
+        const daysOrder = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+        const todayName = daysOrder[now.getDay()];
+        const todaySchedule = currentSchedule.days.find(d => d.day === todayName);
+
+        if (todaySchedule && todaySchedule.isOpen) {
+            if (todaySchedule.shifts.length === 0) {
+                setIsOpenNow(true);
+            } else {
+                const currentTime = now.getHours() * 60 + now.getMinutes();
+                const isOpen = todaySchedule.shifts.some(shift => {
+                    const [startH, startM] = shift.start.split(':').map(Number);
+                    const [endH, endM] = shift.end.split(':').map(Number);
+                    const start = startH * 60 + startM;
+                    const end = endH * 60 + endM;
+                    return currentTime >= start && currentTime < end;
+                });
+                setIsOpenNow(isOpen);
+            }
+        } else {
+            setIsOpenNow(false);
+        }
+    }, [currentSchedule]);
+
+    return (
+        <div className="relative">
+            <div className="h-48 w-full overflow-hidden relative">
+                {branch.coverImageUrl ? (
+                    <img src={branch.coverImageUrl} alt="Cover" className="w-full h-full object-cover" />
+                ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0f172a] via-[#0f172a]/60 to-transparent"></div>
+            </div>
+
+            <div className="px-6 relative -mt-16 flex flex-col items-center text-center pb-8 border-b border-gray-800/50">
+                <div className="w-28 h-28 bg-gray-800 rounded-full p-1 shadow-2xl mb-4 relative z-10 border-4 border-[#0f172a]">
+                     <div className="w-full h-full rounded-full overflow-hidden bg-black flex items-center justify-center">
+                        {branch.logoUrl ? 
+                            <img src={branch.logoUrl} alt={`${company.name} logo`} className="w-full h-full object-cover" />
+                            :
+                            <span className="text-2xl font-black text-emerald-500">AF</span>
+                        }
+                     </div>
+                </div>
+                
+                <h1 className="text-3xl font-black text-white uppercase tracking-tighter mb-1">{company.name}</h1>
+                <div className="flex flex-col items-center gap-1 mb-6">
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">
+                        {branch.alias}
+                    </p>
+                    {currentSchedule && (
+                        <div className="flex items-center gap-2 mt-2">
+                            <span className={`w-1.5 h-1.5 rounded-full ${isOpenNow ? 'bg-emerald-500' : 'bg-rose-500'} animate-pulse`}></span>
+                            <button onClick={() => setShowSchedule(true)} className={`text-[10px] font-black uppercase tracking-widest ${isOpenNow ? 'text-emerald-400' : 'text-rose-400'} hover:underline`}>
+                                {isOpenNow ? 'Abierto Ahora' : 'Cerrado'}
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {tableInfo ? (
+                    <div className="w-full p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-center gap-3 animate-bounce-subtle">
+                        <IconTableLayout className="h-4 w-4 text-emerald-400" />
+                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Mesa {tableInfo.table} • {tableInfo.zone}</p>
+                    </div>
+                ) : (
+                    <div className="w-full max-w-xs bg-gray-800/40 rounded-2xl p-1.5 flex relative border border-gray-700 shadow-inner">
+                        <div 
+                            className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] bg-gray-700 rounded-xl transition-transform duration-300 ease-out shadow-lg ${orderType === OrderType.TakeAway ? 'translate-x-full left-1.5' : 'left-1.5'}`}
+                        ></div>
+                        <button 
+                            onClick={() => setOrderType(OrderType.Delivery)} 
+                            className={`flex-1 relative z-10 py-2.5 text-[10px] font-black uppercase tracking-widest transition-colors duration-200 ${orderType === OrderType.Delivery ? 'text-emerald-400' : 'text-gray-500 hover:text-gray-300'}`}
+                        >
+                            A domicilio
+                        </button>
+                        <button 
+                            onClick={() => setOrderType(OrderType.TakeAway)} 
+                            className={`flex-1 relative z-10 py-2.5 text-[10px] font-black uppercase tracking-widest transition-colors duration-200 ${orderType === OrderType.TakeAway ? 'text-emerald-400' : 'text-gray-500 hover:text-gray-300'}`}
+                        >
+                            Recoger
+                        </button>
+                    </div>
+                )}
+            </div>
+            
+            {currentSchedule && (
+                <ScheduleModal 
+                    isOpen={showSchedule} 
+                    onClose={() => setShowSchedule(false)} 
+                    schedule={currentSchedule}
+                />
+            )}
+        </div>
+    );
+};
 
 const Header: React.FC<{ title: string; onBack?: () => void }> = ({ title, onBack }) => (
     <header className="p-4 flex justify-between items-center sticky top-0 bg-[#0f172a]/95 backdrop-blur-md z-30 border-b border-gray-800">
@@ -49,6 +211,9 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
 export default function CustomerView() {
     const [view, setView] = useState<'menu' | 'cart' | 'checkout' | 'confirmation' | 'account'>('menu');
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+    const [selectedOptions, setSelectedOptions] = useState<{ [personalizationId: string]: PersonalizationOption[] }>({});
+    const [productComments, setProductComments] = useState('');
+    const [productQuantity, setProductQuantity] = useState(1);
     const [settings, setSettings] = useState<AppSettings | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [activeCategory, setActiveCategory] = useState<string>('');
@@ -168,25 +333,37 @@ export default function CustomerView() {
         const customer: Customer = { name, phone, address: addressData, paymentProof: paymentProof || undefined };
 
         try {
-            if (!isFinalClosing) {
+            if (isFinalClosing && isTableSession) {
+                // FLUJO: CIERRE DE CUENTA
+                const finalOrderData: any = {
+                    customer,
+                    items: sessionItems,
+                    total: finalTotal,
+                    status: OrderStatus.Completed, // Mark as completed or a special status
+                    orderType,
+                    tableId: `${tableInfo?.zone} - ${tableInfo?.table}`,
+                    paymentStatus: paymentProof ? 'paid' : 'pending',
+                    tip: tipAmount,
+                    generalComments: 'CIERRE DE CUENTA FINAL'
+                };
+                await saveOrder(finalOrderData);
+            } else if (cartItems.length > 0) {
                 // FLUJO: ENVIAR RONDA A COCINA (No limpia sesión, la acumula)
-                if (cartItems.length > 0) {
-                    const newOrderData: any = {
-                        customer, 
-                        items: cartItems, 
-                        total: finalTotal,
-                        status: OrderStatus.Pending, 
-                        orderType,
-                        tableId: isTableSession ? `${tableInfo?.zone} - ${tableInfo?.table}` : undefined,
-                        paymentStatus: 'pending',
-                        tip: tipAmount
-                    };
-                    await saveOrder(newOrderData);
-                    
-                    if (isTableSession) {
-                        setSessionItems(prev => [...prev, ...cartItems]);
-                        setCustomerName(name);
-                    }
+                const newOrderData: any = {
+                    customer, 
+                    items: cartItems, 
+                    total: finalTotal,
+                    status: OrderStatus.Pending, 
+                    orderType,
+                    tableId: isTableSession ? `${tableInfo?.zone} - ${tableInfo?.table}` : undefined,
+                    paymentStatus: 'pending',
+                    tip: tipAmount
+                };
+                await saveOrder(newOrderData);
+                
+                if (isTableSession) {
+                    setSessionItems(prev => [...prev, ...cartItems]);
+                    setCustomerName(name);
                 }
             }
 
@@ -262,6 +439,53 @@ export default function CustomerView() {
         </div>
     );
 
+    const handleOptionToggle = (personalization: Personalization, option: PersonalizationOption) => {
+        setSelectedOptions(prev => {
+            const currentSelection = prev[personalization.id] || [];
+            const isSelected = currentSelection.some(opt => opt.id === option.id);
+            
+            if (personalization.maxSelection === 1) {
+                return { ...prev, [personalization.id]: [option] };
+            }
+
+            if (isSelected) {
+                return { ...prev, [personalization.id]: currentSelection.filter(opt => opt.id !== option.id) };
+            } else {
+                if (personalization.maxSelection && currentSelection.length >= personalization.maxSelection) {
+                    return prev;
+                }
+                return { ...prev, [personalization.id]: [...currentSelection, option] };
+            }
+        });
+    };
+
+    const isOptionSelected = (pid: string, oid: string) => {
+        return (selectedOptions[pid] || []).some(o => o.id === oid);
+    };
+
+    const currentProductTotalPrice = useMemo(() => {
+        if (!selectedProduct) return 0;
+        const { price: basePrice } = getDiscountedPrice(selectedProduct, allPromotions);
+        let optionsPrice = 0;
+        Object.values(selectedOptions).forEach(options => {
+            options.forEach(opt => {
+                optionsPrice += (Number(opt.price) || 0);
+            });
+        });
+        return (basePrice + optionsPrice) * productQuantity;
+    }, [selectedProduct, selectedOptions, productQuantity, allPromotions]);
+
+    const handleAddToCartWithDetails = () => {
+        if (!selectedProduct) return;
+        const { price: basePrice } = getDiscountedPrice(selectedProduct, allPromotions);
+        const flatOptions = Object.values(selectedOptions).flat();
+        addToCart({ ...selectedProduct, price: basePrice }, productQuantity, productComments, flatOptions);
+        setSelectedProduct(null);
+        setSelectedOptions({});
+        setProductComments('');
+        setProductQuantity(1);
+    };
+
     const isBankPayment = ['Pago Móvil', 'Transferencia', 'Zelle'].includes(selectedPayment);
 
     return (
@@ -284,24 +508,12 @@ export default function CustomerView() {
                 <div className="flex-1 overflow-y-auto pb-48">
                     {view === 'menu' && (
                         <div className="animate-fade-in">
-                            <div className="relative pt-12 pb-8 flex flex-col items-center text-center">
-                                <div className="w-24 h-24 bg-black rounded-full flex items-center justify-center border-4 border-gray-800 mb-4 shadow-2xl overflow-hidden">
-                                    {settings.branch.logoUrl ? <img src={settings.branch.logoUrl} className="w-full h-full object-cover" /> : <span className="text-emerald-500 font-bold text-2xl">AF</span>}
-                                </div>
-                                <h1 className="text-2xl font-black text-white uppercase tracking-tight">{settings.company.name}</h1>
-                                <p className="text-xs text-gray-400 font-medium mt-1">{settings.branch.alias}</p>
-
-                                {!isTableSession ? (
-                                    <div className="w-[85%] bg-gray-800/40 rounded-xl p-1 flex mt-6 border border-gray-700">
-                                        <button onClick={() => setOrderType(OrderType.Delivery)} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${orderType === OrderType.Delivery ? 'bg-gray-700 text-emerald-400 shadow-lg' : 'text-gray-500'}`}>A domicilio</button>
-                                        <button onClick={() => setOrderType(OrderType.TakeAway)} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${orderType === OrderType.TakeAway ? 'bg-gray-700 text-emerald-400 shadow-lg' : 'text-gray-500'}`}>Recoger</button>
-                                    </div>
-                                ) : (
-                                    <div className="mt-6 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-6 py-2 rounded-full text-[10px] font-black tracking-widest flex items-center gap-2 animate-bounce-subtle">
-                                        <IconTableLayout className="h-3 w-3"/> MESA {tableInfo!.table} • {tableInfo!.zone}
-                                    </div>
-                                )}
-                            </div>
+                            <RestaurantHero 
+                                settings={settings}
+                                tableInfo={tableInfo}
+                                orderType={orderType}
+                                setOrderType={setOrderType}
+                            />
 
                             <div className="sticky top-0 z-20 bg-[#0f172a]/95 backdrop-blur-md px-4 py-4 space-y-4 border-b border-gray-800/50">
                                 <div className="relative">
@@ -503,13 +715,13 @@ export default function CustomerView() {
                 {selectedProduct && (
                     <div className="fixed inset-0 z-50 flex items-end justify-center p-4">
                         <div className="absolute inset-0 bg-black/85 backdrop-blur-sm" onClick={() => setSelectedProduct(null)}></div>
-                        <div className="bg-gray-900 w-full max-w-sm rounded-[2.5rem] overflow-hidden relative z-10 animate-slide-up border border-gray-800 shadow-2xl">
-                            <div className="h-64 relative overflow-hidden">
+                        <div className="bg-gray-900 w-full max-w-sm rounded-[2.5rem] overflow-hidden relative z-10 animate-slide-up border border-gray-800 shadow-2xl max-h-[90vh] flex flex-col">
+                            <div className="h-48 relative overflow-hidden shrink-0">
                                 <img src={selectedProduct.imageUrl} className="w-full h-full object-cover" />
                                 <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent"></div>
                                 <button onClick={() => setSelectedProduct(null)} className="absolute top-6 right-6 bg-black/40 p-2 rounded-full text-white backdrop-blur-md border border-white/10 transition-colors hover:bg-black/60"><IconX/></button>
                             </div>
-                            <div className="p-8 -mt-10 relative">
+                            <div className="p-8 -mt-10 relative overflow-y-auto flex-1">
                                 <h2 className="text-3xl font-black mb-2 text-white leading-none">{selectedProduct.name}</h2>
                                 <p className="text-gray-400 text-sm mb-6 leading-relaxed font-medium mt-4">{selectedProduct.description}</p>
                                 
@@ -517,29 +729,63 @@ export default function CustomerView() {
                                     .filter(pers => selectedProduct.personalizationIds?.includes(pers.id))
                                     .map(pers => (
                                         <div key={pers.id} className="mb-6 space-y-3">
-                                            <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">{pers.name}</h4>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                {pers.options.map(opt => (
-                                                    <button key={opt.id} className="p-3 bg-gray-800 rounded-xl border border-gray-700 text-xs font-bold text-gray-300 text-left hover:border-emerald-500 transition-all flex justify-between">
-                                                        <span>{opt.name}</span>
-                                                        {opt.price > 0 && <span className="text-emerald-500">+${opt.price}</span>}
-                                                    </button>
-                                                ))}
+                                            <div className="flex justify-between items-center">
+                                                <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">{pers.name}</h4>
+                                                <span className="text-[9px] text-gray-500 font-bold uppercase tracking-tighter">
+                                                    {pers.maxSelection === 1 ? 'Elige 1' : `Máx ${pers.maxSelection || '∞'}`}
+                                                </span>
+                                            </div>
+                                            <div className="grid grid-cols-1 gap-2">
+                                                {pers.options.filter(o => o.available).map(opt => {
+                                                    const isSelected = isOptionSelected(pers.id, opt.id);
+                                                    return (
+                                                        <button 
+                                                            key={opt.id} 
+                                                            onClick={() => handleOptionToggle(pers, opt)}
+                                                            className={`p-3 rounded-xl border text-xs font-bold text-left transition-all flex justify-between items-center ${isSelected ? 'bg-emerald-500/20 border-emerald-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-600'}`}
+                                                        >
+                                                            <div className="flex items-center gap-2">
+                                                                <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${isSelected ? 'bg-emerald-500 border-emerald-500' : 'border-gray-600'}`}>
+                                                                    {isSelected && <IconCheck className="h-2 w-2 text-white" />}
+                                                                </div>
+                                                                <span>{opt.name}</span>
+                                                            </div>
+                                                            {opt.price > 0 && <span className="text-emerald-500">+${opt.price}</span>}
+                                                        </button>
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     ))
                                 }
 
+                                <div className="mb-6">
+                                    <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-3">Instrucciones especiales</h4>
+                                    <textarea 
+                                        value={productComments}
+                                        onChange={(e) => setProductComments(e.target.value)}
+                                        className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-xs text-white outline-none focus:ring-1 focus:ring-emerald-500/50 resize-none"
+                                        placeholder="Ej. Sin cebolla, salsa aparte..."
+                                        rows={2}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="p-6 bg-gray-900 border-t border-gray-800 shrink-0">
+                                <div className="flex items-center justify-between mb-4">
+                                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Cantidad</span>
+                                    <div className="flex items-center bg-gray-800 rounded-xl px-2 py-1 border border-gray-700">
+                                        <button onClick={() => setProductQuantity(q => Math.max(1, q - 1))} className="p-2 text-gray-400 hover:text-white"><IconMinus className="h-4 w-4"/></button>
+                                        <span className="w-8 text-center text-sm font-black text-white">{productQuantity}</span>
+                                        <button onClick={() => setProductQuantity(q => q + 1)} className="p-2 text-gray-400 hover:text-white"><IconPlus className="h-4 w-4"/></button>
+                                    </div>
+                                </div>
                                 <button 
-                                    onClick={() => { 
-                                        const { price: finalPrice } = getDiscountedPrice(selectedProduct, allPromotions);
-                                        addToCart({ ...selectedProduct, price: finalPrice }, 1); 
-                                        setSelectedProduct(null); 
-                                    }}
+                                    onClick={handleAddToCartWithDetails}
                                     className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex justify-between px-8 items-center active:scale-95 transition-all shadow-xl shadow-emerald-900/40"
                                 >
                                     <span className="uppercase tracking-widest text-[10px]">Añadir a la Ronda</span>
-                                    <span className="text-xl font-black">${getDiscountedPrice(selectedProduct, allPromotions).price.toFixed(2)}</span>
+                                    <span className="text-xl font-black">${currentProductTotalPrice.toFixed(2)}</span>
                                 </button>
                             </div>
                         </div>
@@ -579,7 +825,6 @@ export default function CustomerView() {
                         )}
                     </div>
                 )}
-                <Chatbot />
             </div>
             <style>{`
                 .no-scrollbar::-webkit-scrollbar { display: none; }

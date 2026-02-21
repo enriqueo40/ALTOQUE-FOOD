@@ -2368,7 +2368,7 @@ const Messages: React.FC = () => {
             lastMessageTimestamp: message.timestamp
         };
         
-        setConversations(prev => prev.map(c => c.id === updatedConversation.id ? updatedConversation : c));
+        setConversations((prev: Conversation[]) => prev.map((c: Conversation) => c.id === updatedConversation.id ? updatedConversation : c));
         setSelectedConversation(updatedConversation);
         setNewMessage('');
     };
@@ -2380,7 +2380,7 @@ const Messages: React.FC = () => {
                     <h2 className="text-xl font-bold">Conversaciones</h2>
                 </div>
                 <div className="overflow-y-auto h-full">
-                    {conversations.map(conv => (
+                    {conversations.map((conv: Conversation) => (
                         <div
                             key={conv.id}
                             onClick={() => setSelectedConversation(conv)}
@@ -3652,13 +3652,13 @@ const SettingsModal: React.FC<{
 
     const renderPage = () => {
         switch (activePage) {
-            case 'general': return <GeneralSettings onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
-            case 'store-data': return <BranchSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
-            case 'shipping-costs': return <ShippingSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
-            case 'payment-methods': return <PaymentSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
-            case 'hours': return <HoursSettings onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
+            case 'general': return <GeneralSettings onSave={handleSaveSettings} settings={settings} setSettings={setSettings as React.Dispatch<React.SetStateAction<AppSettings>>} />;
+            case 'store-data': return <BranchSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings as React.Dispatch<React.SetStateAction<AppSettings>>} />;
+            case 'shipping-costs': return <ShippingSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings as React.Dispatch<React.SetStateAction<AppSettings>>} />;
+            case 'payment-methods': return <PaymentSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings as React.Dispatch<React.SetStateAction<AppSettings>>} />;
+            case 'hours': return <HoursSettings onSave={handleSaveSettings} settings={settings} setSettings={setSettings as React.Dispatch<React.SetStateAction<AppSettings>>} />;
             case 'zones-tables': return <ZonesAndTablesSettings zones={zones} onAddZone={handleAddZone} onEditZoneName={handleEditZoneName} onDeleteZone={handleDeleteZone} onEditZoneLayout={handleEditLayout} />;
-            case 'printing': return <PrintingSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings} />;
+            case 'printing': return <PrintingSettingsView onSave={handleSaveSettings} settings={settings} setSettings={setSettings as React.Dispatch<React.SetStateAction<AppSettings>>} />;
             default: return null;
         }
     };
@@ -3877,4 +3877,112 @@ const ShareView: React.FC<{ onGoToTableSettings: () => void }> = ({ onGoToTableS
                     <div className="mx-auto h-16 w-16 text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
                         <IconStore className="h-10 w-10" />
                     </div>
-                    <h3 className="mt-4 text-lg font-semibold text-gray-800 dark:text-gray
+                    <h3 className="mt-4 text-lg font-semibold text-gray-800 dark:text-gray-200">Gestión Multi-sucursal</h3>
+                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">Próximamente podrás gestionar múltiples sucursales y generar enlaces únicos para cada una.</p>
+                </div>
+            )}
+
+            <QRModal 
+                isOpen={isQrModalOpen} 
+                onClose={() => setIsQrModalOpen(false)} 
+                url={qrModalData.url} 
+                title={qrModalData.title} 
+                filename={qrModalData.filename}
+            />
+            
+            {toastMessage && (
+                <div className="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-2 animate-fade-in-up">
+                    <IconCheck className="h-5 w-5 text-emerald-400"/>
+                    {toastMessage}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const AdminView: React.FC = () => {
+    const [currentPage, setCurrentPage] = useState<AdminViewPage>('dashboard');
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false); // Placeholder for preview modal logic
+    const [theme, toggleTheme] = useTheme();
+    
+    // State for Zone Editor Logic
+    const [isZoneEditorOpen, setIsZoneEditorOpen] = useState(false);
+    const [zoneToEdit, setZoneToEdit] = useState<Zone | null>(null);
+
+    const openTableSettings = () => {
+        setIsSettingsOpen(true);
+        // In a real app, pass initialPage='zones-tables' prop to SettingsModal
+    };
+    
+    const handleEditZoneLayout = (zone: Zone) => {
+        setZoneToEdit(zone);
+        setIsSettingsOpen(false);
+        setIsZoneEditorOpen(true);
+    };
+
+    const handleSaveZoneLayout = async (updatedZone: Zone) => {
+        try {
+            await saveZoneLayout(updatedZone);
+            setIsZoneEditorOpen(false);
+            setZoneToEdit(null);
+            setIsSettingsOpen(true); // Return to settings
+        } catch (error) {
+            alert("Error al guardar la distribución: " + error);
+        }
+    };
+
+    const renderPage = () => {
+        switch (currentPage) {
+            case 'dashboard': return <Dashboard />;
+            case 'products': return <MenuManagement />;
+            case 'orders': return <OrderManagement onSettingsClick={openTableSettings} />;
+            case 'analytics': return <Analytics />;
+            case 'messages': return <Messages />;
+            case 'availability': return <AvailabilityView />;
+            case 'share': return <ShareView onGoToTableSettings={openTableSettings}/>;
+            case 'tutorials': return <div className="p-10 text-center text-gray-500">Tutoriales próximamente...</div>;
+            default: return <Dashboard />;
+        }
+    };
+
+    return (
+        <div className="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-200 overflow-hidden transition-colors duration-200">
+            <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
+            <div className="flex-1 flex flex-col min-w-0">
+                <Header 
+                    title={PAGE_TITLES[currentPage]} 
+                    onSettingsClick={() => setIsSettingsOpen(true)} 
+                    onPreviewClick={() => setIsPreviewOpen(true)}
+                    theme={theme}
+                    toggleTheme={toggleTheme}
+                />
+                <main className="flex-1 overflow-auto p-8 scroll-smooth">
+                    <div className="max-w-7xl mx-auto">
+                        {renderPage()}
+                    </div>
+                </main>
+            </div>
+            
+            {isZoneEditorOpen && zoneToEdit && (
+                <ZoneEditor 
+                    initialZone={zoneToEdit}
+                    onSave={handleSaveZoneLayout}
+                    onExit={() => {
+                        setIsZoneEditorOpen(false);
+                        setZoneToEdit(null);
+                        setIsSettingsOpen(true);
+                    }}
+                />
+            )}
+            
+            <SettingsModal 
+                isOpen={isSettingsOpen} 
+                onClose={() => setIsSettingsOpen(false)} 
+                onEditZoneLayout={handleEditZoneLayout}
+            />
+        </div>
+    );
+};
+
+export default AdminView;

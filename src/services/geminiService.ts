@@ -2,11 +2,23 @@
 import { GoogleGenAI } from "@google/genai";
 import { ChatMessage, Order, Product } from '../types';
 
-// Use process.env.API_KEY directly for initialization
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Lazy initialization of the Gemini API client
+let aiClient: GoogleGenAI | null = null;
+
+const getAiClient = (): GoogleGenAI => {
+    if (!aiClient) {
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            throw new Error("GEMINI_API_KEY is not defined in the environment.");
+        }
+        aiClient = new GoogleGenAI({ apiKey });
+    }
+    return aiClient;
+};
 
 export const generateProductDescription = async (productName: string, categoryName: string, currentDescription: string): Promise<string> => {
     try {
+        const ai = getAiClient();
         const prompt = `Genera una descripción chic, minimalista y tentadora para un menú de restaurante profesional.
         Producto: ${productName}
         Categoría: ${categoryName}
@@ -15,7 +27,7 @@ export const generateProductDescription = async (productName: string, categoryNa
         Enfoque en frescura y experiencia sensorial. Máximo 15 palabras.`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
+            model: 'gemini-3.1-pro-preview',
             contents: prompt,
         });
 
@@ -38,8 +50,9 @@ export const getChatbotResponse = async (history: ChatMessage[], newMessage: str
     }));
 
     try {
+        const ai = getAiClient();
         const chat = ai.chats.create({
-            model: 'gemini-3-flash-preview',
+            model: 'gemini-flash-latest',
             config: { systemInstruction },
             history: contents, 
         });
@@ -65,14 +78,10 @@ export const getAdvancedInsights = async (query: string, orders: Order[]): Promi
     `;
     
     try {
+        const ai = getAiClient();
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-3.1-pro-preview',
             contents: prompt,
-            config: {
-                thinkingConfig: { 
-                    thinkingBudget: 32768 
-                }
-            }
         });
         return response.text || "No se pudieron generar insights estratégicos.";
     } catch (error) {
