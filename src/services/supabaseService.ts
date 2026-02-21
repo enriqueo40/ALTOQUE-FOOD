@@ -24,20 +24,31 @@ type OrderCallback = (payload: any) => void;
 const orderInsertListeners: OrderCallback[] = [];
 const orderUpdateListeners: OrderCallback[] = [];
 
+// Helper to add timeout to any promise
+const withTimeout = <T>(promise: Promise<T> | any, timeoutMs: number = 10000): Promise<T> => {
+    return Promise.race([
+        promise as Promise<T>,
+        new Promise<T>((_, reject) => setTimeout(() => reject(new Error("Request timed out")), timeoutMs))
+    ]);
+};
+
 // Helper function to get the client or throw an error.
-// This uses a singleton pattern to create the client only once.
 const getClient = (): SupabaseClient => {
     if (supabase) {
         return supabase;
     }
     
-    if (!supabaseUrl || !supabaseAnonKey) {
-        throw new Error("Supabase URL or Anon Key is not defined in services/supabaseService.ts.");
+    try {
+        if (!supabaseUrl || !supabaseAnonKey) {
+            throw new Error("Supabase URL or Anon Key is not defined.");
+        }
+        supabase = createClient(supabaseUrl, supabaseAnonKey);
+        console.log("Supabase client initialized successfully.");
+        return supabase;
+    } catch (err) {
+        console.error("Failed to initialize Supabase client:", err);
+        throw err;
     }
-
-    // Initialize the client and store it.
-    supabase = createClient(supabaseUrl, supabaseAnonKey);
-    return supabase;
 };
 
 // --- Connection Check ---
@@ -50,19 +61,25 @@ export const checkDbConnection = async (): Promise<void> => {
 
 // --- Settings Functions ---
 export const getAppSettings = async (): Promise<AppSettings> => {
-    const { data, error } = await getClient()
-        .from('app_settings')
-        .select('settings')
-        .eq('id', 1)
-        .single();
+    try {
+        const result: any = await withTimeout(getClient()
+            .from('app_settings')
+            .select('settings')
+            .eq('id', 1)
+            .single());
+        
+        const { data, error } = result;
 
-    if (!error && data && data.settings && Object.keys(data.settings).length > 0) {
-        const mergedSettings = { ...JSON.parse(JSON.stringify(INITIAL_SETTINGS)), ...data.settings };
-        return mergedSettings;
-    }
+        if (!error && data && data.settings && Object.keys(data.settings).length > 0) {
+            const mergedSettings = { ...JSON.parse(JSON.stringify(INITIAL_SETTINGS)), ...data.settings };
+            return mergedSettings;
+        }
 
-    if (error && error.code !== 'PGRST116') { 
-         console.error("An unexpected error occurred while fetching app settings:", error);
+        if (error && error.code !== 'PGRST116') { 
+             console.error("An unexpected error occurred while fetching app settings:", error);
+        }
+    } catch (err) {
+        console.error("Error in getAppSettings:", err);
     }
     
     console.warn("App settings are missing or empty. Initializing defaults.");
@@ -92,12 +109,18 @@ export const saveAppSettings = async (settings: AppSettings): Promise<void> => {
 
 // --- Categories Functions ---
 export const getCategories = async (): Promise<Category[]> => {
-    const { data, error } = await getClient().from('categories').select('*').order('created_at');
-    if (error) {
-        console.error("Error fetching categories:", error);
-        throw error;
+    try {
+        const result: any = await withTimeout(getClient().from('categories').select('*').order('created_at'));
+        const { data, error } = result;
+        if (error) {
+            console.error("Error fetching categories:", error);
+            throw error;
+        }
+        return data || [];
+    } catch (err) {
+        console.error("Failed to get categories:", err);
+        return [];
     }
-    return data || [];
 };
 
 export const saveCategory = async (category: Omit<Category, 'id' | 'created_at'> & { id?: string }): Promise<Category> => {
@@ -128,17 +151,23 @@ export const deleteCategory = async (categoryId: string): Promise<void> => {
 
 // --- Products Functions ---
 export const getProducts = async (): Promise<Product[]> => {
-    const { data, error } = await getClient().from('products').select('*').order('name');
-    if (error) {
-        console.error("Error fetching products:", error);
-        throw error;
+    try {
+        const result: any = await withTimeout(getClient().from('products').select('*').order('name'));
+        const { data, error } = result;
+        if (error) {
+            console.error("Error fetching products:", error);
+            throw error;
+        }
+        return (data?.map((p: any) => ({
+            ...p,
+            imageUrl: p.image_url || p.imageUrl, // Handle both just in case
+            categoryId: p.category_id || p.categoryId,
+            personalizationIds: p.personalization_ids || p.personalizationIds
+        })) || []) as Product[];
+    } catch (err) {
+        console.error("Failed to get products:", err);
+        return [];
     }
-    return (data?.map(p => ({
-        ...p,
-        imageUrl: p.image_url || p.imageUrl, // Handle both just in case
-        categoryId: p.category_id || p.categoryId,
-        personalizationIds: p.personalization_ids || p.personalizationIds
-    })) || []) as Product[];
 };
 
 export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & { id?: string }): Promise<Product> => {
@@ -213,24 +242,34 @@ export const deleteProduct = async (productId: string): Promise<void> => {
 
 // --- Personalizations Functions ---
 export const getPersonalizations = async (): Promise<Personalization[]> => {
-    const { data, error } = await getClient()
-        .from('personalizations')
-        .select('*, options:personalization_options(*)');
-        
-    if (error) {
-        console.error("Error fetching personalizations:", error);
-        throw error;
-    }
+    try {
+        const result: any = await withTimeout(getClient()
+            .from('personalizations')
+            .select('*, options:personalization_options(*)'));
+            
+        const { data, error } = result;
+        if (error) {
+            console.error("Error fetching personalizations:", error);
+            throw error;
+        }
 
-    return (data?.map(p => {
-        const { allow_repetition, min_selection, max_selection, ...rest } = p;
-        return {
-            ...rest,
-            allowRepetition: allow_repetition,
-            minSelection: min_selection,
-            maxSelection: max_selection
-        };
-    }) || []) as Personalization[];
+        return (data?.map((p: any) => {
+            const { allow_repetition, min_selection, max_selection, ...rest } = p;
+            return {
+                ...rest,
+                allowRepetition: allow_repetition,
+                minSelection: min_selection,
+                maxSelection: max_selection,
+                options: p.options?.map((o: any) => ({
+                    ...o,
+                    available: o.available ?? true
+                })) || []
+            };
+        }) || []) as Personalization[];
+    } catch (err) {
+        console.error("Failed to get personalizations:", err);
+        return [];
+    }
 };
 
 export const updatePersonalizationOptionAvailability = async (optionId: string, available: boolean): Promise<PersonalizationOption> => {
@@ -297,21 +336,27 @@ export const deletePersonalization = async (personalizationId: string): Promise<
 
 // --- Promotions Functions ---
 export const getPromotions = async (): Promise<Promotion[]> => {
-    const { data, error } = await getClient().from('promotions').select('*, promotion_products(product_id)');
-    if (error) throw error;
-    
-    return data?.map(promo => {
-        const { discount_type, discount_value, applies_to, start_date, end_date, promotion_products, ...rest } = promo;
-        return {
-            ...rest,
-            discountType: discount_type,
-            discountValue: discount_value,
-            appliesTo: applies_to,
-            productIds: promotion_products.map((p: any) => p.product_id),
-            startDate: start_date,
-            endDate: end_date,
-        };
-    }) || [];
+    try {
+        const result: any = await withTimeout(getClient().from('promotions').select('*, promotion_products(product_id)'));
+        const { data, error } = result;
+        if (error) throw error;
+        
+        return data?.map((promo: any) => {
+            const { discount_type, discount_value, applies_to, start_date, end_date, promotion_products, ...rest } = promo;
+            return {
+                ...rest,
+                discountType: discount_type,
+                discountValue: discount_value,
+                appliesTo: applies_to,
+                productIds: promotion_products.map((p: any) => p.product_id),
+                startDate: start_date,
+                endDate: end_date,
+            };
+        }) || [];
+    } catch (err) {
+        console.error("Failed to get promotions:", err);
+        return [];
+    }
 };
 
 export const savePromotion = async (promotion: Omit<Promotion, 'id' | 'created_at'> & { id?: string }): Promise<Promotion> => {
@@ -355,23 +400,30 @@ export const deletePromotion = async (promotionId: string): Promise<void> => {
 // --- Zones and Tables Functions ---
 
 export const getZones = async (): Promise<Zone[]> => {
-    const { data, error } = await getClient()
-        .from('zones')
-        .select('*, tables(*)')
-        .order('created_at');
+    try {
+        const result: any = await withTimeout(getClient()
+            .from('zones')
+            .select('*, tables(*)')
+            .order('created_at'));
+        
+        const { data, error } = result;
 
-    if (error) {
-        console.error("Error fetching zones:", error);
-        throw error;
+        if (error) {
+            console.error("Error fetching zones:", error);
+            throw error;
+        }
+        
+        return (data?.map((z: any) => ({
+            ...z,
+            tables: z.tables?.map((t: any) => ({
+                ...t,
+                zoneId: t.zone_id || t.zoneId
+            })) || []
+        })) || []) as Zone[];
+    } catch (err) {
+        console.error("Failed to get zones:", err);
+        return [];
     }
-    
-    return (data?.map((z: any) => ({
-        ...z,
-        tables: z.tables?.map((t: any) => ({
-            ...t,
-            zoneId: t.zone_id || t.zoneId
-        })) || []
-    })) || []) as Zone[];
 };
 
 export const saveZone = async (zone: Pick<Zone, 'name' | 'rows' | 'cols'> & { id?: string }): Promise<Zone> => {
@@ -452,31 +504,38 @@ export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created
 };
 
 export const getActiveOrders = async (): Promise<Order[]> => {
-    const { data, error } = await getClient()
-        .from('orders')
-        .select('*')
-        .neq('status', 'Cancelled') 
-        .order('created_at', { ascending: false });
+    try {
+        const result: any = await withTimeout(getClient()
+            .from('orders')
+            .select('*')
+            .neq('status', 'Cancelled') 
+            .order('created_at', { ascending: false }));
+        
+        const { data, error } = result;
 
-    if (error) {
-        console.error('Error fetching orders:', error);
+        if (error) {
+            console.error('Error fetching orders:', error);
+            return [];
+        }
+        
+        return data.map((o: any) => ({
+            id: o.id,
+            customer: o.customer, 
+            items: o.items,
+            status: o.status,
+            total: o.total,
+            createdAt: new Date(o.created_at),
+            branchId: o.branch_id,
+            orderType: o.order_type,
+            tableId: o.table_id,
+            generalComments: o.general_comments,
+            paymentStatus: o.payment_status,
+            paymentProof: o.customer?.paymentProof 
+        })) as Order[];
+    } catch (err) {
+        console.error("Failed to get active orders:", err);
         return [];
     }
-    
-    return data.map((o: any) => ({
-        id: o.id,
-        customer: o.customer, 
-        items: o.items,
-        status: o.status,
-        total: o.total,
-        createdAt: new Date(o.created_at),
-        branchId: o.branch_id,
-        orderType: o.order_type,
-        tableId: o.table_id,
-        generalComments: o.general_comments,
-        paymentStatus: o.payment_status,
-        paymentProof: o.customer?.paymentProof 
-    })) as Order[];
 };
 
 export const updateOrder = async (orderId: string, updates: Partial<Order>): Promise<void> => {

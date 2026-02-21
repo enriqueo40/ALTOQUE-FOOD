@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, PaymentMethod, OrderType, Personalization, Promotion, PersonalizationOption, DiscountType, PromotionAppliesTo, ShippingCostType, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconCheck, IconUpload, IconReceipt, IconClock, IconStore, IconLocationMarker, INITIAL_SETTINGS } from '../constants';
+import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconCheck, IconUpload, IconReceipt, IconClock, IconStore, IconLocationMarker, INITIAL_SETTINGS, PRODUCTS, CATEGORIES } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 
 // --- Componentes de UI Auxiliares ---
@@ -286,18 +286,27 @@ export default function CustomerView() {
                 ]);
                 
                 if (s) setSettings(s); 
-                setAllProducts(p); 
-                setAllCategories(c); 
+                
+                // Consistency check: Use mock data ONLY if the database is completely empty.
+                // If the user has categories but no products, we should show their categories.
+                let finalProducts = p;
+                let finalCategories = c;
+                
+                const dbIsEmpty = p.length === 0 && c.length === 0;
+
+                if (dbIsEmpty) {
+                    console.warn("Database is empty. Using professional mock data as fallback.");
+                    finalProducts = PRODUCTS;
+                    finalCategories = CATEGORIES;
+                }
+                
+                setAllProducts(finalProducts); 
+                setAllCategories(finalCategories); 
                 setAllPromotions(proms);
                 setAllPersonalizations(pers);
                 
-                if (c.length > 0) {
-                    setActiveCategory(c[0].id);
-                }
-                
-                if (p.length === 0 && c.length === 0) {
-                    console.warn("No data found in database. Using mock data as fallback.");
-                    // Optional: setAllProducts(PRODUCTS); setAllCategories(CATEGORIES);
+                if (finalCategories.length > 0) {
+                    setActiveCategory(finalCategories[0].id);
                 }
             } catch (err) {
                 console.error("Fatal error in fetchData:", err);
@@ -563,40 +572,58 @@ export default function CustomerView() {
                             </div>
 
                             <div className="p-4 space-y-8 mt-4">
-                                {allCategories.length === 0 && allProducts.length === 0 ? (
+                                {allCategories.length === 0 ? (
                                     <div className="py-20 text-center space-y-4">
                                         <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto">
                                             <IconSearch className="w-8 h-8 text-gray-600" />
                                         </div>
-                                        <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">El menú está vacío por ahora</p>
+                                        <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">No hay categorías disponibles</p>
                                     </div>
                                 ) : (
-                                    allCategories.map(cat => {
-                                        const products = allProducts.filter(p => p.categoryId === cat.id && p.available && p.name.toLowerCase().includes(searchTerm.toLowerCase()));
-                                        if (products.length === 0) return null;
-                                        return (
-                                            <div key={cat.id} id={`cat-${cat.id}`}>
-                                                <h3 className="text-lg font-black text-white uppercase tracking-tighter mb-4 flex items-center gap-2">{cat.name}</h3>
-                                                <div className="grid gap-3">
-                                                    {products.map(p => (
-                                                        <div key={p.id} onClick={() => setSelectedProduct(p)} className="bg-[#1e293b]/50 p-3 rounded-2xl border border-gray-800/60 flex gap-4 active:scale-[0.98] transition-all cursor-pointer hover:bg-[#1e293b]/80 group relative">
-                                                            <div className="relative shrink-0">
-                                                                <img src={p.imageUrl} className="w-24 h-24 rounded-xl object-cover shadow-lg group-hover:scale-105 transition-transform" />
+                                    (() => {
+                                        const renderedCategories = allCategories.map(cat => {
+                                            const products = allProducts.filter(p => 
+                                                String(p.categoryId) === String(cat.id) && 
+                                                p.available !== false && 
+                                                p.name.toLowerCase().includes(searchTerm.toLowerCase())
+                                            );
+                                            if (products.length === 0) return null;
+                                            return (
+                                                <div key={cat.id} id={`cat-${cat.id}`}>
+                                                    <h3 className="text-lg font-black text-white uppercase tracking-tighter mb-4 flex items-center gap-2">{cat.name}</h3>
+                                                    <div className="grid gap-3">
+                                                        {products.map(p => (
+                                                            <div key={p.id} onClick={() => setSelectedProduct(p)} className="bg-[#1e293b]/50 p-3 rounded-2xl border border-gray-800/60 flex gap-4 active:scale-[0.98] transition-all cursor-pointer hover:bg-[#1e293b]/80 group relative">
+                                                                <div className="relative shrink-0">
+                                                                    <img src={p.imageUrl} className="w-24 h-24 rounded-xl object-cover shadow-lg group-hover:scale-105 transition-transform" />
+                                                                </div>
+                                                                <div className="flex-1 flex flex-col justify-center">
+                                                                    <h4 className="font-bold text-gray-100 group-hover:text-emerald-400 transition-colors leading-snug">{p.name}</h4>
+                                                                    <p className="text-[11px] text-gray-500 line-clamp-2 mt-1 leading-relaxed">{p.description}</p>
+                                                                    <span className="mt-2 font-black text-emerald-400 text-base">${getDiscountedPrice(p, allPromotions).price.toFixed(2)}</span>
+                                                                </div>
+                                                                <div className="absolute bottom-3 right-3 bg-gray-800 p-1.5 rounded-lg text-emerald-400 border border-gray-700 shadow-xl group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                                                    <IconPlus className="h-4 w-4" />
+                                                                </div>
                                                             </div>
-                                                            <div className="flex-1 flex flex-col justify-center">
-                                                                <h4 className="font-bold text-gray-100 group-hover:text-emerald-400 transition-colors leading-snug">{p.name}</h4>
-                                                                <p className="text-[11px] text-gray-500 line-clamp-2 mt-1 leading-relaxed">{p.description}</p>
-                                                                <span className="mt-2 font-black text-emerald-400 text-base">${getDiscountedPrice(p, allPromotions).price.toFixed(2)}</span>
-                                                            </div>
-                                                            <div className="absolute bottom-3 right-3 bg-gray-800 p-1.5 rounded-lg text-emerald-400 border border-gray-700 shadow-xl group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                                                                <IconPlus className="h-4 w-4" />
-                                                            </div>
-                                                        </div>
-                                                    ))}
+                                                        ))}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })
+                                            );
+                                        }).filter(Boolean);
+
+                                        if (renderedCategories.length === 0) {
+                                            return (
+                                                <div className="py-20 text-center space-y-4">
+                                                    <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto">
+                                                        <IconSearch className="w-8 h-8 text-gray-600" />
+                                                    </div>
+                                                    <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">No se encontraron productos</p>
+                                                </div>
+                                            );
+                                        }
+                                        return renderedCategories;
+                                    })()
                                 )}
                             </div>
                         </div>

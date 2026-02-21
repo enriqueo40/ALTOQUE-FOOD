@@ -3754,14 +3754,19 @@ const ShareView: React.FC<{ onGoToTableSettings: () => void }> = ({ onGoToTableS
     useEffect(() => {
         const fetchData = async () => {
             try {
+                setIsLoading(true);
                 const [appSettings, zoneData] = await Promise.all([
                     getAppSettings(),
                     getZones()
                 ]);
                 setSettings(appSettings);
                 setZones(zoneData);
+                if (zoneData.length === 0) {
+                    console.warn("No zones found in database for ShareView.");
+                }
             } catch (error) {
-                console.error("Failed to load share data:", error);
+                console.error("Failed to load share data in AdminView:", error);
+                alert("Error al cargar las zonas y mesas. Revisa la conexión.");
             } finally {
                 setIsLoading(false);
             }
