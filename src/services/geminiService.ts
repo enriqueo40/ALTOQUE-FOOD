@@ -1,24 +1,24 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { ChatMessage, Order, Product } from '../types';
 
-// Lazy initialization of the Gemini API client
-let aiClient: GoogleGenAI | null = null;
+// Use process.env.API_KEY directly for initialization
+let aiInstance: GoogleGenAI | null = null;
 
-const getAiClient = (): GoogleGenAI => {
-    if (!aiClient) {
+const getAi = () => {
+    if (!aiInstance) {
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
-            throw new Error("GEMINI_API_KEY is not defined in the environment.");
+            throw new Error("GEMINI_API_KEY is not set");
         }
-        aiClient = new GoogleGenAI({ apiKey });
+        aiInstance = new GoogleGenAI({ apiKey });
     }
-    return aiClient;
+    return aiInstance;
 };
 
 export const generateProductDescription = async (productName: string, categoryName: string, currentDescription: string): Promise<string> => {
     try {
-        const ai = getAiClient();
+        const ai = getAi();
         const prompt = `Genera una descripción chic, minimalista y tentadora para un menú de restaurante profesional.
         Producto: ${productName}
         Categoría: ${categoryName}
@@ -27,7 +27,7 @@ export const generateProductDescription = async (productName: string, categoryNa
         Enfoque en frescura y experiencia sensorial. Máximo 15 palabras.`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3.1-pro-preview',
+            model: 'gemini-3-flash-preview',
             contents: prompt,
         });
 
@@ -50,9 +50,9 @@ export const getChatbotResponse = async (history: ChatMessage[], newMessage: str
     }));
 
     try {
-        const ai = getAiClient();
+        const ai = getAi();
         const chat = ai.chats.create({
-            model: 'gemini-flash-latest',
+            model: 'gemini-3-flash-preview',
             config: { systemInstruction },
             history: contents, 
         });
@@ -78,10 +78,15 @@ export const getAdvancedInsights = async (query: string, orders: Order[]): Promi
     `;
     
     try {
-        const ai = getAiClient();
+        const ai = getAi();
         const response = await ai.models.generateContent({
-            model: 'gemini-3.1-pro-preview',
+            model: 'gemini-3-pro-preview',
             contents: prompt,
+            config: {
+                thinkingConfig: { 
+                    thinkingLevel: ThinkingLevel.HIGH
+                }
+            }
         });
         return response.text || "No se pudieron generar insights estratégicos.";
     } catch (error) {

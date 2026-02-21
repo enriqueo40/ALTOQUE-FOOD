@@ -3,8 +3,8 @@ import React, { Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route } from 'react-router-dom';
 
 // Lazy load the main views to reduce initial bundle size
-const CustomerView = lazy(() => import('./src/components/CustomerView'));
-const AdminView = lazy(() => import('./src/components/AdminView'));
+const CustomerView = lazy(() => import('./components/CustomerView'));
+const AdminView = lazy(() => import('./components/AdminView'));
 
 // Chic Loading Screen Component
 const GlobalLoader = () => (
