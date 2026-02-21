@@ -133,14 +133,32 @@ export const getProducts = async (): Promise<Product[]> => {
         console.error("Error fetching products:", error);
         throw error;
     }
-    return data || [];
+    return (data?.map(p => ({
+        ...p,
+        imageUrl: p.image_url || p.imageUrl, // Handle both just in case
+        categoryId: p.category_id || p.categoryId,
+        personalizationIds: p.personalization_ids || p.personalizationIds
+    })) || []) as Product[];
 };
 
 export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & { id?: string }): Promise<Product> => {
     const { id, ...productData } = product;
+    
+    // Map to snake_case for DB
+    const dbProduct: any = {
+        id,
+        name: productData.name,
+        description: productData.description,
+        price: productData.price,
+        image_url: productData.imageUrl,
+        category_id: productData.categoryId,
+        available: productData.available,
+        personalization_ids: productData.personalizationIds
+    };
+
     const { data, error } = await getClient()
         .from('products')
-        .upsert({ id, ...productData })
+        .upsert(dbProduct)
         .select();
 
     if (error) {
@@ -150,7 +168,15 @@ export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & 
      if (!data?.[0]) {
         throw new Error("Could not save product.");
     }
-    return data[0];
+    
+    // Map back to camelCase
+    const saved = data[0];
+    return {
+        ...saved,
+        imageUrl: saved.image_url,
+        categoryId: saved.category_id,
+        personalizationIds: saved.personalization_ids
+    } as Product;
 };
 
 export const updateProductAvailability = async (productId: string, available: boolean): Promise<Product> => {
@@ -168,7 +194,13 @@ export const updateProductAvailability = async (productId: string, available: bo
     if (!data) {
         throw new Error("Could not update product availability.");
     }
-    return data;
+    
+    return {
+        ...data,
+        imageUrl: data.image_url,
+        categoryId: data.category_id,
+        personalizationIds: data.personalization_ids
+    } as Product;
 };
 
 export const deleteProduct = async (productId: string): Promise<void> => {
@@ -216,7 +248,7 @@ export const updatePersonalizationOptionAvailability = async (optionId: string, 
     if (!data) {
         throw new Error("Could not update option availability.");
     }
-    return data;
+    return data as PersonalizationOption;
 };
 
 export const savePersonalization = async (personalization: Omit<Personalization, 'id' | 'created_at'> & { id?: string }): Promise<Personalization> => {
@@ -332,7 +364,14 @@ export const getZones = async (): Promise<Zone[]> => {
         console.error("Error fetching zones:", error);
         throw error;
     }
-    return (data as Zone[]) || [];
+    
+    return (data?.map((z: any) => ({
+        ...z,
+        tables: z.tables?.map((t: any) => ({
+            ...t,
+            zoneId: t.zone_id || t.zoneId
+        })) || []
+    })) || []) as Zone[];
 };
 
 export const saveZone = async (zone: Pick<Zone, 'name' | 'rows' | 'cols'> & { id?: string }): Promise<Zone> => {
