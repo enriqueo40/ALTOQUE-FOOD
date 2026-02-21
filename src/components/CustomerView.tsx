@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, PaymentMethod, OrderType, Personalization, Promotion, PersonalizationOption, DiscountType, PromotionAppliesTo, ShippingCostType, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
-import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconCheck, IconUpload, IconReceipt, IconClock, IconStore, IconLocationMarker } from '../constants';
+import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconCheck, IconUpload, IconReceipt, IconClock, IconStore, IconLocationMarker, INITIAL_SETTINGS } from '../constants';
 import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
 
 // --- Componentes de UI Auxiliares ---
@@ -214,8 +214,9 @@ export default function CustomerView() {
     const [selectedOptions, setSelectedOptions] = useState<{ [personalizationId: string]: PersonalizationOption[] }>({});
     const [productComments, setProductComments] = useState('');
     const [productQuantity, setProductQuantity] = useState(1);
-    const [settings, setSettings] = useState<AppSettings | null>(null);
+    const [settings, setSettings] = useState<AppSettings>(INITIAL_SETTINGS);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [activeCategory, setActiveCategory] = useState<string>('');
     const [searchTerm, setSearchTerm] = useState('');
     
@@ -277,14 +278,30 @@ export default function CustomerView() {
         const fetchData = async () => {
             try {
                 const [s, p, c, proms, pers] = await Promise.all([
-                    getAppSettings(), getProducts(), getCategories(), getPromotions(), getPersonalizations()
+                    getAppSettings().catch(err => { console.error("Error fetching settings:", err); return INITIAL_SETTINGS; }),
+                    getProducts().catch(err => { console.error("Error fetching products:", err); return []; }),
+                    getCategories().catch(err => { console.error("Error fetching categories:", err); return []; }),
+                    getPromotions().catch(err => { console.error("Error fetching promotions:", err); return []; }),
+                    getPersonalizations().catch(err => { console.error("Error fetching personalizations:", err); return []; })
                 ]);
-                setSettings(s); 
+                
+                if (s) setSettings(s); 
                 setAllProducts(p); 
                 setAllCategories(c); 
                 setAllPromotions(proms);
                 setAllPersonalizations(pers);
-                if (c.length > 0) setActiveCategory(c[0].id);
+                
+                if (c.length > 0) {
+                    setActiveCategory(c[0].id);
+                }
+                
+                if (p.length === 0 && c.length === 0) {
+                    console.warn("No data found in database. Using mock data as fallback.");
+                    // Optional: setAllProducts(PRODUCTS); setAllCategories(CATEGORIES);
+                }
+            } catch (err) {
+                console.error("Fatal error in fetchData:", err);
+                setError("Hubo un problema al cargar el menú. Por favor, intenta de nuevo.");
             } finally {
                 setIsLoading(false);
             }
@@ -292,8 +309,11 @@ export default function CustomerView() {
         fetchData();
         subscribeToMenuUpdates(fetchData);
 
-        // Captura de parámetros QR de la URL
-        const params = new URLSearchParams(window.location.hash.split('?')[1]);
+        // Captura de parámetros QR de la URL de forma más robusta
+        const hash = window.location.hash;
+        const queryString = hash.includes('?') ? hash.split('?')[1] : '';
+        const params = new URLSearchParams(queryString);
+        
         const table = params.get('table');
         const zone = params.get('zone');
         
@@ -432,10 +452,23 @@ export default function CustomerView() {
         }
     };
 
-    if (isLoading || !settings) return (
+    if (isLoading) return (
         <div className="h-screen bg-[#0f172a] flex flex-col items-center justify-center">
             <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
             <p className="text-emerald-500 font-black uppercase tracking-widest text-xs animate-pulse">Sincronizando mesa...</p>
+        </div>
+    );
+
+    if (error) return (
+        <div className="h-screen bg-[#0f172a] flex flex-col items-center justify-center p-8 text-center">
+            <div className="w-16 h-16 bg-rose-500/10 rounded-full flex items-center justify-center mb-6">
+                <IconX className="w-8 h-8 text-rose-500" />
+            </div>
+            <h2 className="text-xl font-black text-white mb-2">¡UPS! ALGO SALIÓ MAL</h2>
+            <p className="text-gray-400 text-sm mb-8">{error}</p>
+            <button onClick={() => window.location.reload()} className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs">
+                Reintentar
+            </button>
         </div>
     );
 
@@ -530,32 +563,41 @@ export default function CustomerView() {
                             </div>
 
                             <div className="p-4 space-y-8 mt-4">
-                                {allCategories.map(cat => {
-                                    const products = allProducts.filter(p => p.categoryId === cat.id && p.available && p.name.toLowerCase().includes(searchTerm.toLowerCase()));
-                                    if (products.length === 0) return null;
-                                    return (
-                                        <div key={cat.id} id={`cat-${cat.id}`}>
-                                            <h3 className="text-lg font-black text-white uppercase tracking-tighter mb-4 flex items-center gap-2">{cat.name}</h3>
-                                            <div className="grid gap-3">
-                                                {products.map(p => (
-                                                    <div key={p.id} onClick={() => setSelectedProduct(p)} className="bg-[#1e293b]/50 p-3 rounded-2xl border border-gray-800/60 flex gap-4 active:scale-[0.98] transition-all cursor-pointer hover:bg-[#1e293b]/80 group relative">
-                                                        <div className="relative shrink-0">
-                                                            <img src={p.imageUrl} className="w-24 h-24 rounded-xl object-cover shadow-lg group-hover:scale-105 transition-transform" />
-                                                        </div>
-                                                        <div className="flex-1 flex flex-col justify-center">
-                                                            <h4 className="font-bold text-gray-100 group-hover:text-emerald-400 transition-colors leading-snug">{p.name}</h4>
-                                                            <p className="text-[11px] text-gray-500 line-clamp-2 mt-1 leading-relaxed">{p.description}</p>
-                                                            <span className="mt-2 font-black text-emerald-400 text-base">${getDiscountedPrice(p, allPromotions).price.toFixed(2)}</span>
-                                                        </div>
-                                                        <div className="absolute bottom-3 right-3 bg-gray-800 p-1.5 rounded-lg text-emerald-400 border border-gray-700 shadow-xl group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                                                            <IconPlus className="h-4 w-4" />
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
+                                {allCategories.length === 0 && allProducts.length === 0 ? (
+                                    <div className="py-20 text-center space-y-4">
+                                        <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto">
+                                            <IconSearch className="w-8 h-8 text-gray-600" />
                                         </div>
-                                    );
-                                })}
+                                        <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">El menú está vacío por ahora</p>
+                                    </div>
+                                ) : (
+                                    allCategories.map(cat => {
+                                        const products = allProducts.filter(p => p.categoryId === cat.id && p.available && p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+                                        if (products.length === 0) return null;
+                                        return (
+                                            <div key={cat.id} id={`cat-${cat.id}`}>
+                                                <h3 className="text-lg font-black text-white uppercase tracking-tighter mb-4 flex items-center gap-2">{cat.name}</h3>
+                                                <div className="grid gap-3">
+                                                    {products.map(p => (
+                                                        <div key={p.id} onClick={() => setSelectedProduct(p)} className="bg-[#1e293b]/50 p-3 rounded-2xl border border-gray-800/60 flex gap-4 active:scale-[0.98] transition-all cursor-pointer hover:bg-[#1e293b]/80 group relative">
+                                                            <div className="relative shrink-0">
+                                                                <img src={p.imageUrl} className="w-24 h-24 rounded-xl object-cover shadow-lg group-hover:scale-105 transition-transform" />
+                                                            </div>
+                                                            <div className="flex-1 flex flex-col justify-center">
+                                                                <h4 className="font-bold text-gray-100 group-hover:text-emerald-400 transition-colors leading-snug">{p.name}</h4>
+                                                                <p className="text-[11px] text-gray-500 line-clamp-2 mt-1 leading-relaxed">{p.description}</p>
+                                                                <span className="mt-2 font-black text-emerald-400 text-base">${getDiscountedPrice(p, allPromotions).price.toFixed(2)}</span>
+                                                            </div>
+                                                            <div className="absolute bottom-3 right-3 bg-gray-800 p-1.5 rounded-lg text-emerald-400 border border-gray-700 shadow-xl group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                                                <IconPlus className="h-4 w-4" />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
                             </div>
                         </div>
                     )}
