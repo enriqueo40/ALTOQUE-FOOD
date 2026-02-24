@@ -276,6 +276,55 @@ export default function CustomerView() {
     const baseTotal = isFinalClosing ? sessionTotal : cartTotal;
     const finalTotal = useMemo(() => baseTotal + tipAmount, [baseTotal, tipAmount]);
 
+    const handleOptionToggle = (personalization: Personalization, option: PersonalizationOption) => {
+        setSelectedOptions(prev => {
+            const currentSelection = prev[personalization.id] || [];
+            const isSelected = currentSelection.some(opt => opt.id === option.id);
+            
+            if (personalization.maxSelection === 1) {
+                return { ...prev, [personalization.id]: [option] };
+            }
+
+            if (isSelected) {
+                return { ...prev, [personalization.id]: currentSelection.filter(opt => opt.id !== option.id) };
+            } else {
+                if (personalization.maxSelection && currentSelection.length >= personalization.maxSelection) {
+                    return prev;
+                }
+                return { ...prev, [personalization.id]: [...currentSelection, option] };
+            }
+        });
+    };
+
+    const isOptionSelected = (pid: string, oid: string) => {
+        return (selectedOptions[pid] || []).some(o => o.id === oid);
+    };
+
+    const currentProductTotalPrice = useMemo(() => {
+        if (!selectedProduct) return 0;
+        const { price: basePrice } = getDiscountedPrice(selectedProduct, allPromotions);
+        let optionsPrice = 0;
+        Object.values(selectedOptions).forEach(options => {
+            options.forEach(opt => {
+                optionsPrice += (Number(opt.price) || 0);
+            });
+        });
+        return (basePrice + optionsPrice) * productQuantity;
+    }, [selectedProduct, selectedOptions, productQuantity, allPromotions]);
+
+    const handleAddToCartWithDetails = () => {
+        if (!selectedProduct) return;
+        const { price: basePrice } = getDiscountedPrice(selectedProduct, allPromotions);
+        const flatOptions = Object.values(selectedOptions).flat();
+        addToCart({ ...selectedProduct, price: basePrice }, productQuantity, productComments, flatOptions);
+        setSelectedProduct(null);
+        setSelectedOptions({});
+        setProductComments('');
+        setProductQuantity(1);
+    };
+
+    const isBankPayment = ['Pago Móvil', 'Transferencia', 'Zelle'].includes(selectedPayment);
+
     // Persistencia Automática cada vez que cambia la cuenta o info de mesa
     useEffect(() => {
         if (isTableSession) {
@@ -492,55 +541,6 @@ export default function CustomerView() {
             </button>
         </div>
     );
-
-    const handleOptionToggle = (personalization: Personalization, option: PersonalizationOption) => {
-        setSelectedOptions(prev => {
-            const currentSelection = prev[personalization.id] || [];
-            const isSelected = currentSelection.some(opt => opt.id === option.id);
-            
-            if (personalization.maxSelection === 1) {
-                return { ...prev, [personalization.id]: [option] };
-            }
-
-            if (isSelected) {
-                return { ...prev, [personalization.id]: currentSelection.filter(opt => opt.id !== option.id) };
-            } else {
-                if (personalization.maxSelection && currentSelection.length >= personalization.maxSelection) {
-                    return prev;
-                }
-                return { ...prev, [personalization.id]: [...currentSelection, option] };
-            }
-        });
-    };
-
-    const isOptionSelected = (pid: string, oid: string) => {
-        return (selectedOptions[pid] || []).some(o => o.id === oid);
-    };
-
-    const currentProductTotalPrice = useMemo(() => {
-        if (!selectedProduct) return 0;
-        const { price: basePrice } = getDiscountedPrice(selectedProduct, allPromotions);
-        let optionsPrice = 0;
-        Object.values(selectedOptions).forEach(options => {
-            options.forEach(opt => {
-                optionsPrice += (Number(opt.price) || 0);
-            });
-        });
-        return (basePrice + optionsPrice) * productQuantity;
-    }, [selectedProduct, selectedOptions, productQuantity, allPromotions]);
-
-    const handleAddToCartWithDetails = () => {
-        if (!selectedProduct) return;
-        const { price: basePrice } = getDiscountedPrice(selectedProduct, allPromotions);
-        const flatOptions = Object.values(selectedOptions).flat();
-        addToCart({ ...selectedProduct, price: basePrice }, productQuantity, productComments, flatOptions);
-        setSelectedProduct(null);
-        setSelectedOptions({});
-        setProductComments('');
-        setProductQuantity(1);
-    };
-
-    const isBankPayment = ['Pago Móvil', 'Transferencia', 'Zelle'].includes(selectedPayment);
 
     return (
         <div className="bg-[#0f172a] min-h-screen text-gray-100 font-sans selection:bg-emerald-500/20 pb-safe overflow-x-hidden">
@@ -842,116 +842,53 @@ export default function CustomerView() {
                                     .map(pers => (
                                         <div key={pers.id} className="mb-6 space-y-3">
                                             <div className="flex justify-between items-center">
-                                                <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">{pers.name}</h4>
-                                                <span className="text-[9px] text-gray-500 font-bold uppercase tracking-tighter">
-                                                    {pers.maxSelection === 1 ? 'Elige 1' : `Máx ${pers.maxSelection || '∞'}`}
-                                                </span>
+                                                <h3 className="font-black text-white uppercase tracking-wider text-sm">{pers.name}</h3>
+                                                {pers.maxSelection > 1 && <span className="text-[10px] bg-gray-800 text-emerald-400 px-2 py-1 rounded-lg font-bold">Máx {pers.maxSelection}</span>}
                                             </div>
-                                            <div className="grid grid-cols-1 gap-2">
-                                                {pers.options.filter(o => o.available).map(opt => {
+                                            <div className="space-y-2">
+                                                {pers.options.map(opt => {
                                                     const isSelected = isOptionSelected(pers.id, opt.id);
                                                     return (
-                                                        <button 
-                                                            key={opt.id} 
-                                                            onClick={() => handleOptionToggle(pers, opt)}
-                                                            className={`p-3 rounded-xl border text-xs font-bold text-left transition-all flex justify-between items-center ${isSelected ? 'bg-emerald-500/20 border-emerald-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-600'}`}
-                                                        >
-                                                            <div className="flex items-center gap-2">
-                                                                <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${isSelected ? 'bg-emerald-500 border-emerald-500' : 'border-gray-600'}`}>
-                                                                    {isSelected && <IconCheck className="h-2 w-2 text-white" />}
+                                                        <div key={opt.id} onClick={() => handleOptionToggle(pers, opt)} className={`p-4 rounded-xl border flex justify-between items-center cursor-pointer transition-all active:scale-[0.98] ${isSelected ? 'bg-emerald-500/10 border-emerald-500' : 'bg-gray-800/50 border-gray-800 hover:bg-gray-800'}`}>
+                                                            <span className={`font-bold text-sm ${isSelected ? 'text-white' : 'text-gray-400'}`}>{opt.name}</span>
+                                                            <div className="flex items-center gap-3">
+                                                                {Number(opt.price) > 0 && <span className="text-emerald-400 font-black text-xs">+${Number(opt.price).toFixed(2)}</span>}
+                                                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-emerald-500 bg-emerald-500' : 'border-gray-600'}`}>
+                                                                    {isSelected && <IconCheck className="w-3 h-3 text-white" />}
                                                                 </div>
-                                                                <span>{opt.name}</span>
                                                             </div>
-                                                            {opt.price > 0 && <span className="text-emerald-500">+${opt.price}</span>}
-                                                        </button>
+                                                        </div>
                                                     );
                                                 })}
                                             </div>
                                         </div>
-                                    ))
-                                }
+                                    ))}
 
                                 <div className="mb-6">
-                                    <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-3">Instrucciones especiales</h4>
+                                    <h3 className="font-black text-white uppercase tracking-wider text-sm mb-3">Notas de cocina</h3>
                                     <textarea 
                                         value={productComments}
                                         onChange={(e) => setProductComments(e.target.value)}
-                                        className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-xs text-white outline-none focus:ring-1 focus:ring-emerald-500/50 resize-none"
-                                        placeholder="Ej. Sin cebolla, salsa aparte..."
-                                        rows={2}
+                                        placeholder="¿Sin cebolla? ¿Salsa aparte?"
+                                        className="w-full bg-gray-800/50 border border-gray-800 rounded-xl p-4 text-sm text-white placeholder-gray-600 focus:ring-1 focus:ring-emerald-500 outline-none resize-none h-24 font-medium"
                                     />
                                 </div>
-                            </div>
 
-                            <div className="p-6 bg-gray-900 border-t border-gray-800 shrink-0">
-                                <div className="flex items-center justify-between mb-4">
-                                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Cantidad</span>
-                                    <div className="flex items-center bg-gray-800 rounded-xl px-2 py-1 border border-gray-700">
-                                        <button onClick={() => setProductQuantity(q => Math.max(1, q - 1))} className="p-2 text-gray-400 hover:text-white"><IconMinus className="h-4 w-4"/></button>
-                                        <span className="w-8 text-center text-sm font-black text-white">{productQuantity}</span>
-                                        <button onClick={() => setProductQuantity(q => q + 1)} className="p-2 text-gray-400 hover:text-white"><IconPlus className="h-4 w-4"/></button>
-                                    </div>
+                                <div className="flex items-center justify-between bg-gray-800/50 p-2 rounded-2xl border border-gray-800 mb-6">
+                                    <button onClick={() => setProductQuantity(Math.max(1, productQuantity - 1))} className="w-12 h-12 flex items-center justify-center bg-gray-800 rounded-xl text-white hover:bg-gray-700 transition-colors"><IconMinus/></button>
+                                    <span className="text-2xl font-black text-white">{productQuantity}</span>
+                                    <button onClick={() => setProductQuantity(productQuantity + 1)} className="w-12 h-12 flex items-center justify-center bg-emerald-600 rounded-xl text-white hover:bg-emerald-500 transition-colors shadow-lg shadow-emerald-900/20"><IconPlus/></button>
                                 </div>
-                                <button 
-                                    onClick={handleAddToCartWithDetails}
-                                    className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white flex justify-between px-8 items-center active:scale-95 transition-all shadow-xl shadow-emerald-900/40"
-                                >
-                                    <span className="uppercase tracking-widest text-[10px]">Añadir a la Ronda</span>
-                                    <span className="text-xl font-black">${currentProductTotalPrice.toFixed(2)}</span>
+
+                                <button onClick={handleAddToCartWithDetails} className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white shadow-2xl shadow-emerald-900/40 active:scale-[0.98] transition-all uppercase tracking-[0.2em] text-sm flex justify-between px-8 items-center group">
+                                    <span>AGREGAR</span>
+                                    <span className="bg-black/20 px-3 py-1 rounded-lg group-hover:bg-black/30 transition-colors">${currentProductTotalPrice.toFixed(2)}</span>
                                 </button>
                             </div>
                         </div>
                     </div>
                 )}
-                
-                {view === 'menu' && (
-                    <div className="fixed bottom-6 left-4 right-4 max-w-md mx-auto z-40 flex flex-col gap-3">
-                        {isTableSession && sessionItems.length > 0 && (
-                            <button 
-                                onClick={() => setView('account')} 
-                                className="w-full bg-[#1e293b]/90 backdrop-blur-xl text-white font-black py-4 px-6 rounded-2xl flex justify-between items-center border border-gray-700 shadow-2xl transition-transform active:scale-95 group"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-white/10 p-2 rounded-lg text-white/60 group-hover:text-emerald-400 transition-colors">
-                                        <IconReceipt className="h-5 w-5"/>
-                                    </div>
-                                    <div className="text-left leading-none">
-                                        <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-black mb-1">Mi Cuenta</p>
-                                        <p className="text-xs text-gray-400 font-bold">Ver consumo total</p>
-                                    </div>
-                                </div>
-                                <span className="text-xl font-black">${sessionTotal.toFixed(2)}</span>
-                            </button>
-                        )}
-                        {itemCount > 0 && (
-                            <button 
-                                onClick={() => setView('cart')} 
-                                className="w-full bg-emerald-600 text-white font-black py-4 px-6 rounded-2xl flex justify-between items-center shadow-xl shadow-emerald-900/50 active:scale-[0.98] transition-all border border-emerald-400/50"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-emerald-800 px-3 py-1 rounded-lg text-sm font-black border border-emerald-400/30 shadow-inner">{itemCount}</div>
-                                    <span className="tracking-[0.1em] uppercase text-xs font-black">{isTableSession ? 'Revisar Ronda Actual' : 'Ver Pedido'}</span>
-                                </div>
-                                <span className="font-black text-xl">${cartTotal.toFixed(2)}</span>
-                            </button>
-                        )}
-                    </div>
-                )}
             </div>
-            <style>{`
-                .no-scrollbar::-webkit-scrollbar { display: none; }
-                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-                @keyframes slide-up {
-                    from { transform: translateY(100%); opacity: 0; }
-                    to { transform: translateY(0); opacity: 1; }
-                }
-                .animate-slide-up { animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-                @keyframes bounce-subtle {
-                    0%, 100% { transform: translateY(0); }
-                    50% { transform: translateY(-4px); }
-                }
-                .animate-bounce-subtle { animation: bounce-subtle 2s infinite ease-in-out; }
-            `}</style>
         </div>
     );
 }
