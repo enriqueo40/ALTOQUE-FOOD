@@ -1388,14 +1388,7 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
         window.print();
     };
 
-    const handleAdvanceStatus = () => {
-        let nextStatus = OrderStatus.Pending;
-        if(order.status === OrderStatus.Pending) nextStatus = OrderStatus.Confirmed;
-        else if(order.status === OrderStatus.Confirmed) nextStatus = OrderStatus.Preparing;
-        else if(order.status === OrderStatus.Preparing) nextStatus = OrderStatus.Ready;
-        else if(order.status === OrderStatus.Ready) nextStatus = order.orderType === OrderType.Delivery ? OrderStatus.Delivering : OrderStatus.Completed;
-        else if(order.status === OrderStatus.Delivering) nextStatus = OrderStatus.Completed;
-        
+    const handleAdvanceStatus = (nextStatus: OrderStatus) => {
         onUpdateStatus(order.id, nextStatus);
         
         // Auto-print ticket when moving to Preparing
@@ -1406,36 +1399,57 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
 
     const formattedDate = new Date(order.createdAt).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: 'numeric', minute: 'numeric', hour12: true });
 
+    const steps = [
+        { status: OrderStatus.Pending, label: 'Pendiente', icon: IconClock },
+        { status: OrderStatus.Confirmed, label: 'Confirmado', icon: IconCheck },
+        { status: OrderStatus.Preparing, label: 'Preparando', icon: IconReceipt },
+        { status: OrderStatus.Ready, label: 'Listo', icon: IconCheck },
+        { status: OrderStatus.Completed, label: 'Entregado', icon: IconCheck },
+    ];
+
+    const currentStepIndex = steps.findIndex(s => s.status === order.status);
+    const isCancelled = order.status === OrderStatus.Cancelled;
+
     return (
         <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${isClosing ? 'pointer-events-none' : ''}`}>
             <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isClosing ? 'opacity-0' : 'opacity-100'}`} onClick={handleClose}></div>
             <div className={`bg-white dark:bg-gray-800 w-full max-w-2xl rounded-xl shadow-2xl transform transition-all duration-300 flex flex-col max-h-[90vh] ${isClosing ? 'scale-95 opacity-0 translate-y-4' : 'scale-100 opacity-100 translate-y-0'}`}>
                 
                 {/* Print-only Ticket (Comanda) */}
-                <div className="hidden print:block p-4 bg-white text-black font-mono text-sm">
-                    <div className="text-center mb-4 border-b border-black pb-2">
-                        <h1 className="text-2xl font-bold uppercase">COMANDA COCINA</h1>
-                        <p className="text-lg font-bold mt-1">#{order.id.slice(0, 5).toUpperCase()}</p>
-                        <p className="text-sm">{formattedDate}</p>
-                        <p className="text-xl font-bold mt-2 uppercase">{order.orderType === OrderType.DineIn ? `MESA ${order.tableId}` : order.orderType}</p>
+                <div className="hidden print:block fixed inset-0 z-[9999] bg-white p-8 m-0 w-full h-full overflow-hidden text-black font-mono leading-tight">
+                    <div className="text-center mb-6 border-b-2 border-black pb-4">
+                        <h1 className="text-4xl font-black uppercase mb-2">COMANDA COCINA</h1>
+                        <div className="flex justify-between items-end border-t-2 border-black pt-2 mt-2">
+                             <div className="text-left">
+                                 <p className="text-sm font-bold text-gray-600">PEDIDO #</p>
+                                 <p className="text-3xl font-black">{order.id.slice(0, 6).toUpperCase()}</p>
+                             </div>
+                             <div className="text-right">
+                                 <p className="text-sm font-bold text-gray-600">HORA</p>
+                                 <p className="text-xl font-bold">{new Date(order.createdAt).toLocaleTimeString('es-MX', {hour: '2-digit', minute:'2-digit'})}</p>
+                             </div>
+                        </div>
+                        <div className="mt-4 text-left bg-black text-white p-2 font-bold text-xl uppercase text-center rounded-sm">
+                            {order.orderType === OrderType.DineIn ? `MESA ${order.tableId}` : order.orderType}
+                        </div>
                     </div>
                     
-                    <div className="space-y-4">
+                    <div className="space-y-6">
                         {order.items.map((item, idx) => (
-                            <div key={idx} className="border-b border-dashed border-black pb-2">
-                                <div className="flex gap-2 items-start">
-                                    <span className="text-xl font-bold">{item.quantity}x</span>
+                            <div key={idx} className="border-b border-dashed border-gray-400 pb-4">
+                                <div className="flex gap-4 items-start">
+                                    <span className="text-3xl font-black">{item.quantity}</span>
                                     <div className="flex-1">
-                                        <span className="text-lg font-bold block leading-tight">{item.name}</span>
+                                        <span className="text-2xl font-bold block leading-none mb-2">{item.name}</span>
                                         {item.selectedOptions && item.selectedOptions.length > 0 && (
-                                            <ul className="ml-2 mt-1 text-sm list-disc pl-4">
+                                            <div className="flex flex-wrap gap-x-4 gap-y-1 mb-2">
                                                 {item.selectedOptions.map((opt, i) => (
-                                                    <li key={i}>{opt.name}</li>
+                                                    <span key={i} className="text-lg font-medium italic text-gray-800">+ {opt.name}</span>
                                                 ))}
-                                            </ul>
+                                            </div>
                                         )}
                                         {item.comments && (
-                                            <p className="text-base font-bold mt-1 uppercase bg-black text-white inline-block px-1">
+                                            <p className="text-lg font-bold mt-1 uppercase bg-gray-200 inline-block px-2 py-1 border border-black">
                                                 NOTA: {item.comments}
                                             </p>
                                         )}
@@ -1446,117 +1460,164 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                     </div>
 
                     {order.generalComments && (
-                        <div className="mt-6 border-2 border-black p-2 font-bold text-lg uppercase text-center">
+                        <div className="mt-8 border-4 border-black p-4 font-bold text-2xl uppercase text-center bg-gray-100">
                             NOTA GENERAL: {order.generalComments}
                         </div>
                     )}
                     
-                    <div className="mt-8 text-center text-xs border-t border-black pt-2">
-                        <p>Fin de comanda</p>
+                    <div className="mt-12 text-center text-sm border-t-2 border-black pt-4">
+                        <p className="font-bold">--- FIN DE COMANDA ---</p>
                     </div>
                 </div>
 
                 {/* Screen Content */}
                 <div className="print:hidden flex flex-col h-full">
                     {/* Header */}
-                    <div className="p-6 border-b dark:border-gray-700 flex justify-between items-start bg-gray-50 dark:bg-gray-900/50 rounded-t-xl">
-                    <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded">#{order.id.slice(0, 6).toUpperCase()}</span>
-                            <span className="text-xs text-gray-500 dark:text-gray-400">{formattedDate}</span>
+                    <div className="p-6 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 rounded-t-xl">
+                        <div className="flex justify-between items-start mb-6">
+                            <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded">#{order.id.slice(0, 6).toUpperCase()}</span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">{formattedDate}</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{order.customer.name}</h2>
+                                    <OrderStatusBadge status={order.status} />
+                                </div>
+                                <p className="text-gray-600 dark:text-gray-300 font-mono text-sm mt-1 flex items-center gap-1">
+                                    <IconWhatsapp className="h-4 w-4 text-green-500"/> 
+                                    <a href={`https://wa.me/${order.customer.phone.replace(/\D/g,'')}`} target="_blank" className="hover:underline">{order.customer.phone}</a>
+                                </p>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                                <button onClick={handlePrint} className="px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center gap-2 shadow-sm">
+                                    <IconPrinter className="h-4 w-4"/> Imprimir Comanda
+                                </button>
+                                <button onClick={handleClose} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors">
+                                    <IconX className="h-6 w-6 text-gray-500"/>
+                                </button>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                             <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{order.customer.name}</h2>
-                             <OrderStatusBadge status={order.status} />
-                        </div>
-                        <p className="text-gray-600 dark:text-gray-300 font-mono text-sm mt-1 flex items-center gap-1">
-                             <IconWhatsapp className="h-4 w-4 text-green-500"/> 
-                             <a href={`https://wa.me/${order.customer.phone.replace(/\D/g,'')}`} target="_blank" className="hover:underline">{order.customer.phone}</a>
-                        </p>
+
+                        {/* Status Stepper */}
+                        {!isCancelled && (
+                            <div className="w-full overflow-x-auto pb-2">
+                                <div className="flex items-center justify-between min-w-[500px]">
+                                    {steps.map((step, index) => {
+                                        const isCompleted = currentStepIndex > index;
+                                        const isCurrent = currentStepIndex === index;
+                                        const StepIcon = step.icon;
+                                        
+                                        return (
+                                            <div key={step.status} className="flex flex-col items-center relative flex-1">
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 z-10 transition-colors duration-300 ${isCompleted || isCurrent ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-400'}`}>
+                                                    <StepIcon className="h-5 w-5" />
+                                                </div>
+                                                <span className={`text-xs font-bold mt-2 uppercase tracking-wider ${isCompleted || isCurrent ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'}`}>{step.label}</span>
+                                                {index < steps.length - 1 && (
+                                                    <div className={`absolute top-5 left-1/2 w-full h-0.5 -z-0 ${currentStepIndex > index ? 'bg-emerald-600' : 'bg-gray-300 dark:bg-gray-700'}`}></div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
                     </div>
-                    
-                     <div className="relative group">
-                        <button className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"><IconMoreVertical /></button>
-                        <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 shadow-xl rounded-lg border dark:border-gray-700 hidden group-hover:block z-10 overflow-hidden">
-                             <button onClick={handleCopyOrder} className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 text-sm"><IconDuplicate className="h-4 w-4"/> Copiar detalles</button>
-                             <button onClick={() => { onUpdateStatus(order.id, OrderStatus.Cancelled); handleClose(); }} className="w-full text-left px-4 py-3 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 flex items-center gap-2 text-sm border-t dark:border-gray-700"><IconX className="h-4 w-4"/> Cancelar pedido</button>
-                        </div>
-                    </div>
-                </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6">
-                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                        <div className="md:col-span-2 space-y-4">
-                             <h3 className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2 border-b dark:border-gray-700 pb-2">
-                                 <IconReceipt className="h-5 w-5 text-gray-400"/> Detalle del pedido
-                             </h3>
-                             <div className="space-y-3">
-                                 {order.items.map((item, idx) => (
-                                     <div key={idx} className="flex justify-between items-start p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-                                         <div className="flex gap-3">
-                                             <span className="font-bold text-emerald-600 dark:text-emerald-400 text-lg">{item.quantity}x</span>
-                                             <div>
-                                                 <p className="font-medium text-gray-800 dark:text-gray-200">{item.name}</p>
-                                                 {item.comments && <p className="text-xs text-orange-600 dark:text-orange-300 italic mt-1 font-medium">Nota: {item.comments}</p>}
+                <div className="flex-1 overflow-y-auto p-6 bg-gray-100 dark:bg-gray-900">
+                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Order Details Column */}
+                        <div className="lg:col-span-2 space-y-6">
+                             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border dark:border-gray-700">
+                                 <h3 className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2 border-b dark:border-gray-700 pb-4 mb-4">
+                                     <IconReceipt className="h-5 w-5 text-gray-400"/> Detalle del pedido
+                                 </h3>
+                                 <div className="space-y-4">
+                                     {order.items.map((item, idx) => (
+                                         <div key={idx} className="flex justify-between items-start p-4 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-gray-100 dark:border-gray-700/50">
+                                             <div className="flex gap-4">
+                                                 <span className="font-black text-emerald-600 dark:text-emerald-400 text-xl bg-emerald-50 dark:bg-emerald-900/20 w-10 h-10 flex items-center justify-center rounded-lg">{item.quantity}x</span>
+                                                 <div>
+                                                     <p className="font-bold text-gray-800 dark:text-gray-200 text-lg">{item.name}</p>
+                                                     {item.selectedOptions && item.selectedOptions.length > 0 && (
+                                                         <div className="flex flex-wrap gap-1 mt-1">
+                                                             {item.selectedOptions.map((opt, i) => (
+                                                                 <span key={i} className="text-xs bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded-full">{opt.name}</span>
+                                                             ))}
+                                                         </div>
+                                                     )}
+                                                     {item.comments && <p className="text-sm text-orange-600 dark:text-orange-300 italic mt-2 font-medium bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded border border-orange-100 dark:border-orange-900/30 inline-block">Nota: {item.comments}</p>}
+                                                 </div>
                                              </div>
+                                             <span className="font-bold text-gray-700 dark:text-gray-300 text-lg">${(item.price * item.quantity).toFixed(2)}</span>
                                          </div>
-                                         <span className="font-semibold text-gray-700 dark:text-gray-300">${(item.price * item.quantity).toFixed(2)}</span>
-                                     </div>
-                                 ))}
-                             </div>
-                             {order.generalComments && (
-                                 <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/50 rounded-lg text-sm text-yellow-800 dark:text-yellow-200">
-                                     <strong className="block mb-1">📝 Nota general del cliente:</strong> {order.generalComments}
+                                     ))}
                                  </div>
-                             )}
-                             
-                             {/* Payment Proof Section */}
+                                 {order.generalComments && (
+                                     <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/50 rounded-xl text-sm text-yellow-800 dark:text-yellow-200 flex items-start gap-3">
+                                         <span className="text-2xl">📝</span>
+                                         <div>
+                                             <strong className="block mb-1 uppercase tracking-wide text-xs">Nota general del cliente</strong>
+                                             <p className="font-medium text-lg">{order.generalComments}</p>
+                                         </div>
+                                     </div>
+                                 )}
+                             </div>
+
+                             {/* Payment Proof */}
                              {order.paymentProof && (
-                                 <div className="mt-4 border dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
-                                     <h4 className="font-bold text-gray-900 dark:text-gray-100 mb-2 flex items-center gap-2">
+                                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border dark:border-gray-700">
+                                     <h4 className="font-bold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
                                          <IconCheck className="h-5 w-5 text-green-500"/> Comprobante de pago
                                      </h4>
-                                     <div className="rounded-lg overflow-hidden border dark:border-gray-600">
-                                         <img src={order.paymentProof} alt="Comprobante" className="w-full h-auto object-contain max-h-64" />
+                                     <div className="rounded-xl overflow-hidden border dark:border-gray-600 bg-gray-50 dark:bg-gray-900 flex justify-center p-4">
+                                         <img src={order.paymentProof} alt="Comprobante" className="max-h-96 object-contain" />
                                      </div>
-                                     <a href={order.paymentProof} download={`comprobante-${order.id}.png`} className="mt-2 inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline">
-                                         <IconUpload className="h-4 w-4 rotate-180"/> Descargar comprobante
-                                     </a>
+                                     <div className="mt-4 flex justify-center">
+                                         <a href={order.paymentProof} download={`comprobante-${order.id}.png`} className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 font-semibold flex items-center gap-2 transition-colors">
+                                             <IconUpload className="h-4 w-4 rotate-180"/> Descargar comprobante
+                                         </a>
+                                     </div>
                                  </div>
                              )}
                         </div>
                         
+                        {/* Sidebar Info */}
                         <div className="space-y-6">
-                            <div>
-                                <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2 border-b dark:border-gray-700 pb-2">
+                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border dark:border-gray-700">
+                                <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2 border-b dark:border-gray-700 pb-2">
                                     <IconLocationMarker className="h-5 w-5 text-gray-400"/> Datos de entrega
                                 </h3>
-                                <div className="text-sm space-y-2 bg-gray-50 dark:bg-gray-700/30 p-3 rounded-lg">
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-500">Tipo:</span>
-                                        <span className="font-medium">{order.orderType}</span>
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                                        <span className="text-gray-500 text-sm">Tipo de pedido</span>
+                                        <span className="font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wide text-sm">{order.orderType}</span>
                                     </div>
+                                    
                                     {order.tableId && (
-                                         <div className="flex justify-between">
-                                            <span className="text-gray-500">Mesa:</span>
-                                            <span className="font-bold text-emerald-600">{order.tableId}</span>
+                                        <div className="flex justify-between items-center p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-100 dark:border-emerald-800/30">
+                                            <span className="text-emerald-700 dark:text-emerald-400 font-medium">Mesa</span>
+                                            <span className="font-black text-emerald-600 dark:text-emerald-400 text-xl">{order.tableId}</span>
                                         </div>
                                     )}
+                                    
                                     {order.orderType === OrderType.Delivery && (
-                                        <div className="pt-2 border-t dark:border-gray-600 mt-2">
-                                            <p className="font-medium">{order.customer.address.calle} #{order.customer.address.numero}</p>
-                                            <p className="text-gray-500">{order.customer.address.colonia}</p>
-                                            {order.customer.address.referencias && <p className="text-xs mt-1 italic text-gray-500">"{order.customer.address.referencias}"</p>}
+                                        <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-800/30">
+                                            <p className="font-bold text-gray-800 dark:text-gray-200 mb-1">{order.customer.address.calle} #{order.customer.address.numero}</p>
+                                            <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">{order.customer.address.colonia}</p>
+                                            {order.customer.address.referencias && <p className="text-xs italic text-gray-500 bg-white dark:bg-gray-800 p-2 rounded border dark:border-gray-700">"{order.customer.address.referencias}"</p>}
                                             
                                             {order.customer.address.googleMapsLink && (
                                                 <a 
                                                     href={order.customer.address.googleMapsLink} 
                                                     target="_blank" 
                                                     rel="noopener noreferrer"
-                                                    className="mt-3 flex items-center justify-center gap-2 w-full py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors font-semibold"
+                                                    className="mt-3 flex items-center justify-center gap-2 w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-bold text-sm shadow-md"
                                                 >
-                                                    <IconLocationMarker className="h-4 w-4"/> Ver ubicación GPS
+                                                    <IconLocationMarker className="h-4 w-4"/> Ver en Mapa
                                                 </a>
                                             )}
                                         </div>
@@ -1564,44 +1625,80 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                                 </div>
                             </div>
 
-                             <div>
-                                <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2 border-b dark:border-gray-700 pb-2">
-                                    <IconPayment className="h-5 w-5 text-gray-400"/> Pago
+                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border dark:border-gray-700">
+                                <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2 border-b dark:border-gray-700 pb-2">
+                                    <IconPayment className="h-5 w-5 text-gray-400"/> Resumen de Pago
                                 </h3>
-                                <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-lg text-center">
-                                    <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">${order.total.toFixed(2)}</p>
-                                    <div className="flex justify-center mt-2">
-                                         <button 
-                                            onClick={() => onUpdatePayment(order.id, order.paymentStatus === 'paid' ? 'pending' : 'paid')}
-                                            className={`text-xs font-bold px-3 py-1 rounded-full border transition-colors ${order.paymentStatus === 'paid' ? 'bg-green-200 text-green-800 border-green-300' : 'bg-yellow-100 text-yellow-800 border-yellow-300 hover:bg-green-100'}`}
-                                        >
-                                            {order.paymentStatus === 'paid' ? 'PAGADO' : 'MARCAR PAGADO'}
-                                        </button>
+                                <div className="text-center space-y-4">
+                                    <div>
+                                        <p className="text-gray-500 text-sm uppercase tracking-widest mb-1">Total a Pagar</p>
+                                        <p className="text-4xl font-black text-gray-900 dark:text-white">${order.total.toFixed(2)}</p>
                                     </div>
+                                    
+                                    <div className={`p-4 rounded-xl border-2 ${order.paymentStatus === 'paid' ? 'bg-green-50 border-green-500 text-green-700' : 'bg-yellow-50 border-yellow-400 text-yellow-700'}`}>
+                                        <p className="font-bold uppercase tracking-wider text-sm mb-2">Estado del Pago</p>
+                                        <div className="flex items-center justify-center gap-2 text-lg font-black">
+                                            {order.paymentStatus === 'paid' ? <IconCheck className="h-6 w-6"/> : <IconClock className="h-6 w-6"/>}
+                                            {order.paymentStatus === 'paid' ? 'PAGADO' : 'PENDIENTE'}
+                                        </div>
+                                    </div>
+
+                                    <button 
+                                        onClick={() => onUpdatePayment(order.id, order.paymentStatus === 'paid' ? 'pending' : 'paid')}
+                                        className="w-full py-2 text-sm font-bold text-gray-500 hover:text-gray-800 underline decoration-dashed"
+                                    >
+                                        {order.paymentStatus === 'paid' ? 'Marcar como pendiente' : 'Marcar como pagado manualmente'}
+                                    </button>
                                 </div>
                             </div>
                         </div>
                      </div>
                 </div>
 
-                {/* Footer */}
-                <div className="p-4 bg-white dark:bg-gray-800 border-t dark:border-gray-700 flex gap-3 justify-end">
-                     <button onClick={handleClose} className="px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
-                         Cerrar
-                     </button>
-                     <button onClick={handlePrint} className="px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
-                         <IconPrinter className="h-5 w-5"/> Imprimir
-                     </button>
-                     
-                     {order.status !== OrderStatus.Completed && order.status !== OrderStatus.Cancelled && (
-                        <button onClick={handleAdvanceStatus} className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
-                            <IconCheck className="h-5 w-5"/>
-                            {order.status === OrderStatus.Pending ? 'Confirmar Pedido' : 
-                             order.status === OrderStatus.Confirmed ? 'Empezar Preparación' :
-                             order.status === OrderStatus.Preparing ? 'Marcar Listo' :
-                             order.status === OrderStatus.Ready ? (order.orderType === OrderType.Delivery ? 'Enviar Repartidor' : 'Entregar a Cliente') :
-                             'Completar Pedido'}
-                        </button>
+                {/* Footer Actions */}
+                <div className="p-4 bg-white dark:bg-gray-800 border-t dark:border-gray-700 flex flex-col sm:flex-row gap-3 justify-end items-center">
+                    {order.status !== OrderStatus.Completed && order.status !== OrderStatus.Cancelled && (
+                        <>
+                            {order.status === OrderStatus.Pending && (
+                                <button onClick={() => handleAdvanceStatus(OrderStatus.Confirmed)} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
+                                    <IconCheck className="h-5 w-5"/> Confirmar Pedido
+                                </button>
+                            )}
+                            {order.status === OrderStatus.Confirmed && (
+                                <button onClick={() => handleAdvanceStatus(OrderStatus.Preparing)} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
+                                    <IconReceipt className="h-5 w-5"/> Enviar a Cocina
+                                </button>
+                            )}
+                            {order.status === OrderStatus.Preparing && (
+                                <button onClick={() => handleAdvanceStatus(OrderStatus.Ready)} className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
+                                    <IconCheck className="h-5 w-5"/> Marcar Listo
+                                </button>
+                            )}
+                            {order.status === OrderStatus.Ready && (
+                                <button onClick={() => handleAdvanceStatus(order.orderType === OrderType.Delivery ? OrderStatus.Delivering : OrderStatus.Completed)} className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
+                                    {order.orderType === OrderType.Delivery ? 'Enviar Repartidor' : 'Entregar a Cliente'}
+                                </button>
+                            )}
+                            {order.status === OrderStatus.Delivering && (
+                                <button onClick={() => handleAdvanceStatus(OrderStatus.Completed)} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
+                                    <IconCheck className="h-5 w-5"/> Completar Entrega
+                                </button>
+                            )}
+                            
+                            <button onClick={() => { if(window.confirm('¿Cancelar pedido?')) onUpdateStatus(order.id, OrderStatus.Cancelled); }} className="text-red-500 hover:text-red-700 font-bold px-4 py-2">
+                                Cancelar
+                            </button>
+                        </>
+                    )}
+                     {order.status === OrderStatus.Completed && (
+                         <div className="flex items-center gap-2 text-emerald-600 font-bold bg-emerald-50 px-4 py-2 rounded-lg">
+                             <IconCheck className="h-5 w-5"/> Pedido Completado
+                         </div>
+                     )}
+                     {order.status === OrderStatus.Cancelled && (
+                         <div className="flex items-center gap-2 text-red-600 font-bold bg-red-50 px-4 py-2 rounded-lg">
+                             <IconX className="h-5 w-5"/> Pedido Cancelado
+                         </div>
                      )}
                 </div>
                 </div>

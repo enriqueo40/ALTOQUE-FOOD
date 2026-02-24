@@ -695,7 +695,14 @@ export default function CustomerView() {
                                                                     </div>
                                                                     <div className="flex-1 flex flex-col justify-between py-1">
                                                                         <div>
-                                                                            <h4 className="font-bold text-white text-base leading-tight mb-1">{p.name}</h4>
+                                                                            <div className="flex justify-between items-start">
+                                                                                <h4 className="font-bold text-white text-base leading-tight mb-1">{p.name}</h4>
+                                                                                {((p.personalizationIds && p.personalizationIds.length > 0) || ((p as any).personalization_ids && (p as any).personalization_ids.length > 0)) && (
+                                                                                    <span className="text-[10px] font-bold bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/30 uppercase tracking-wide">
+                                                                                        Personalizable
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
                                                                             <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed">{p.description}</p>
                                                                         </div>
                                                                         <div className="flex items-end justify-between mt-2">
@@ -978,26 +985,49 @@ export default function CustomerView() {
                                 {allPersonalizations
                                     .filter(pers => {
                                         const ids = selectedProduct.personalizationIds || (selectedProduct as any).personalization_ids || [];
-                                        return ids.includes(pers.id);
+                                        return Array.isArray(ids) && ids.includes(pers.id);
                                     })
                                     .map(pers => (
-                                        <div key={pers.id} className="mb-6 space-y-3">
-                                            <div className="flex justify-between items-center">
-                                                <h3 className="font-black text-white uppercase tracking-wider text-sm">{pers.name}</h3>
-                                                {(pers.maxSelection || 0) > 1 && <span className="text-[10px] bg-gray-800 text-emerald-400 px-2 py-1 rounded-lg font-bold">Máx {pers.maxSelection}</span>}
+                                        <div key={pers.id} className="mb-8 space-y-4 border-b border-gray-800 pb-6 last:border-0">
+                                            <div className="flex justify-between items-end">
+                                                <div>
+                                                    <h3 className="font-black text-white uppercase tracking-wider text-base mb-1">{pers.name}</h3>
+                                                    <p className="text-xs text-gray-400 font-medium">
+                                                        {pers.minSelection && pers.minSelection > 0 ? (
+                                                            <span className="text-rose-400 font-bold uppercase tracking-wide">Obligatorio</span>
+                                                        ) : (
+                                                            <span className="text-gray-500 font-bold uppercase tracking-wide">Opcional</span>
+                                                        )}
+                                                        {pers.maxSelection && pers.maxSelection > 1 && (
+                                                            <span className="text-gray-500"> • Máx {pers.maxSelection}</span>
+                                                        )}
+                                                        {pers.maxSelection === 1 && (
+                                                            <span className="text-gray-500"> • Solo 1</span>
+                                                        )}
+                                                    </p>
+                                                </div>
+                                                {(pers.minSelection && pers.minSelection > 0) && (
+                                                    <div className="bg-rose-500/10 px-2 py-1 rounded text-[10px] font-bold text-rose-500 border border-rose-500/20 uppercase">
+                                                        Requerido
+                                                    </div>
+                                                )}
                                             </div>
-                                            <div className="space-y-2">
+                                            <div className="space-y-3">
                                                 {pers.options.map(opt => {
                                                     const isSelected = isOptionSelected(pers.id, opt.id);
                                                     return (
-                                                        <div key={opt.id} onClick={() => handleOptionToggle(pers, opt)} className={`p-4 rounded-xl border flex justify-between items-center cursor-pointer transition-all active:scale-[0.98] ${isSelected ? 'bg-emerald-500/10 border-emerald-500' : 'bg-gray-800/50 border-gray-800 hover:bg-gray-800'}`}>
-                                                            <span className={`font-bold text-sm ${isSelected ? 'text-white' : 'text-gray-400'}`}>{opt.name}</span>
+                                                        <div 
+                                                            key={opt.id} 
+                                                            onClick={() => handleOptionToggle(pers, opt)} 
+                                                            className={`p-4 rounded-xl border flex justify-between items-center cursor-pointer transition-all active:scale-[0.98] group ${isSelected ? 'bg-emerald-500/10 border-emerald-500 shadow-lg shadow-emerald-900/20' : 'bg-gray-800/40 border-gray-700/50 hover:bg-gray-800 hover:border-gray-600'}`}
+                                                        >
                                                             <div className="flex items-center gap-3">
-                                                                {Number(opt.price) > 0 && <span className="text-emerald-400 font-black text-xs">+{formatCurrency(Number(opt.price), settings.company.currency.code)}</span>}
-                                                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-emerald-500 bg-emerald-500' : 'border-gray-600'}`}>
+                                                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected ? 'border-emerald-500 bg-emerald-500' : 'border-gray-600 group-hover:border-gray-500'}`}>
                                                                     {isSelected && <IconCheck className="w-3 h-3 text-white" />}
                                                                 </div>
+                                                                <span className={`font-bold text-sm ${isSelected ? 'text-white' : 'text-gray-300 group-hover:text-white'}`}>{opt.name}</span>
                                                             </div>
+                                                            {Number(opt.price) > 0 && <span className="text-emerald-400 font-black text-xs bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20">+{formatCurrency(Number(opt.price), settings.company.currency.code)}</span>}
                                                         </div>
                                                     );
                                                 })}
