@@ -1388,6 +1388,12 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
         else if(order.status === OrderStatus.Delivering) nextStatus = OrderStatus.Completed;
         
         onUpdateStatus(order.id, nextStatus);
+        
+        // Auto-print ticket when moving to Preparing
+        if (nextStatus === OrderStatus.Preparing) {
+            setTimeout(() => window.print(), 500);
+        }
+        
         handleClose();
     };
 
@@ -1398,8 +1404,55 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
             <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isClosing ? 'opacity-0' : 'opacity-100'}`} onClick={handleClose}></div>
             <div className={`bg-white dark:bg-gray-800 w-full max-w-2xl rounded-xl shadow-2xl transform transition-all duration-300 flex flex-col max-h-[90vh] ${isClosing ? 'scale-95 opacity-0 translate-y-4' : 'scale-100 opacity-100 translate-y-0'}`}>
                 
-                {/* Header */}
-                <div className="p-6 border-b dark:border-gray-700 flex justify-between items-start bg-gray-50 dark:bg-gray-900/50 rounded-t-xl">
+                {/* Print-only Ticket (Comanda) */}
+                <div className="hidden print:block p-4 bg-white text-black font-mono text-sm">
+                    <div className="text-center mb-4 border-b border-black pb-2">
+                        <h1 className="text-2xl font-bold uppercase">COMANDA COCINA</h1>
+                        <p className="text-lg font-bold mt-1">#{order.id.slice(0, 5).toUpperCase()}</p>
+                        <p className="text-sm">{formattedDate}</p>
+                        <p className="text-xl font-bold mt-2 uppercase">{order.orderType === OrderType.DineIn ? `MESA ${order.tableId}` : order.orderType}</p>
+                    </div>
+                    
+                    <div className="space-y-4">
+                        {order.items.map((item, idx) => (
+                            <div key={idx} className="border-b border-dashed border-black pb-2">
+                                <div className="flex gap-2 items-start">
+                                    <span className="text-xl font-bold">{item.quantity}x</span>
+                                    <div className="flex-1">
+                                        <span className="text-lg font-bold block leading-tight">{item.name}</span>
+                                        {item.selectedOptions && item.selectedOptions.length > 0 && (
+                                            <ul className="ml-2 mt-1 text-sm list-disc pl-4">
+                                                {item.selectedOptions.map((opt, i) => (
+                                                    <li key={i}>{opt.name}</li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                        {item.comments && (
+                                            <p className="text-base font-bold mt-1 uppercase bg-black text-white inline-block px-1">
+                                                NOTA: {item.comments}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {order.generalComments && (
+                        <div className="mt-6 border-2 border-black p-2 font-bold text-lg uppercase text-center">
+                            NOTA GENERAL: {order.generalComments}
+                        </div>
+                    )}
+                    
+                    <div className="mt-8 text-center text-xs border-t border-black pt-2">
+                        <p>Fin de comanda</p>
+                    </div>
+                </div>
+
+                {/* Screen Content */}
+                <div className="print:hidden flex flex-col h-full">
+                    {/* Header */}
+                    <div className="p-6 border-b dark:border-gray-700 flex justify-between items-start bg-gray-50 dark:bg-gray-900/50 rounded-t-xl">
                     <div>
                         <div className="flex items-center gap-2 mb-1">
                             <span className="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded">#{order.id.slice(0, 6).toUpperCase()}</span>
@@ -1540,6 +1593,7 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                              'Completar Pedido'}
                         </button>
                      )}
+                </div>
                 </div>
             </div>
         </div>

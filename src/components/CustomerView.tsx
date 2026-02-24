@@ -319,14 +319,29 @@ export default function CustomerView() {
             const currentSelection = prev[personalization.id] || [];
             const isSelected = currentSelection.some(opt => opt.id === option.id);
             
+            // Single selection mode
             if (personalization.maxSelection === 1) {
+                // If clicking the already selected option, do nothing (or deselect if optional? usually required or radio behavior)
+                // Let's assume radio behavior: clicking a new one replaces the old one.
+                if (isSelected) {
+                     // Optional: allow deselecting if minSelection is 0. For now, let's keep it simple:
+                     // If it's the only one selected, maybe we want to allow deselecting?
+                     // Let's stick to: clicking another replaces. Clicking same toggles off ONLY if not required?
+                     // Simplest UX: Always replace.
+                     return { ...prev, [personalization.id]: [] }; // Allow toggle off
+                }
                 return { ...prev, [personalization.id]: [option] };
             }
 
+            // Multi selection mode
             if (isSelected) {
                 return { ...prev, [personalization.id]: currentSelection.filter(opt => opt.id !== option.id) };
             } else {
+                // Check max limit
                 if (personalization.maxSelection && currentSelection.length >= personalization.maxSelection) {
+                    // Optional: Replace the oldest, or just block?
+                    // User request implies "logic isn't working", maybe they expect it to just work.
+                    // Blocking is standard.
                     return prev;
                 }
                 return { ...prev, [personalization.id]: [...currentSelection, option] };
@@ -541,10 +556,19 @@ export default function CustomerView() {
             }
 
             window.open(`https://wa.me/${settings.branch.whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+            
+            // Reset state and close view
             clearCart();
             setPaymentProof(null);
             setTipAmount(0);
-            setView('confirmation');
+            
+            // If it was a final closing, we are done.
+            // If it was just sending a round (table session), we go back to menu.
+            // If delivery/pickup, we go back to menu (or confirmation screen).
+            
+            // User request: "LA PANTALLA DEBERIA CERRAR UNA VEZ CONFIRMADO EL PEDIDO"
+            // This implies returning to the main menu or a "success" state that auto-closes.
+            setView('menu'); 
             
         } catch(e) {
             alert("Error al procesar el pedido.");
