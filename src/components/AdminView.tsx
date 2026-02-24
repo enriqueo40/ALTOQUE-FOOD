@@ -440,26 +440,27 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
                                     <button 
                                         type="button" 
                                         onClick={() => setShowPersonalizationDropdown(!showPersonalizationDropdown)}
-                                        className="text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-md hover:bg-emerald-700 flex items-center gap-1"
+                                        className="text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-md hover:bg-emerald-700 flex items-center gap-1 shadow-md"
                                     >
-                                        <IconPlus className="h-3 w-3" /> Añadir personalización
+                                        <IconPlus className="h-3 w-3" /> ASIGNAR
                                     </button>
                                     
                                     {showPersonalizationDropdown && (
-                                        <div className="absolute right-0 mt-1 w-56 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10 border dark:border-gray-600 max-h-48 overflow-y-auto">
+                                        <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-md shadow-xl z-20 border dark:border-gray-600 max-h-60 overflow-y-auto">
                                             {availablePersonalizations.length > 0 ? (
                                                 availablePersonalizations.map(p => (
                                                     <button
                                                         key={p.id}
                                                         type="button"
                                                         onClick={() => handleAddPersonalization(p.id)}
-                                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                        className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-0 flex justify-between items-center group"
                                                     >
-                                                        {p.name}
+                                                        <span>{p.name}</span>
+                                                        <IconPlus className="h-3 w-3 opacity-0 group-hover:opacity-100 text-emerald-500 transition-opacity"/>
                                                     </button>
                                                 ))
                                             ) : (
-                                                <div className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">No hay más opciones disponibles</div>
+                                                <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-center">No hay más opciones disponibles</div>
                                             )}
                                         </div>
                                     )}
@@ -469,22 +470,36 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
                             {selectedPersonalizations.length > 0 ? (
                                 <div className="space-y-2">
                                     {selectedPersonalizations.map(pers => (
-                                        <div key={pers.id} className="flex items-center justify-between p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md">
-                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{pers.name}</span>
+                                        <div key={pers.id} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm">
+                                            <div className="flex items-center gap-3">
+                                                <div className="bg-emerald-100 dark:bg-emerald-900/30 p-1.5 rounded-full">
+                                                    <IconGripVertical className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                                                </div>
+                                                <div>
+                                                    <span className="text-sm font-bold text-gray-800 dark:text-gray-200 block">{pers.name}</span>
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400">{pers.options.length} opciones</span>
+                                                </div>
+                                            </div>
                                             <button 
                                                 type="button" 
                                                 onClick={() => handleRemovePersonalization(pers.id)}
-                                                className="text-gray-400 hover:text-red-500 p-1"
+                                                className="text-gray-400 hover:text-red-500 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
+                                                title="Remover personalización"
                                             >
-                                                <IconX className="h-4 w-4" />
+                                                <IconTrash className="h-4 w-4" />
                                             </button>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
-                                <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md">
-                                    Este producto no tiene personalizaciones asignadas.
-                                </p>
+                                <div className="text-center py-6 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md bg-white/50 dark:bg-gray-800/30">
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                                        Este producto no tiene personalizaciones.
+                                    </p>
+                                    <p className="text-xs text-gray-400">
+                                        Usa el botón "ASIGNAR" para agregar opciones.
+                                    </p>
+                                </div>
                             )}
                         </div>
 
@@ -871,93 +886,170 @@ const PersonalizationModal: React.FC<{isOpen: boolean, onClose: () => void, onSa
     if (!isOpen) return null;
     
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-start justify-end">
-            <div className="bg-white dark:bg-gray-800 h-full w-full max-w-3xl flex flex-col relative">
-                <header className="p-6 border-b dark:border-gray-700 flex justify-between items-center sticky top-0 bg-white dark:bg-gray-800 z-10 shrink-0">
-                    <h2 className="text-xl font-semibold">{personalization ? 'Editar' : 'Agregar'} una personalización</h2>
-                    <div className="flex items-center gap-x-4">
-                        <button className="text-sm font-medium text-gray-700 dark:text-gray-200 px-3 py-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 border dark:border-gray-600">Vista previa</button>
-                        <button onClick={onClose} className="text-gray-500 hover:text-gray-800 p-1"><IconX /></button>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-[#151922] w-full max-w-5xl h-[90vh] rounded-xl shadow-2xl flex overflow-hidden border border-gray-800">
+                {/* Left Side: Form */}
+                <div className="flex-1 flex flex-col border-r border-gray-800">
+                    <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-[#151922]">
+                        <h2 className="text-xl font-bold text-white">{personalization ? 'Editar una personalización' : 'Crear una personalización'}</h2>
+                        <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors"><IconX className="h-6 w-6"/></button>
                     </div>
-                </header>
-                <div className="flex flex-1 overflow-hidden">
-                    <form onSubmit={handleSubmit} className="flex-1 flex flex-col w-2/3">
-                        <div className="p-6 flex-1 overflow-y-auto space-y-6">
+                    
+                    <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre de personalización</label>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Instrucciones para el cliente.</p>
-                                <input type="text" value={name} onChange={e => setName(e.target.value)} required className={lightInputClasses}/>
+                                <label className="block text-sm font-medium text-gray-300 mb-1">Nombre de personalización</label>
+                                <p className="text-xs text-gray-500 mb-2">Instrucciones para el cliente.</p>
+                                <input 
+                                    type="text" 
+                                    value={name} 
+                                    onChange={e => setName(e.target.value)} 
+                                    required 
+                                    className="w-full bg-[#1e2330] border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                                    placeholder="Ej: Elige tu salsa"
+                                />
                             </div>
+
                             <div>
-                                <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300">
+                                <label className="block text-sm font-medium text-gray-300 mb-1 flex items-center gap-2">
                                     Etiqueta distintiva
-                                    <IconInfo className="inline h-4 w-4 ml-1 text-gray-400" title="No es visible para tus clientes."/>
+                                    <IconInfo className="h-4 w-4 text-gray-500" title="Uso interno"/>
                                 </label>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">No es visible para tus clientes.</p>
-                                <input type="text" value={label} onChange={e => setLabel(e.target.value)} className={lightInputClasses}/>
+                                <p className="text-xs text-gray-500 mb-2">No es visible para tus clientes.</p>
+                                <input 
+                                    type="text" 
+                                    value={label} 
+                                    onChange={e => setLabel(e.target.value)} 
+                                    className="w-full bg-[#1e2330] border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                                    placeholder="Ej: Salsas"
+                                />
                             </div>
+
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Opciones</label>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Ingredientes, extras, aderezos, etc.</p>
+                                <label className="block text-sm font-medium text-gray-300 mb-1">Opciones</label>
+                                <p className="text-xs text-gray-500 mb-3">Ingredientes, extras, aderezos, etc.</p>
+                                
                                 <div className="space-y-3">
                                     {options.map((opt, index) => (
-                                        <div key={index} className="flex items-center gap-x-2">
-                                            <IconGripVertical className="h-5 w-5 text-gray-400 cursor-grab flex-shrink-0" />
-                                            <input type="text" placeholder="Nombre" value={opt.name} onChange={e => handleOptionChange(index, 'name', e.target.value)} required className={`${lightInputClasses} flex-1`}/>
-                                            <div className="relative flex-shrink-0">
-                                                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500 dark:text-gray-400 text-sm">$</span>
-                                                <input type="number" step="0.01" placeholder="0" value={opt.price} onChange={e => handleOptionChange(index, 'price', e.target.value)} required className={`${lightInputClasses} w-28 pl-7`}/>
+                                        <div key={index} className="flex items-center gap-3 group">
+                                            <IconGripVertical className="h-5 w-5 text-gray-600 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            <input 
+                                                type="text" 
+                                                placeholder="Nombre opción" 
+                                                value={opt.name} 
+                                                onChange={e => handleOptionChange(index, 'name', e.target.value)} 
+                                                required 
+                                                className="flex-1 bg-[#1e2330] border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:ring-1 focus:ring-emerald-500 outline-none"
+                                            />
+                                            <div className="relative w-32">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                                                <input 
+                                                    type="number" 
+                                                    step="0.01" 
+                                                    placeholder="0.00" 
+                                                    value={opt.price} 
+                                                    onChange={e => handleOptionChange(index, 'price', e.target.value)} 
+                                                    required 
+                                                    className="w-full bg-[#1e2330] border border-gray-700 rounded-lg pl-7 pr-3 py-2 text-white placeholder-gray-600 focus:ring-1 focus:ring-emerald-500 outline-none text-right"
+                                                />
                                             </div>
-                                            <button type="button" onClick={() => removeOption(index)} disabled={options.length <= 1} className="text-gray-500 hover:text-red-600 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed"><IconTrash className="h-4 w-4"/> Borrar</button>
+                                            <button 
+                                                type="button" 
+                                                onClick={() => removeOption(index)} 
+                                                disabled={options.length <= 1}
+                                                className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-500"
+                                            >
+                                                <IconTrash className="h-5 w-5"/>
+                                            </button>
                                         </div>
                                     ))}
                                 </div>
-                                <button type="button" onClick={addOption} className="mt-4 text-emerald-600 font-semibold text-sm flex items-center gap-x-2 hover:text-emerald-800">
-                                    <IconPlus className="h-4 w-4" /> Agregar otro opción
+                                
+                                <button 
+                                    type="button" 
+                                    onClick={addOption} 
+                                    className="mt-4 text-emerald-500 hover:text-emerald-400 font-bold text-sm flex items-center gap-2 transition-colors"
+                                >
+                                    <IconPlus className="h-4 w-4" /> Agregar otra opción
                                 </button>
                             </div>
-                            <div className="border-t dark:border-gray-700 pt-6 space-y-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Permitir repetición de opciones</label>
-                                    <div className="flex">
-                                        <button type="button" onClick={() => setAllowRepetition(false)} className={`px-6 py-2 text-sm border focus:outline-none focus:z-10 focus:ring-2 focus:ring-emerald-500 rounded-l-md ${!allowRepetition ? 'bg-white dark:bg-gray-600 border-emerald-500 text-emerald-600 dark:text-white z-10' : 'bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300'}`}>No</button>
-                                        <button type="button" onClick={() => setAllowRepetition(true)} className={`-ml-px px-6 py-2 text-sm border focus:outline-none focus:z-10 focus:ring-2 focus:ring-emerald-500 rounded-r-md ${allowRepetition ? 'bg-white dark:bg-gray-600 border-emerald-500 text-emerald-600 dark:text-white z-10' : 'bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300'}`}>Sí</button>
+
+                            <div className="pt-6 border-t border-gray-800">
+                                <label className="flex items-center gap-3 cursor-pointer group">
+                                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${allowRepetition ? 'bg-emerald-600 border-emerald-600' : 'border-gray-600 bg-[#1e2330]'}`}>
+                                        {allowRepetition && <IconCheck className="h-3 w-3 text-white"/>}
                                     </div>
+                                    <input type="checkbox" checked={allowRepetition} onChange={e => setAllowRepetition(e.target.checked)} className="hidden"/>
+                                    <span className="text-sm text-gray-300 group-hover:text-white transition-colors">Permitir repetición de opciones</span>
+                                </label>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-1">Mínimo de selección</label>
+                                    <input 
+                                        type="number" 
+                                        value={minSelection} 
+                                        onChange={e => setMinSelection(Math.max(0, Number(e.target.value)))} 
+                                        className="w-full bg-[#1e2330] border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-1 focus:ring-emerald-500 outline-none"
+                                    />
                                 </div>
                                 <div>
-                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cantidad que se podrá seleccionar</label>
-                                     <div className="grid grid-cols-2 gap-4">
-                                        <div className="relative">
-                                            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500 dark:text-gray-400 text-sm">Mínimo</span>
-                                            <input 
-                                                type="number" 
-                                                value={minSelection} 
-                                                onChange={e => setMinSelection(Math.max(0, Number(e.target.value)))} 
-                                                className={`${lightInputClasses} text-right pr-4 pl-16`}
-                                            />
-                                        </div>
-                                        <div className="relative">
-                                            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500 dark:text-gray-400 text-sm">Máximo</span>
-                                            <input 
-                                                type="number"
-                                                value={maxSelection ?? ''}
-                                                onChange={e => setMaxSelection(e.target.value === '' ? null : Math.max(minSelection, Number(e.target.value)))}
-                                                placeholder="Sin límite"
-                                                className={`${lightInputClasses} text-right pr-4 pl-16`}
-                                            />
-                                        </div>
-                                     </div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-1">Máximo de selección</label>
+                                    <input 
+                                        type="number" 
+                                        value={maxSelection ?? ''} 
+                                        onChange={e => setMaxSelection(e.target.value === '' ? null : Math.max(minSelection, Number(e.target.value)))} 
+                                        placeholder="Sin límite"
+                                        className="w-full bg-[#1e2330] border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-1 focus:ring-emerald-500 outline-none"
+                                    />
                                 </div>
                             </div>
                         </div>
-                        <footer className="p-6 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex justify-end items-center space-x-3 sticky bottom-0 shrink-0">
-                            <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">Cancelar</button>
-                            <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700">Agregar personalización</button>
-                        </footer>
+
+                        <div className="p-6 border-t border-gray-800 bg-[#151922] flex justify-end gap-3">
+                            <button 
+                                type="button" 
+                                onClick={onClose} 
+                                className="px-6 py-2.5 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-800 hover:text-white font-medium transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                type="submit" 
+                                className="px-6 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 font-bold shadow-lg shadow-emerald-900/20 transition-all active:scale-[0.98]"
+                            >
+                                {personalization ? 'Guardar Cambios' : 'Agregar personalización'}
+                            </button>
+                        </div>
                     </form>
-                    <div className="w-1/3 bg-gray-100 dark:bg-gray-900/50 p-6 border-l dark:border-gray-700">
-                         <h3 className="font-semibold text-gray-800 dark:text-gray-200">Vista previa</h3>
-                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">La vista previa aparecerá aquí a medida que completes el formulario.</p>
+                </div>
+
+                {/* Right Side: Preview */}
+                <div className="w-1/3 bg-[#0f172a] border-l border-gray-800 p-8 hidden lg:block overflow-y-auto">
+                    <h3 className="text-lg font-bold text-white mb-6">Vista previa</h3>
+                    
+                    <div className="bg-[#1e293b] rounded-xl border border-gray-700 p-6 shadow-xl">
+                        <h4 className="font-bold text-white text-lg mb-1">{name || 'Nombre de personalización'}</h4>
+                        <p className="text-sm text-gray-400 mb-4">Selecciona hasta {maxSelection || 'X'} opciones</p>
+                        
+                        <div className="space-y-3">
+                            {options.map((opt, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-3 rounded-lg border border-gray-700 bg-[#151922]/50 hover:bg-[#151922] transition-colors cursor-pointer group">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-5 h-5 rounded-full border border-gray-500 group-hover:border-emerald-500 transition-colors"></div>
+                                        <span className="text-gray-300 group-hover:text-white">{opt.name || 'Opción ' + (idx + 1)}</span>
+                                    </div>
+                                    {Number(opt.price) > 0 && (
+                                        <span className="text-emerald-400 font-bold text-sm">+${Number(opt.price).toFixed(2)}</span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    <div className="mt-8 text-center text-gray-500 text-sm">
+                        <p>Así es como tus clientes verán esta opción en el menú.</p>
                     </div>
                 </div>
             </div>
@@ -1413,6 +1505,18 @@ const MenuManagement: React.FC = () => {
 
 const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onUpdateStatus: (id: string, status: OrderStatus) => void; onUpdatePayment: (id: string, status: PaymentStatus) => void }> = ({ order, onClose, onUpdateStatus, onUpdatePayment }) => {
     const [isClosing, setIsClosing] = useState(false);
+    const [showMenu, setShowMenu] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setShowMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     if (!order) return null;
 
@@ -1426,6 +1530,19 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
 
     const handlePrint = () => {
         window.print();
+        setShowMenu(false);
+    };
+
+    const handleEditOrder = () => {
+        alert("Función de editar pedido en desarrollo.");
+        setShowMenu(false);
+    };
+
+    const handleCancelOrder = () => {
+        if(window.confirm('¿Cancelar pedido?')) {
+            onUpdateStatus(order.id, OrderStatus.Cancelled);
+        }
+        setShowMenu(false);
     };
 
     const handleAdvanceStatus = (nextStatus: OrderStatus) => {
@@ -1439,21 +1556,28 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
 
     const formattedDate = new Date(order.createdAt).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: 'numeric', minute: 'numeric', hour12: true });
 
-    const steps = [
-        { status: OrderStatus.Pending, label: 'PENDIENTE', icon: IconClock },
-        { status: OrderStatus.Confirmed, label: 'CONFIRMADO', icon: IconCheck },
-        { status: OrderStatus.Preparing, label: 'PREPARANDO', icon: IconReceipt },
-        { status: OrderStatus.Ready, label: 'LISTO', icon: IconCheck },
-        { status: OrderStatus.Completed, label: 'ENTREGADO', icon: IconCheck },
-    ];
-
-    const currentStepIndex = steps.findIndex(s => s.status === order.status);
     const isCancelled = order.status === OrderStatus.Cancelled;
+
+    // Helper to get status badge style and label
+    const getStatusInfo = (status: OrderStatus) => {
+        switch (status) {
+            case OrderStatus.Pending: return { label: 'Nuevo', className: 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30' };
+            case OrderStatus.Confirmed: return { label: 'Confirmado', className: 'bg-blue-500/20 text-blue-500 border-blue-500/30' };
+            case OrderStatus.Preparing: return { label: 'Preparando', className: 'bg-orange-500/20 text-orange-500 border-orange-500/30' };
+            case OrderStatus.Ready: return { label: 'Listo', className: 'bg-purple-500/20 text-purple-500 border-purple-500/30' };
+            case OrderStatus.Delivering: return { label: 'En camino', className: 'bg-cyan-500/20 text-cyan-500 border-cyan-500/30' };
+            case OrderStatus.Completed: return { label: 'Completado', className: 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30' };
+            case OrderStatus.Cancelled: return { label: 'Cancelado', className: 'bg-red-500/20 text-red-500 border-red-500/30' };
+            default: return { label: status, className: 'bg-gray-500/20 text-gray-500' };
+        }
+    };
+
+    const statusInfo = getStatusInfo(order.status);
 
     return (
         <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${isClosing ? 'pointer-events-none' : ''}`}>
             <div className={`absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity duration-300 ${isClosing ? 'opacity-0' : 'opacity-100'}`} onClick={handleClose}></div>
-            <div className={`bg-[#1e293b] w-full max-w-5xl rounded-xl shadow-2xl transform transition-all duration-300 flex flex-col max-h-[95vh] border border-gray-700 ${isClosing ? 'scale-95 opacity-0 translate-y-4' : 'scale-100 opacity-100 translate-y-0'}`}>
+            <div className={`bg-[#151922] w-full max-w-5xl rounded-xl shadow-2xl transform transition-all duration-300 flex flex-col max-h-[95vh] border border-gray-800 ${isClosing ? 'scale-95 opacity-0 translate-y-4' : 'scale-100 opacity-100 translate-y-0'}`}>
                 
                 {/* Print-only Ticket (Comanda) */}
                 <div className="hidden print:block fixed inset-0 z-[9999] bg-white p-8 m-0 w-full h-full overflow-hidden text-black font-mono leading-tight">
@@ -1513,21 +1637,46 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                 {/* Screen Content */}
                 <div className="print:hidden flex flex-col h-full text-gray-100">
                     {/* Header */}
-                    <div className="p-6 border-b border-gray-700 bg-[#0f172a] rounded-t-xl shrink-0">
-                        <div className="flex justify-between items-start mb-4">
-                            <div className="flex items-center gap-4">
-                                <div className="bg-gray-800 px-3 py-1 rounded text-sm font-mono text-gray-400">
+                    <div className="p-6 border-b border-gray-800 bg-[#151922] rounded-t-xl shrink-0">
+                        <div className="flex justify-between items-center mb-6">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-gray-800 px-3 py-1.5 rounded text-xs font-mono text-gray-400 border border-gray-700">
                                     #{order.id.slice(0, 6).toUpperCase()}
                                 </div>
                                 <span className="text-gray-400 text-sm">{formattedDate}</span>
-                                <span className="bg-orange-500/20 text-orange-400 text-xs font-bold px-2 py-1 rounded border border-orange-500/30">Nuevo</span>
+                                <span className={`text-xs font-bold px-2 py-1 rounded border ${statusInfo.className}`}>
+                                    {statusInfo.label}
+                                </span>
                             </div>
                             
-                            <div className="flex items-center gap-3">
-                                <button onClick={handlePrint} className="px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-sm font-bold text-gray-300 hover:bg-gray-700 flex items-center gap-2 transition-colors">
+                            <div className="flex items-center gap-3 relative" ref={menuRef}>
+                                <button onClick={handlePrint} className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm font-bold text-gray-300 hover:bg-gray-700 flex items-center gap-2 transition-colors">
                                     <IconPrinter className="h-4 w-4"/> Imprimir
                                 </button>
-                                <button onClick={handleClose} className="p-2 hover:bg-gray-700 rounded-full transition-colors text-gray-400 hover:text-white">
+                                
+                                <button 
+                                    onClick={() => setShowMenu(!showMenu)}
+                                    className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
+                                >
+                                    <IconMoreVertical className="h-5 w-5"/>
+                                </button>
+
+                                {showMenu && (
+                                    <div className="absolute right-0 top-full mt-2 w-56 bg-[#1e2330] border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                                        <button onClick={handleEditOrder} className="w-full text-left px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-white flex items-center gap-3 transition-colors">
+                                            <IconEdit className="h-4 w-4"/> Editar pedido
+                                        </button>
+                                        <button onClick={handlePrint} className="w-full text-left px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-white flex items-center gap-3 transition-colors">
+                                            <IconPrinter className="h-4 w-4"/> Imprimir comanda
+                                        </button>
+                                        <div className="border-t border-gray-700 my-1"></div>
+                                        <button onClick={handleCancelOrder} className="w-full text-left px-4 py-3 text-sm text-red-400 hover:bg-red-900/20 hover:text-red-300 flex items-center gap-3 transition-colors">
+                                            <IconTrash className="h-4 w-4"/> Cancelar pedido
+                                        </button>
+                                    </div>
+                                )}
+
+                                <button onClick={handleClose} className="p-2 hover:bg-gray-800 rounded-full transition-colors text-gray-400 hover:text-white ml-2">
                                     <IconX className="h-6 w-6"/>
                                 </button>
                             </div>
@@ -1543,62 +1692,65 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                     </div>
 
                     {/* Content Grid */}
-                    <div className="flex-1 overflow-y-auto p-6 bg-[#0f172a]">
-                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="flex-1 overflow-y-auto p-6 bg-[#151922]">
+                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                             {/* Left Column: Order Details */}
-                            <div className="lg:col-span-2 space-y-6">
-                                 <div className="flex items-center gap-2 mb-2">
-                                     <IconReceipt className="h-5 w-5 text-gray-400"/>
-                                     <h3 className="font-bold text-gray-100 text-lg">Detalle del pedido</h3>
-                                 </div>
-                                 <div className="space-y-3">
-                                     {order.items.map((item, idx) => (
-                                         <div key={idx} className="flex justify-between items-center p-4 bg-[#1e293b] rounded-xl border border-gray-700">
-                                             <div className="flex items-center gap-4">
-                                                 <span className="font-black text-emerald-500 text-xl">{item.quantity}x</span>
-                                                 <div>
-                                                     <p className="font-bold text-gray-200 text-lg">{item.name}</p>
-                                                     {item.selectedOptions && item.selectedOptions.length > 0 && (
-                                                         <div className="flex flex-wrap gap-1 mt-1">
-                                                             {item.selectedOptions.map((opt, i) => (
-                                                                 <span key={i} className="text-xs text-gray-400">{opt.name}{i < item.selectedOptions!.length - 1 ? ',' : ''}</span>
-                                                             ))}
-                                                         </div>
-                                                     )}
-                                                     {item.comments && <p className="text-sm text-orange-400 italic mt-1">Nota: {item.comments}</p>}
-                                                 </div>
-                                             </div>
-                                             <span className="font-bold text-gray-300 text-lg">${(item.price * item.quantity).toFixed(2)}</span>
-                                         </div>
-                                     ))}
-                                 </div>
-                                 
-                                 {order.generalComments && (
-                                     <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-sm text-yellow-200 flex items-start gap-3">
-                                         <span className="text-2xl">📝</span>
-                                         <div>
-                                             <strong className="block mb-1 uppercase tracking-wide text-xs text-yellow-500">Nota general del cliente</strong>
-                                             <p className="font-medium text-lg">{order.generalComments}</p>
-                                         </div>
+                            <div className="lg:col-span-2 space-y-8">
+                                 {/* Order Items */}
+                                 <div>
+                                     <div className="flex items-center gap-2 mb-4">
+                                         <IconReceipt className="h-5 w-5 text-gray-400"/>
+                                         <h3 className="font-bold text-white text-lg">Detalle del pedido</h3>
                                      </div>
-                                 )}
+                                     <div className="space-y-1 bg-[#1e2330] rounded-xl border border-gray-800 overflow-hidden">
+                                         {order.items.map((item, idx) => (
+                                             <div key={idx} className="flex justify-between items-center p-4 border-b border-gray-800 last:border-0 hover:bg-gray-800/50 transition-colors">
+                                                 <div className="flex items-center gap-4">
+                                                     <span className="font-black text-emerald-500 text-xl w-8 text-center">{item.quantity}x</span>
+                                                     <div>
+                                                         <p className="font-bold text-gray-200 text-lg">{item.name}</p>
+                                                         {item.selectedOptions && item.selectedOptions.length > 0 && (
+                                                             <div className="flex flex-wrap gap-1 mt-1">
+                                                                 {item.selectedOptions.map((opt, i) => (
+                                                                     <span key={i} className="text-xs text-gray-400">{opt.name}{i < item.selectedOptions!.length - 1 ? ',' : ''}</span>
+                                                                 ))}
+                                                             </div>
+                                                         )}
+                                                         {item.comments && <p className="text-sm text-orange-400 italic mt-1 bg-orange-500/10 px-2 py-0.5 rounded inline-block">Nota: {item.comments}</p>}
+                                                     </div>
+                                                 </div>
+                                                 <span className="font-bold text-gray-300 text-lg">${(item.price * item.quantity).toFixed(2)}</span>
+                                             </div>
+                                         ))}
+                                     </div>
+                                     
+                                     {order.generalComments && (
+                                         <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-sm text-yellow-200 flex items-start gap-3">
+                                             <span className="text-2xl">📝</span>
+                                             <div>
+                                                 <strong className="block mb-1 uppercase tracking-wide text-xs text-yellow-500">Nota general del cliente</strong>
+                                                 <p className="font-medium text-lg">{order.generalComments}</p>
+                                             </div>
+                                         </div>
+                                     )}
+                                 </div>
 
                                  {/* Payment Proof Section */}
-                                 <div className="mt-8">
-                                     <div className="flex items-center gap-2 mb-2">
+                                 <div>
+                                     <div className="flex items-center gap-2 mb-4">
                                          <IconCheck className="h-5 w-5 text-green-500"/>
-                                         <h3 className="font-bold text-gray-100 text-lg">Comprobante de pago</h3>
+                                         <h3 className="font-bold text-white text-lg">Comprobante de pago</h3>
                                      </div>
-                                     <div className="bg-[#1e293b] rounded-xl p-4 border border-gray-700">
+                                     <div className="bg-[#1e2330] rounded-xl p-4 border border-gray-800">
                                          {order.paymentProof ? (
                                              <div className="flex flex-col items-center">
-                                                 <img src={order.paymentProof} alt="Comprobante" className="max-h-64 object-contain rounded-lg mb-4" />
-                                                 <a href={order.paymentProof} download={`comprobante-${order.id}.png`} className="text-blue-400 hover:text-blue-300 text-sm font-bold underline">
-                                                     Descargar imagen
+                                                 <img src={order.paymentProof} alt="Comprobante" className="max-h-80 object-contain rounded-lg mb-4" />
+                                                 <a href={order.paymentProof} download={`comprobante-${order.id}.png`} className="text-blue-400 hover:text-blue-300 text-sm font-bold underline flex items-center gap-2">
+                                                     <IconUpload className="h-4 w-4 rotate-180"/> Descargar imagen
                                                  </a>
                                              </div>
                                          ) : (
-                                             <div className="text-center py-8 text-gray-500">
+                                             <div className="text-center py-12 text-gray-500 border-2 border-dashed border-gray-700 rounded-lg">
                                                  <p>No se adjuntó comprobante de pago.</p>
                                              </div>
                                          )}
@@ -1607,24 +1759,35 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                             </div>
                             
                             {/* Right Column: Delivery & Payment */}
-                            <div className="space-y-6">
+                            <div className="space-y-8">
                                 {/* Delivery Info */}
                                 <div>
-                                    <div className="flex items-center gap-2 mb-2">
+                                    <div className="flex items-center gap-2 mb-4">
                                         <IconLocationMarker className="h-5 w-5 text-gray-400"/>
-                                        <h3 className="font-bold text-gray-100 text-lg">Datos de entrega</h3>
+                                        <h3 className="font-bold text-white text-lg">Datos de entrega</h3>
                                     </div>
-                                    <div className="bg-[#1e293b] rounded-xl p-4 border border-gray-700 space-y-4">
-                                        <div className="flex justify-between items-center p-3 bg-[#0f172a] rounded-lg border border-gray-800">
+                                    <div className="bg-[#1e2330] rounded-xl p-5 border border-gray-800 space-y-4">
+                                        <div className="flex justify-between items-center p-3 bg-[#151922] rounded-lg border border-gray-700">
                                             <span className="text-gray-400 text-sm">Tipo</span>
-                                            <span className="font-bold text-white text-sm">{order.orderType === OrderType.Delivery ? 'Delivery' : 'Para llevar'}</span>
+                                            <span className="font-bold text-white text-sm">{order.orderType === OrderType.Delivery ? 'Delivery' : order.orderType === OrderType.TakeAway ? 'Para llevar' : 'Mesa'}</span>
                                         </div>
                                         
                                         {order.orderType === OrderType.Delivery && (
-                                            <div className="p-3 bg-[#0f172a] rounded-lg border border-gray-800">
+                                            <div className="p-4 bg-[#151922] rounded-lg border border-gray-700">
                                                 <p className="font-bold text-white mb-1">{order.customer.address.calle} #{order.customer.address.numero}</p>
                                                 <p className="text-gray-400 text-sm">{order.customer.address.colonia}</p>
-                                                {order.customer.address.referencias && <p className="text-xs italic text-gray-500 mt-2">"{order.customer.address.referencias}"</p>}
+                                                {order.customer.address.referencias && <p className="text-xs italic text-gray-500 mt-2 bg-gray-800 p-2 rounded">"{order.customer.address.referencias}"</p>}
+                                                
+                                                {order.customer.address.googleMapsLink && (
+                                                    <a 
+                                                        href={order.customer.address.googleMapsLink} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer"
+                                                        className="mt-3 flex items-center justify-center gap-2 w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-bold text-sm shadow-md"
+                                                    >
+                                                        <IconLocationMarker className="h-4 w-4"/> Ver en Mapa
+                                                    </a>
+                                                )}
                                             </div>
                                         )}
                                         {order.tableId && (
@@ -1638,22 +1801,37 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
 
                                 {/* Payment Info */}
                                 <div>
-                                    <div className="flex items-center gap-2 mb-2">
+                                    <div className="flex items-center gap-2 mb-4">
                                         <IconPayment className="h-5 w-5 text-gray-400"/>
-                                        <h3 className="font-bold text-gray-100 text-lg">Pago</h3>
+                                        <h3 className="font-bold text-white text-lg">Pago</h3>
                                     </div>
-                                    <div className="bg-[#1e293b] rounded-xl p-6 border border-gray-700 text-center">
-                                        <p className="text-4xl font-black text-emerald-500 mb-4">${order.total.toFixed(2)}</p>
-                                        
-                                        <button 
-                                            onClick={() => onUpdatePayment(order.id, order.paymentStatus === 'paid' ? 'pending' : 'paid')}
-                                            className={`w-full py-3 rounded-lg font-bold text-sm mb-2 transition-colors ${order.paymentStatus === 'paid' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 hover:bg-emerald-500/30' : 'bg-yellow-500 text-gray-900 hover:bg-yellow-400'}`}
-                                        >
-                                            {order.paymentStatus === 'paid' ? 'PAGADO' : 'MARCAR PAGADO'}
-                                        </button>
-                                        <p className="text-xs text-gray-500 uppercase tracking-wider font-bold">
-                                            {order.paymentStatus === 'paid' ? 'El pedido ha sido pagado' : 'Pago pendiente'}
-                                        </p>
+                                    <div className="bg-[#1e2330] rounded-xl p-8 border border-gray-800 text-center relative overflow-hidden">
+                                        <div className="relative z-10">
+                                            <p className="text-5xl font-black text-emerald-500 mb-6 tracking-tight">${order.total.toFixed(2)}</p>
+                                            
+                                            {order.paymentStatus === 'paid' ? (
+                                                <div className="w-full py-3 bg-emerald-900/30 border border-emerald-500/50 rounded-lg text-emerald-400 font-bold text-sm mb-2 flex items-center justify-center gap-2">
+                                                    <IconCheck className="h-5 w-5"/> PAGADO
+                                                </div>
+                                            ) : (
+                                                <button 
+                                                    onClick={() => onUpdatePayment(order.id, 'paid')}
+                                                    className="w-full py-3 bg-[#fde047] hover:bg-[#facc15] text-gray-900 rounded-lg font-black text-sm mb-2 transition-colors uppercase tracking-wide shadow-lg shadow-yellow-900/20"
+                                                >
+                                                    MARCAR PAGADO
+                                                </button>
+                                            )}
+                                            
+                                            <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mt-4">
+                                                {order.paymentStatus === 'paid' ? 'EL PEDIDO HA SIDO PAGADO' : 'PAGO PENDIENTE'}
+                                            </p>
+                                            
+                                            {order.paymentStatus === 'paid' && (
+                                                <button onClick={() => onUpdatePayment(order.id, 'pending')} className="text-xs text-gray-600 hover:text-gray-400 underline mt-2">
+                                                    Marcar como pendiente
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1661,47 +1839,47 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="p-4 bg-[#1e293b] border-t border-gray-700 flex flex-col sm:flex-row gap-3 justify-end items-center rounded-b-xl shrink-0">
+                    <div className="p-6 bg-[#151922] border-t border-gray-800 flex flex-col sm:flex-row gap-4 justify-end items-center rounded-b-xl shrink-0">
                         {order.status !== OrderStatus.Completed && order.status !== OrderStatus.Cancelled && (
                             <>
                                 {order.status === OrderStatus.Pending && (
-                                    <button onClick={() => handleAdvanceStatus(OrderStatus.Confirmed)} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
+                                    <button onClick={() => handleAdvanceStatus(OrderStatus.Confirmed)} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
                                         <IconCheck className="h-5 w-5"/> Confirmar Pedido
                                     </button>
                                 )}
                                 {order.status === OrderStatus.Confirmed && (
-                                    <button onClick={() => handleAdvanceStatus(OrderStatus.Preparing)} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
-                                        <IconReceipt className="h-5 w-5"/> Enviar a Cocina
+                                    <button onClick={() => handleAdvanceStatus(OrderStatus.Preparing)} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
+                                        <IconReceipt className="h-5 w-5"/> Empezar Preparación
                                     </button>
                                 )}
                                 {order.status === OrderStatus.Preparing && (
-                                    <button onClick={() => handleAdvanceStatus(OrderStatus.Ready)} className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
+                                    <button onClick={() => handleAdvanceStatus(OrderStatus.Ready)} className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
                                         <IconCheck className="h-5 w-5"/> Marcar Listo
                                     </button>
                                 )}
                                 {order.status === OrderStatus.Ready && (
-                                    <button onClick={() => handleAdvanceStatus(order.orderType === OrderType.Delivery ? OrderStatus.Delivering : OrderStatus.Completed)} className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
+                                    <button onClick={() => handleAdvanceStatus(order.orderType === OrderType.Delivery ? OrderStatus.Delivering : OrderStatus.Completed)} className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
                                         {order.orderType === OrderType.Delivery ? 'Enviar Repartidor' : 'Entregar a Cliente'}
                                     </button>
                                 )}
                                 {order.status === OrderStatus.Delivering && (
-                                    <button onClick={() => handleAdvanceStatus(OrderStatus.Completed)} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
+                                    <button onClick={() => handleAdvanceStatus(OrderStatus.Completed)} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
                                         <IconCheck className="h-5 w-5"/> Completar Entrega
                                     </button>
                                 )}
                                 
-                                <button onClick={() => { if(window.confirm('¿Cancelar pedido?')) onUpdateStatus(order.id, OrderStatus.Cancelled); }} className="text-red-500 hover:text-red-400 font-bold px-4 py-2 border border-red-500/20 rounded-lg hover:bg-red-500/10">
-                                    Cancelar
+                                <button onClick={() => { if(window.confirm('¿Cancelar pedido?')) onUpdateStatus(order.id, OrderStatus.Cancelled); }} className="p-4 rounded-xl border border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors">
+                                    <IconTrash className="h-5 w-5"/>
                                 </button>
                             </>
                         )}
                          {order.status === OrderStatus.Completed && (
-                             <div className="flex items-center gap-2 text-emerald-400 font-bold bg-emerald-500/10 px-4 py-2 rounded-lg border border-emerald-500/20">
+                             <div className="flex items-center gap-2 text-emerald-400 font-bold bg-emerald-500/10 px-6 py-4 rounded-xl border border-emerald-500/20">
                                  <IconCheck className="h-5 w-5"/> Pedido Completado
                              </div>
                          )}
                          {order.status === OrderStatus.Cancelled && (
-                             <div className="flex items-center gap-2 text-red-400 font-bold bg-red-500/10 px-4 py-2 rounded-lg border border-red-500/20">
+                             <div className="flex items-center gap-2 text-red-400 font-bold bg-red-500/10 px-6 py-4 rounded-xl border border-red-500/20">
                                  <IconX className="h-5 w-5"/> Pedido Cancelado
                              </div>
                          )}

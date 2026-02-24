@@ -25,7 +25,7 @@ const orderInsertListeners: OrderCallback[] = [];
 const orderUpdateListeners: OrderCallback[] = [];
 
 // Helper to add timeout to any promise
-const withTimeout = <T>(promise: Promise<T> | any, timeoutMs: number = 10000): Promise<T> => {
+const withTimeout = <T>(promise: Promise<T> | any, timeoutMs: number = 30000): Promise<T> => {
     return Promise.race([
         promise as Promise<T>,
         new Promise<T>((_, reject) => setTimeout(() => reject(new Error("Request timed out")), timeoutMs))
@@ -503,7 +503,7 @@ export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created
     }
 };
 
-export const getActiveOrders = async (): Promise<Order[]> => {
+export const getActiveOrders = async (retries = 1): Promise<Order[]> => {
     try {
         const result: any = await withTimeout(getClient()
             .from('orders')
@@ -515,6 +515,10 @@ export const getActiveOrders = async (): Promise<Order[]> => {
 
         if (error) {
             console.error('Error fetching orders:', error);
+            if (retries > 0) {
+                console.log(`Retrying getActiveOrders... (${retries} attempts left)`);
+                return getActiveOrders(retries - 1);
+            }
             return [];
         }
         
@@ -534,6 +538,10 @@ export const getActiveOrders = async (): Promise<Order[]> => {
         })) as Order[];
     } catch (err) {
         console.error("Failed to get active orders:", err);
+        if (retries > 0) {
+             console.log(`Retrying getActiveOrders after error... (${retries} attempts left)`);
+             return getActiveOrders(retries - 1);
+        }
         return [];
     }
 };
