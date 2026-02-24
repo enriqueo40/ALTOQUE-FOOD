@@ -249,6 +249,7 @@ const ProductListItem: React.FC<{product: Product, onEdit: () => void, onDuplica
                         <div className="p-2">
                             <p className="px-2 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Acciones</p>
                             <button onClick={() => { onEdit(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-x-3 px-2 py-2 text-sm text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"><IconPencil className="h-4 w-4" /> Editar</button>
+                            <button onClick={() => { onEdit(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-x-3 px-2 py-2 text-sm text-emerald-600 dark:text-emerald-400 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/20"><IconGripVertical className="h-4 w-4" /> Personalizar</button>
                             <button onClick={() => { onDuplicate(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-x-3 px-2 py-2 text-sm text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"><IconDuplicate className="h-4 w-4" /> Duplicar</button>
                             <button onClick={() => { onDelete(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-x-3 px-2 py-2 text-sm text-red-600 dark:text-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-900/50"><IconTrash className="h-4 w-4" /> Borrar</button>
                         </div>
@@ -267,7 +268,10 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
     useEffect(() => {
         if (isOpen) {
             if (product) {
-                setFormData(product);
+                setFormData({
+                    ...product,
+                    personalizationIds: product.personalizationIds || (product as any).personalization_ids || []
+                });
             } else {
                 setFormData({
                     name: '',
@@ -352,8 +356,10 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
             imageUrl: formData.imageUrl!,
             categoryId: formData.categoryId!,
             available: formData.available!,
-            personalizationIds: formData.personalizationIds
-        });
+            personalizationIds: formData.personalizationIds,
+            // Ensure snake_case is also sent for Supabase compatibility
+            personalization_ids: formData.personalizationIds
+        } as any);
         onClose();
     };
 
@@ -413,24 +419,27 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
                             {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                         </select>
                         
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Personalizaciones</label>
-                            <div className="space-y-2 max-h-40 overflow-y-auto p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700/50">
+                        <div className="bg-gray-50 dark:bg-gray-700/30 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                                <IconGripVertical className="h-4 w-4 text-emerald-600"/> Personalizaciones
+                            </label>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Selecciona las opciones de personalización disponibles para este producto.</p>
+                            <div className="space-y-2 max-h-40 overflow-y-auto p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800">
                                 {personalizations.map(pers => (
-                                    <div key={pers.id} className="flex items-center">
+                                    <div key={pers.id} className="flex items-center p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded">
                                         <input
                                             id={`pers-${pers.id}`}
                                             type="checkbox"
                                             checked={formData.personalizationIds?.includes(pers.id) || false}
                                             onChange={() => handlePersonalizationToggle(pers.id)}
-                                            className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
+                                            className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded cursor-pointer"
                                         />
-                                        <label htmlFor={`pers-${pers.id}`} className="ml-2 block text-sm text-gray-900 dark:text-gray-100 cursor-pointer select-none">
+                                        <label htmlFor={`pers-${pers.id}`} className="ml-2 block text-sm text-gray-900 dark:text-gray-100 cursor-pointer select-none flex-1">
                                             {pers.name}
                                         </label>
                                     </div>
                                 ))}
-                                {personalizations.length === 0 && <p className="text-xs text-gray-500">No hay personalizaciones creadas.</p>}
+                                {personalizations.length === 0 && <p className="text-xs text-gray-500 text-center py-2">No hay personalizaciones creadas. Ve a la pestaña "Personalizaciones" para crear una.</p>}
                             </div>
                         </div>
 
@@ -1393,8 +1402,6 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
         if (nextStatus === OrderStatus.Preparing) {
             setTimeout(() => window.print(), 500);
         }
-        
-        handleClose();
     };
 
     const formattedDate = new Date(order.createdAt).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: 'numeric', minute: 'numeric', hour12: true });
@@ -1579,8 +1586,11 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
 
                 {/* Footer */}
                 <div className="p-4 bg-white dark:bg-gray-800 border-t dark:border-gray-700 flex gap-3 justify-end">
+                     <button onClick={handleClose} className="px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+                         Cerrar
+                     </button>
                      <button onClick={handlePrint} className="px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
-                         <IconPrinter className="h-5 w-5"/>
+                         <IconPrinter className="h-5 w-5"/> Imprimir
                      </button>
                      
                      {order.status !== OrderStatus.Completed && order.status !== OrderStatus.Cancelled && (

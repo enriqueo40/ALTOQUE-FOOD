@@ -976,7 +976,10 @@ export default function CustomerView() {
                                 <p className="text-gray-400 text-sm mb-6 leading-relaxed font-medium mt-4">{selectedProduct.description}</p>
                                 
                                 {allPersonalizations
-                                    .filter(pers => selectedProduct.personalizationIds?.includes(pers.id))
+                                    .filter(pers => {
+                                        const ids = selectedProduct.personalizationIds || (selectedProduct as any).personalization_ids || [];
+                                        return ids.includes(pers.id);
+                                    })
                                     .map(pers => (
                                         <div key={pers.id} className="mb-6 space-y-3">
                                             <div className="flex justify-between items-center">
