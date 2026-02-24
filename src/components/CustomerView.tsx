@@ -471,6 +471,7 @@ export default function CustomerView() {
                     orderType,
                     tableId: `${tableInfo?.zone} - ${tableInfo?.table}`,
                     paymentStatus: paymentProof ? 'paid' : 'pending',
+                    paymentProof: paymentProof || undefined, // Explicitly pass paymentProof at top level
                     tip: tipAmount,
                     generalComments: 'CIERRE DE CUENTA FINAL'
                 };
@@ -485,6 +486,7 @@ export default function CustomerView() {
                     orderType,
                     tableId: isTableSession ? `${tableInfo?.zone} - ${tableInfo?.table}` : undefined,
                     paymentStatus: 'pending',
+                    paymentProof: paymentProof || undefined, // Explicitly pass paymentProof at top level
                     tip: tipAmount
                 };
                 await saveOrder(newOrderData);
@@ -532,7 +534,9 @@ export default function CustomerView() {
                 msg = [
                     orderType === OrderType.Delivery ? `🧾 *PEDIDO A DOMICILIO*` : `🥡 *PEDIDO PARA RECOGER*`, 
                     `👤 Cliente: ${name}`, `📱 Tel: ${phone}`,
-                    `💰 Total: $${finalTotal.toFixed(2)}`, `💳 Método: ${selectedPayment}`
+                    `--------------------------------`, itemsStr, `--------------------------------`,
+                    `💰 Total: $${finalTotal.toFixed(2)}`, `💳 Método: ${selectedPayment}`,
+                    paymentProof ? '✅ Comprobante adjunto' : ''
                 ].filter(Boolean).join('\n');
             }
 
