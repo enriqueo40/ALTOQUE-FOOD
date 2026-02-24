@@ -126,12 +126,24 @@ const RestaurantHero: React.FC<{
                 <h1 className="text-2xl font-black text-white uppercase tracking-tight mb-1">{company.name}</h1>
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">{branch.alias}</p>
 
-                <div className="flex items-center gap-2 mb-6">
+                <div className="flex items-center gap-2 mb-4">
                     <span className={`w-2 h-2 rounded-full ${isOpenNow ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
                     <span className={`text-xs font-bold uppercase tracking-wider ${isOpenNow ? 'text-emerald-500' : 'text-rose-500'}`}>
                         {isOpenNow ? 'Abierto' : 'Cerrado'}
                     </span>
                 </div>
+
+                {branch.googleMapsLink && (
+                    <a 
+                        href={branch.googleMapsLink} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="mb-6 flex items-center gap-2 text-[10px] font-black text-emerald-400 hover:text-emerald-300 transition-colors uppercase tracking-widest bg-emerald-500/10 px-4 py-2 rounded-full border border-emerald-500/20 hover:bg-emerald-500/20"
+                    >
+                        <IconLocationMarker className="w-3 h-3" />
+                        Ver Ubicación
+                    </a>
+                )}
 
                 {/* Toggle Delivery/Pickup */}
                 <div className="w-full max-w-sm bg-gray-800/50 rounded-full p-1 flex relative border border-gray-700/50 backdrop-blur-sm mb-6">

@@ -259,7 +259,7 @@ const ProductListItem: React.FC<{product: Product, onEdit: () => void, onDuplica
     )
 }
 
-const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (product: Omit<Product, 'id' | 'created_at'> & { id?: string }) => void; product: Product | null; categories: Category[] }> = ({ isOpen, onClose, onSave, product, categories }) => {
+const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (product: Omit<Product, 'id' | 'created_at'> & { id?: string }) => void; product: Product | null; categories: Category[]; personalizations: Personalization[] }> = ({ isOpen, onClose, onSave, product, categories, personalizations }) => {
     const [formData, setFormData] = useState<Partial<Product>>({});
     const [isGenerating, setIsGenerating] = useState(false);
     const inputClasses = "mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 placeholder-gray-400 dark:placeholder-gray-400 dark:text-white";
@@ -276,6 +276,7 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
                     imageUrl: '',
                     categoryId: categories[0]?.id || '',
                     available: true,
+                    personalizationIds: []
                 });
             }
         }
@@ -291,6 +292,17 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
             processedValue = (e.target as HTMLInputElement).checked;
         }
         setFormData(prev => ({ ...prev, [name]: processedValue }));
+    };
+
+    const handlePersonalizationToggle = (id: string) => {
+        setFormData(prev => {
+            const current = prev.personalizationIds || [];
+            if (current.includes(id)) {
+                return { ...prev, personalizationIds: current.filter(pId => pId !== id) };
+            } else {
+                return { ...prev, personalizationIds: [...current, id] };
+            }
+        });
     };
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -340,6 +352,7 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
             imageUrl: formData.imageUrl!,
             categoryId: formData.categoryId!,
             available: formData.available!,
+            personalizationIds: formData.personalizationIds
         });
         onClose();
     };
@@ -400,6 +413,27 @@ const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (pr
                             {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                         </select>
                         
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Personalizaciones</label>
+                            <div className="space-y-2 max-h-40 overflow-y-auto p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700/50">
+                                {personalizations.map(pers => (
+                                    <div key={pers.id} className="flex items-center">
+                                        <input
+                                            id={`pers-${pers.id}`}
+                                            type="checkbox"
+                                            checked={formData.personalizationIds?.includes(pers.id) || false}
+                                            onChange={() => handlePersonalizationToggle(pers.id)}
+                                            className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
+                                        />
+                                        <label htmlFor={`pers-${pers.id}`} className="ml-2 block text-sm text-gray-900 dark:text-gray-100 cursor-pointer select-none">
+                                            {pers.name}
+                                        </label>
+                                    </div>
+                                ))}
+                                {personalizations.length === 0 && <p className="text-xs text-gray-500">No hay personalizaciones creadas.</p>}
+                            </div>
+                        </div>
+
                         <div className="flex items-center">
                             <input id="available" name="available" type="checkbox" checked={formData.available} onChange={handleChange} className="h-4 w-4 text-emerald-500 focus:ring-emerald-400 border-gray-300 rounded" />
                             <label htmlFor="available" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">Disponible para la venta</label>
@@ -502,6 +536,7 @@ const CategoryModal: React.FC<{
 const ProductsView: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [personalizations, setPersonalizations] = useState<Personalization[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -514,12 +549,14 @@ const ProductsView: React.FC = () => {
         try {
             setIsLoading(true);
             setError(null);
-            const [fetchedProducts, fetchedCategories] = await Promise.all([
+            const [fetchedProducts, fetchedCategories, fetchedPersonalizations] = await Promise.all([
                 getProducts(),
-                getCategories()
+                getCategories(),
+                getPersonalizations()
             ]);
             setProducts(fetchedProducts);
             setCategories(fetchedCategories);
+            setPersonalizations(fetchedPersonalizations);
         } catch (err) {
             setError("Error al cargar los datos. Revisa la consola y la configuración de Supabase.");
             console.error(err);
@@ -707,6 +744,7 @@ const ProductsView: React.FC = () => {
                 onSave={handleSaveProduct}
                 product={editingProduct}
                 categories={categories}
+                personalizations={personalizations}
             />
             <CategoryModal
                 isOpen={isCategoryModalOpen}
