@@ -97,66 +97,78 @@ const RestaurantHero: React.FC<{
     }, [currentSchedule]);
 
     return (
-        <div className="relative">
-            <div className="h-48 w-full overflow-hidden relative">
+        <div className="relative pb-6">
+            <div className="h-64 w-full overflow-hidden relative">
                 {branch.coverImageUrl ? (
                     <img src={branch.coverImageUrl} alt="Cover" className="w-full h-full object-cover" />
                 ) : (
                     <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900" />
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0f172a] via-[#0f172a]/60 to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0f172a] via-[#0f172a]/40 to-transparent"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <h2 className="text-4xl md:text-5xl font-black text-white/10 uppercase tracking-tighter text-center leading-none select-none pointer-events-none">
+                        GET YOUR<br/>MEAL<br/>NOW!
+                    </h2>
+                </div>
             </div>
 
-            <div className="px-6 relative -mt-16 flex flex-col items-center text-center pb-8 border-b border-gray-800/50">
-                <div className="w-28 h-28 bg-gray-800 rounded-full p-1 shadow-2xl mb-4 relative z-10 border-4 border-[#0f172a]">
-                     <div className="w-full h-full rounded-full overflow-hidden bg-black flex items-center justify-center">
+            <div className="px-6 relative -mt-20 flex flex-col items-center text-center">
+                <div className="w-32 h-32 bg-[#0f172a] rounded-full p-1.5 shadow-2xl mb-4 relative z-10">
+                     <div className="w-full h-full rounded-full overflow-hidden bg-black flex items-center justify-center border-2 border-gray-800">
                         {branch.logoUrl ? 
                             <img src={branch.logoUrl} alt={`${company.name} logo`} className="w-full h-full object-cover" />
                             :
-                            <span className="text-2xl font-black text-emerald-500">AF</span>
+                            <span className="text-3xl font-black text-emerald-500">AF</span>
                         }
                      </div>
                 </div>
                 
-                <h1 className="text-3xl font-black text-white uppercase tracking-tighter mb-1">{company.name}</h1>
-                <div className="flex flex-col items-center gap-1 mb-6">
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">
-                        {branch.alias}
-                    </p>
-                    {currentSchedule && (
-                        <div className="flex items-center gap-2 mt-2">
-                            <span className={`w-1.5 h-1.5 rounded-full ${isOpenNow ? 'bg-emerald-500' : 'bg-rose-500'} animate-pulse`}></span>
-                            <button onClick={() => setShowSchedule(true)} className={`text-[10px] font-black uppercase tracking-widest ${isOpenNow ? 'text-emerald-400' : 'text-rose-400'} hover:underline`}>
-                                {isOpenNow ? 'Abierto Ahora' : 'Cerrado'}
-                            </button>
-                        </div>
-                    )}
+                <h1 className="text-2xl font-black text-white uppercase tracking-tight mb-1">{company.name}</h1>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">{branch.alias}</p>
+
+                <div className="flex items-center gap-2 mb-6">
+                    <span className={`w-2 h-2 rounded-full ${isOpenNow ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                    <span className={`text-xs font-bold uppercase tracking-wider ${isOpenNow ? 'text-emerald-500' : 'text-rose-500'}`}>
+                        {isOpenNow ? 'Abierto' : 'Cerrado'}
+                    </span>
                 </div>
 
-                {tableInfo ? (
-                    <div className="w-full p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-center gap-3 animate-bounce-subtle">
-                        <IconTableLayout className="h-4 w-4 text-emerald-400" />
-                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Mesa {tableInfo.table} • {tableInfo.zone}</p>
+                {/* Toggle Delivery/Pickup */}
+                <div className="w-full max-w-sm bg-gray-800/50 rounded-full p-1 flex relative border border-gray-700/50 backdrop-blur-sm mb-6">
+                    <div 
+                        className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-gray-700 rounded-full transition-all duration-300 ease-out shadow-lg ${orderType === OrderType.TakeAway ? 'translate-x-[100%] left-1' : 'left-1'}`}
+                    ></div>
+                    <button 
+                        onClick={() => setOrderType(OrderType.Delivery)} 
+                        className={`flex-1 relative z-10 py-3 text-xs font-bold uppercase tracking-widest transition-colors duration-200 ${orderType === OrderType.Delivery ? 'text-emerald-400' : 'text-gray-400 hover:text-gray-200'}`}
+                    >
+                        A domicilio
+                    </button>
+                    <button 
+                        onClick={() => setOrderType(OrderType.TakeAway)} 
+                        className={`flex-1 relative z-10 py-3 text-xs font-bold uppercase tracking-widest transition-colors duration-200 ${orderType === OrderType.TakeAway ? 'text-emerald-400' : 'text-gray-400 hover:text-gray-200'}`}
+                    >
+                        Para recoger
+                    </button>
+                </div>
+
+                {/* Info Grid */}
+                <div className="grid grid-cols-2 gap-8 w-full max-w-sm border-t border-gray-800 pt-6">
+                    <div className="text-center">
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">TIEMPO ENVÍO</p>
+                        <p className="text-white font-bold text-sm">
+                            {shipping.deliveryTime.min} - {shipping.deliveryTime.max} min
+                        </p>
                     </div>
-                ) : (
-                    <div className="w-full max-w-xs bg-gray-800/40 rounded-2xl p-1.5 flex relative border border-gray-700 shadow-inner">
-                        <div 
-                            className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] bg-gray-700 rounded-xl transition-transform duration-300 ease-out shadow-lg ${orderType === OrderType.TakeAway ? 'translate-x-full left-1.5' : 'left-1.5'}`}
-                        ></div>
-                        <button 
-                            onClick={() => setOrderType(OrderType.Delivery)} 
-                            className={`flex-1 relative z-10 py-2.5 text-[10px] font-black uppercase tracking-widest transition-colors duration-200 ${orderType === OrderType.Delivery ? 'text-emerald-400' : 'text-gray-500 hover:text-gray-300'}`}
-                        >
-                            A domicilio
-                        </button>
-                        <button 
-                            onClick={() => setOrderType(OrderType.TakeAway)} 
-                            className={`flex-1 relative z-10 py-2.5 text-[10px] font-black uppercase tracking-widest transition-colors duration-200 ${orderType === OrderType.TakeAway ? 'text-emerald-400' : 'text-gray-500 hover:text-gray-300'}`}
-                        >
-                            Recoger
-                        </button>
+                    <div className="text-center border-l border-gray-800">
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">COSTO ENVÍO</p>
+                        <p className="text-white font-bold text-sm">
+                            {shipping.costType === ShippingCostType.Fixed && shipping.fixedCost 
+                                ? `$${shipping.fixedCost}` 
+                                : (shipping.costType === ShippingCostType.Free ? 'Gratis' : 'Por definir')}
+                        </p>
                     </div>
-                )}
+                </div>
             </div>
             
             {currentSchedule && (
@@ -560,18 +572,18 @@ export default function CustomerView() {
                             <div className="sticky top-0 z-20 bg-[#0f172a]/95 backdrop-blur-md px-4 py-4 space-y-4 border-b border-gray-800/50">
                                 <div className="relative">
                                     <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 h-5 w-5" />
-                                    <input type="text" placeholder="Buscar algo rico..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[#1e293b] border-none rounded-xl py-3.5 pl-12 pr-4 text-sm focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder-gray-500 font-medium" />
+                                    <input type="text" placeholder="Buscar productos..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[#1e293b] border border-gray-700/50 rounded-xl py-3.5 pl-12 pr-4 text-sm focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder-gray-500 font-medium text-white" />
                                 </div>
                                 <div className="flex overflow-x-auto gap-2 no-scrollbar pb-1">
                                     {allCategories.map(cat => (
-                                        <button key={cat.id} onClick={() => scrollToCategory(cat.id)} className={`whitespace-nowrap px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${activeCategory === cat.id ? 'bg-white text-gray-900 border-white' : 'bg-transparent text-gray-400 border-gray-800 hover:border-gray-600'}`}>
+                                        <button key={cat.id} onClick={() => scrollToCategory(cat.id)} className={`whitespace-nowrap px-6 py-2.5 rounded-full text-[11px] font-black uppercase tracking-widest transition-all border ${activeCategory === cat.id ? 'bg-white text-gray-900 border-white shadow-lg shadow-white/10' : 'bg-[#1e293b] text-gray-400 border-gray-700 hover:border-gray-500'}`}>
                                             {cat.name}
                                         </button>
                                     ))}
                                 </div>
                             </div>
 
-                            <div className="p-4 space-y-8 mt-4">
+                            <div className="p-4 space-y-8 mt-4 pb-32">
                                 {allCategories.length === 0 ? (
                                     <div className="py-20 text-center space-y-4">
                                         <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto">
@@ -581,32 +593,63 @@ export default function CustomerView() {
                                     </div>
                                 ) : (
                                     (() => {
+                                        // Debug log
+                                        console.log(`Rendering menu. Categories: ${allCategories.length}, Products: ${allProducts.length}`);
+                                        
                                         const renderedCategories = allCategories.map(cat => {
-                                            const products = allProducts.filter(p => 
-                                                String(p.categoryId) === String(cat.id) && 
-                                                p.available !== false && 
-                                                p.name.toLowerCase().includes(searchTerm.toLowerCase())
-                                            );
+                                            const products = allProducts.filter(p => {
+                                                const matchCat = String(p.categoryId) === String(cat.id);
+                                                const matchAvail = p.available !== false;
+                                                const matchSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+                                                return matchCat && matchAvail && matchSearch;
+                                            });
+                                            
                                             if (products.length === 0) return null;
+                                            
                                             return (
                                                 <div key={cat.id} id={`cat-${cat.id}`}>
-                                                    <h3 className="text-lg font-black text-white uppercase tracking-tighter mb-4 flex items-center gap-2">{cat.name}</h3>
-                                                    <div className="grid gap-3">
-                                                        {products.map(p => (
-                                                            <div key={p.id} onClick={() => setSelectedProduct(p)} className="bg-[#1e293b]/50 p-3 rounded-2xl border border-gray-800/60 flex gap-4 active:scale-[0.98] transition-all cursor-pointer hover:bg-[#1e293b]/80 group relative">
-                                                                <div className="relative shrink-0">
-                                                                    <img src={p.imageUrl} className="w-24 h-24 rounded-xl object-cover shadow-lg group-hover:scale-105 transition-transform" />
+                                                    <div className="flex items-center gap-3 mb-4">
+                                                        <h3 className="text-xl font-black text-white uppercase tracking-tight">{cat.name}</h3>
+                                                        <span className="bg-gray-800 text-gray-400 text-[10px] font-bold px-2 py-0.5 rounded-full">{products.length}</span>
+                                                    </div>
+                                                    <div className="grid gap-4">
+                                                        {products.map(p => {
+                                                            const { price, promotion } = getDiscountedPrice(p, allPromotions);
+                                                            const hasDiscount = price < p.price;
+                                                            const discountPercent = hasDiscount ? Math.round(((p.price - price) / p.price) * 100) : 0;
+
+                                                            return (
+                                                                <div key={p.id} onClick={() => setSelectedProduct(p)} className="bg-[#1e293b] p-3 rounded-xl border border-gray-800 flex gap-4 active:scale-[0.98] transition-all cursor-pointer hover:border-gray-700 group relative overflow-hidden">
+                                                                    <div className="relative shrink-0 w-24 h-24">
+                                                                        <img src={p.imageUrl} className="w-full h-full rounded-lg object-cover shadow-lg" />
+                                                                        {hasDiscount && (
+                                                                            <div className="absolute top-0 left-0 bg-rose-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-br-lg rounded-tl-lg shadow-sm">
+                                                                                -{discountPercent}%
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex-1 flex flex-col justify-between py-1">
+                                                                        <div>
+                                                                            <h4 className="font-bold text-white text-base leading-tight mb-1">{p.name}</h4>
+                                                                            <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed">{p.description}</p>
+                                                                        </div>
+                                                                        <div className="flex items-end justify-between mt-2">
+                                                                            <div className="flex flex-col">
+                                                                                {hasDiscount && (
+                                                                                    <span className="text-xs text-gray-500 line-through font-medium">${p.price.toFixed(2)}</span>
+                                                                                )}
+                                                                                <span className={`text-lg font-black ${hasDiscount ? 'text-rose-500' : 'text-white'}`}>
+                                                                                    ${price.toFixed(2)}
+                                                                                </span>
+                                                                            </div>
+                                                                            <div className="bg-gray-800 p-2 rounded-full text-gray-300 group-hover:bg-emerald-600 group-hover:text-white transition-colors shadow-lg">
+                                                                                <IconPlus className="h-5 w-5" />
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
-                                                                <div className="flex-1 flex flex-col justify-center">
-                                                                    <h4 className="font-bold text-gray-100 group-hover:text-emerald-400 transition-colors leading-snug">{p.name}</h4>
-                                                                    <p className="text-[11px] text-gray-500 line-clamp-2 mt-1 leading-relaxed">{p.description}</p>
-                                                                    <span className="mt-2 font-black text-emerald-400 text-base">${getDiscountedPrice(p, allPromotions).price.toFixed(2)}</span>
-                                                                </div>
-                                                                <div className="absolute bottom-3 right-3 bg-gray-800 p-1.5 rounded-lg text-emerald-400 border border-gray-700 shadow-xl group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                                                                    <IconPlus className="h-4 w-4" />
-                                                                </div>
-                                                            </div>
-                                                        ))}
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
                                             );
