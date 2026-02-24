@@ -367,6 +367,23 @@ export default function CustomerView() {
 
     const handleAddToCartWithDetails = () => {
         if (!selectedProduct) return;
+
+        // Validation: Check required personalizations
+        const productPersonalizations = allPersonalizations.filter(pers => {
+            const ids = selectedProduct.personalizationIds || (selectedProduct as any).personalization_ids || [];
+            return Array.isArray(ids) && ids.includes(pers.id);
+        });
+
+        for (const pers of productPersonalizations) {
+            if (pers.minSelection && pers.minSelection > 0) {
+                const selectedCount = (selectedOptions[pers.id] || []).length;
+                if (selectedCount < pers.minSelection) {
+                    alert(`Por favor, selecciona al menos ${pers.minSelection} opción(es) para "${pers.name}"`);
+                    return;
+                }
+            }
+        }
+
         const { price: basePrice } = getDiscountedPrice(selectedProduct, allPromotions);
         const flatOptions = Object.values(selectedOptions).flat();
         addToCart({ ...selectedProduct, price: basePrice }, productQuantity, productComments, flatOptions);
