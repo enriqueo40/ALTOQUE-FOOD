@@ -155,16 +155,21 @@ const RestaurantHero: React.FC<{
                 {/* Info Grid */}
                 <div className="grid grid-cols-2 gap-8 w-full max-w-sm border-t border-gray-800 pt-6">
                     <div className="text-center">
-                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">TIEMPO ENVÍO</p>
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">
+                            {orderType === OrderType.Delivery ? 'TIEMPO ENVÍO' : 'TIEMPO RECOGER'}
+                        </p>
                         <p className="text-white font-bold text-sm">
-                            {shipping.deliveryTime.min} - {shipping.deliveryTime.max} min
+                            {orderType === OrderType.Delivery 
+                                ? `${shipping.deliveryTime.min} - ${shipping.deliveryTime.max} min`
+                                : `${shipping.pickupTime.min} min`
+                            }
                         </p>
                     </div>
                     <div className="text-center border-l border-gray-800">
                         <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">COSTO ENVÍO</p>
                         <p className="text-white font-bold text-sm">
                             {shipping.costType === ShippingCostType.Fixed && shipping.fixedCost 
-                                ? `$${shipping.fixedCost}` 
+                                ? formatCurrency(shipping.fixedCost, company.currency.code)
                                 : (shipping.costType === ShippingCostType.Free ? 'Gratis' : 'Por definir')}
                         </p>
                     </div>
@@ -220,7 +225,11 @@ const getDiscountedPrice = (product: Product, promotions: Promotion[]): { price:
     return { price: bestPrice, promotion: bestPromo };
 };
 
-const FloatingCartButton = ({ itemCount, total, onClick }: { itemCount: number, total: number, onClick: () => void }) => (
+const formatCurrency = (amount: number, currencyCode: string) => {
+    return `${currencyCode} $${amount.toFixed(2)}`;
+};
+
+const FloatingCartButton = ({ itemCount, total, onClick, currencyCode }: { itemCount: number, total: number, onClick: () => void, currencyCode: string }) => (
     <div className="fixed bottom-0 left-0 right-0 p-4 z-50 bg-gradient-to-t from-[#0f172a] to-transparent pb-safe">
         <div className="container mx-auto max-w-md">
             <button 
@@ -231,7 +240,7 @@ const FloatingCartButton = ({ itemCount, total, onClick }: { itemCount: number, 
                     {itemCount}
                 </div>
                 <span className="text-lg">Ver Pedido</span>
-                <span className="text-lg">${total.toFixed(2)}</span>
+                <span className="text-lg">{formatCurrency(total, currencyCode)}</span>
             </button>
         </div>
     </div>
@@ -652,10 +661,10 @@ export default function CustomerView() {
                                                                         <div className="flex items-end justify-between mt-2">
                                                                             <div className="flex flex-col">
                                                                                 {hasDiscount && (
-                                                                                    <span className="text-xs text-gray-500 line-through font-medium">${p.price.toFixed(2)}</span>
+                                                                                    <span className="text-xs text-gray-500 line-through font-medium">{formatCurrency(p.price, settings.company.currency.code)}</span>
                                                                                 )}
                                                                                 <span className={`text-lg font-black ${hasDiscount ? 'text-rose-500' : 'text-white'}`}>
-                                                                                    ${price.toFixed(2)}
+                                                                                    {formatCurrency(price, settings.company.currency.code)}
                                                                                 </span>
                                                                             </div>
                                                                             <div className="bg-gray-800 p-2 rounded-full text-gray-300 group-hover:bg-emerald-600 group-hover:text-white transition-colors shadow-lg">
@@ -692,6 +701,7 @@ export default function CustomerView() {
                                     itemCount={cartItems.reduce((acc, item) => acc + item.quantity, 0)} 
                                     total={cartTotal} 
                                     onClick={() => setView('cart')} 
+                                    currencyCode={settings.company.currency.code}
                                 />
                             )}
                         </div>
@@ -706,7 +716,7 @@ export default function CustomerView() {
                                         <div className="flex-1 flex flex-col justify-between"> 
                                             <div className="flex justify-between items-start"> 
                                                 <span className="font-bold text-sm text-white">{i.name}</span> 
-                                                <span className="font-bold text-emerald-400 text-sm">${(i.price * i.quantity).toFixed(2)}</span> 
+                                                <span className="font-bold text-emerald-400 text-sm">{formatCurrency(i.price * i.quantity, settings.company.currency.code)}</span> 
                                             </div> 
                                             {i.selectedOptions && i.selectedOptions.length > 0 && (
                                                 <p className="text-xs text-gray-500 line-clamp-1">
@@ -742,7 +752,7 @@ export default function CustomerView() {
                                 <div className="container mx-auto max-w-md">
                                     <div className="flex justify-between items-center mb-4">
                                         <span className="text-gray-400 text-sm">Total estimado</span>
-                                        <span className="text-2xl font-black text-white">${cartTotal.toFixed(2)}</span>
+                                        <span className="text-2xl font-black text-white">{formatCurrency(cartTotal, settings.company.currency.code)}</span>
                                     </div>
                                     <button 
                                         onClick={() => { setIsFinalClosing(false); setView('checkout'); }} 
@@ -885,15 +895,21 @@ export default function CustomerView() {
                                     <div className="container mx-auto max-w-md space-y-2">
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-400">Subtotal</span>
-                                            <span className="text-white">${baseTotal.toFixed(2)}</span>
+                                            <span className="text-white">{formatCurrency(baseTotal, settings.company.currency.code)}</span>
                                         </div>
+                                        {tipAmount > 0 && (
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-gray-400">Propina</span>
+                                                <span className="text-white">{formatCurrency(tipAmount, settings.company.currency.code)}</span>
+                                            </div>
+                                        )}
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-400">Envío</span>
                                             <span className="text-white">Por cotizar</span>
                                         </div>
                                         <div className="flex justify-between items-center pt-2 border-t border-gray-800 mb-4">
                                             <span className="text-xl font-black text-white">Total</span>
-                                            <span className="text-xl font-black text-white">${finalTotal.toFixed(2)} <span className="text-xs font-normal text-gray-400">+ envío</span></span>
+                                            <span className="text-xl font-black text-white">{formatCurrency(finalTotal, settings.company.currency.code)} <span className="text-xs font-normal text-gray-400">+ envío</span></span>
                                         </div>
                                         <button type="submit" className="w-full bg-emerald-500 text-white py-4 rounded-xl font-bold text-base hover:bg-emerald-600 transition-colors shadow-lg flex items-center justify-center gap-2">
                                             <IconWhatsapp className="h-5 w-5" />
@@ -934,7 +950,7 @@ export default function CustomerView() {
                                                         <div key={opt.id} onClick={() => handleOptionToggle(pers, opt)} className={`p-4 rounded-xl border flex justify-between items-center cursor-pointer transition-all active:scale-[0.98] ${isSelected ? 'bg-emerald-500/10 border-emerald-500' : 'bg-gray-800/50 border-gray-800 hover:bg-gray-800'}`}>
                                                             <span className={`font-bold text-sm ${isSelected ? 'text-white' : 'text-gray-400'}`}>{opt.name}</span>
                                                             <div className="flex items-center gap-3">
-                                                                {Number(opt.price) > 0 && <span className="text-emerald-400 font-black text-xs">+${Number(opt.price).toFixed(2)}</span>}
+                                                                {Number(opt.price) > 0 && <span className="text-emerald-400 font-black text-xs">+{formatCurrency(Number(opt.price), settings.company.currency.code)}</span>}
                                                                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-emerald-500 bg-emerald-500' : 'border-gray-600'}`}>
                                                                     {isSelected && <IconCheck className="w-3 h-3 text-white" />}
                                                                 </div>
@@ -964,7 +980,7 @@ export default function CustomerView() {
 
                                 <button onClick={handleAddToCartWithDetails} className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-white shadow-2xl shadow-emerald-900/40 active:scale-[0.98] transition-all uppercase tracking-[0.2em] text-sm flex justify-between px-8 items-center group">
                                     <span>AGREGAR</span>
-                                    <span className="bg-black/20 px-3 py-1 rounded-lg group-hover:bg-black/30 transition-colors">${currentProductTotalPrice.toFixed(2)}</span>
+                                    <span className="bg-black/20 px-3 py-1 rounded-lg group-hover:bg-black/30 transition-colors">{formatCurrency(currentProductTotalPrice, settings.company.currency.code)}</span>
                                 </button>
                             </div>
                         </div>
