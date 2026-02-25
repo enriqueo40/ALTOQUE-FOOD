@@ -1546,6 +1546,14 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
     };
 
     const handleAdvanceStatus = (nextStatus: OrderStatus) => {
+        // Check payment status before completing or delivering
+        if ((nextStatus === OrderStatus.Completed || nextStatus === OrderStatus.Delivering) && order.paymentStatus !== 'paid') {
+            const confirmed = window.confirm(
+                "ADVERTENCIA: Este pedido NO ha sido marcado como PAGADO.\n\n¿Desea continuar de todos modos?"
+            );
+            if (!confirmed) return;
+        }
+
         onUpdateStatus(order.id, nextStatus);
         
         // Auto-print ticket when moving to Preparing
@@ -1596,6 +1604,15 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                         <div className="mt-4 text-left bg-black text-white p-2 font-bold text-xl uppercase text-center rounded-sm">
                             {order.orderType === OrderType.DineIn ? `MESA ${order.tableId}` : order.orderType === OrderType.Delivery ? 'DOMICILIO' : 'PARA LLEVAR'}
                         </div>
+                        <div className="mt-4 text-left border-b-2 border-black pb-2">
+                            <p className="font-bold text-lg uppercase">{order.customer.name}</p>
+                            <p className="text-sm">{order.customer.phone}</p>
+                            {order.orderType === OrderType.Delivery && (
+                                <p className="text-sm mt-1">
+                                    {order.customer.address.calle} #{order.customer.address.numero}, {order.customer.address.colonia}
+                                </p>
+                            )}
+                        </div>
                     </div>
                     
                     <div className="space-y-6">
@@ -1629,6 +1646,11 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                         </div>
                     )}
                     
+                    <div className="mt-8 flex justify-between items-center border-t-2 border-black pt-4">
+                        <span className="text-xl font-bold">TOTAL</span>
+                        <span className="text-3xl font-black">${order.total.toFixed(2)}</span>
+                    </div>
+
                     <div className="mt-12 text-center text-sm border-t-2 border-black pt-4">
                         <p className="font-bold">--- FIN DE COMANDA ---</p>
                     </div>
@@ -1848,14 +1870,24 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                                     </button>
                                 )}
                                 {order.status === OrderStatus.Confirmed && (
-                                    <button onClick={() => handleAdvanceStatus(OrderStatus.Preparing)} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
-                                        <IconReceipt className="h-5 w-5"/> Empezar Preparación
-                                    </button>
+                                    <>
+                                        <button onClick={() => window.print()} className="w-full sm:w-auto bg-gray-700 hover:bg-gray-600 text-white font-bold py-4 px-6 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
+                                            <IconPrinter className="h-5 w-5"/> Imprimir
+                                        </button>
+                                        <button onClick={() => handleAdvanceStatus(OrderStatus.Preparing)} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
+                                            <IconReceipt className="h-5 w-5"/> Empezar Preparación
+                                        </button>
+                                    </>
                                 )}
                                 {order.status === OrderStatus.Preparing && (
-                                    <button onClick={() => handleAdvanceStatus(OrderStatus.Ready)} className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
-                                        <IconCheck className="h-5 w-5"/> Marcar Listo
-                                    </button>
+                                    <>
+                                        <button onClick={() => window.print()} className="w-full sm:w-auto bg-gray-700 hover:bg-gray-600 text-white font-bold py-4 px-6 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
+                                            <IconPrinter className="h-5 w-5"/> Imprimir
+                                        </button>
+                                        <button onClick={() => handleAdvanceStatus(OrderStatus.Ready)} className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
+                                            <IconCheck className="h-5 w-5"/> Marcar Listo
+                                        </button>
+                                    </>
                                 )}
                                 {order.status === OrderStatus.Ready && (
                                     <button onClick={() => handleAdvanceStatus(order.orderType === OrderType.Delivery ? OrderStatus.Delivering : OrderStatus.Completed)} className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">

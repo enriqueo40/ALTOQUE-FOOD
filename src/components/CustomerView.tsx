@@ -317,40 +317,65 @@ export default function CustomerView() {
     const handleOptionToggle = (personalization: Personalization, option: PersonalizationOption) => {
         setSelectedOptions(prev => {
             const currentSelection = prev[personalization.id] || [];
-            const isSelected = currentSelection.some(opt => opt.id === option.id);
             
-            // Single selection mode
+            // Single selection mode (Radio behavior)
             if (personalization.maxSelection === 1) {
-                // If clicking the already selected option, do nothing (or deselect if optional? usually required or radio behavior)
-                // Let's assume radio behavior: clicking a new one replaces the old one.
-                if (isSelected) {
-                     // Optional: allow deselecting if minSelection is 0. For now, let's keep it simple:
-                     // If it's the only one selected, maybe we want to allow deselecting?
-                     // Let's stick to: clicking another replaces. Clicking same toggles off ONLY if not required?
-                     // Simplest UX: Always replace.
-                     return { ...prev, [personalization.id]: [] }; // Allow toggle off
-                }
+                // Always replace with the new one
                 return { ...prev, [personalization.id]: [option] };
             }
 
             // Multi selection mode
-            if (isSelected) {
-                return { ...prev, [personalization.id]: currentSelection.filter(opt => opt.id !== option.id) };
-            } else {
-                // Check max limit
-                if (personalization.maxSelection && currentSelection.length >= personalization.maxSelection) {
-                    // Optional: Replace the oldest, or just block?
-                    // User request implies "logic isn't working", maybe they expect it to just work.
-                    // Blocking is standard.
+            const isSelected = currentSelection.some(opt => opt.id === option.id);
+            const currentCount = currentSelection.length;
+
+            if (personalization.allowRepetition) {
+                // If repetition is allowed, we can add it again or remove one instance if clicked?
+                // UX decision: Clicking usually toggles or adds. 
+                // For repetition, we probably need +/- buttons, but if we stick to the card click:
+                // Let's make click ADD one, and we need a way to remove.
+                // BUT, the current UI is just a card. 
+                // If I click a selected one, should it remove one instance or add another?
+                // Standard simple UI: Click adds. To remove, maybe we need a small counter UI on the card?
+                // Given the constraints, let's try:
+                // If selected, show a counter. Clicking the main area adds. Clicking a small "-" removes?
+                // For now, let's stick to: Click adds up to max. 
+                // To remove, we might need to clear or have a specific remove action.
+                // actually, let's stick to the previous logic for non-repetition (toggle)
+                // and for repetition: Click adds.
+                
+                if (personalization.maxSelection && currentCount >= personalization.maxSelection) {
+                    // Max reached, can't add more
                     return prev;
                 }
                 return { ...prev, [personalization.id]: [...currentSelection, option] };
+            } else {
+                // No repetition allowed (Toggle behavior)
+                if (isSelected) {
+                    return { ...prev, [personalization.id]: currentSelection.filter(opt => opt.id !== option.id) };
+                } else {
+                    if (personalization.maxSelection && currentCount >= personalization.maxSelection) {
+                        return prev;
+                    }
+                    return { ...prev, [personalization.id]: [...currentSelection, option] };
+                }
             }
         });
     };
 
-    const isOptionSelected = (pid: string, oid: string) => {
-        return (selectedOptions[pid] || []).some(o => o.id === oid);
+    const removeOptionInstance = (personalizationId: string, optionId: string) => {
+        setSelectedOptions(prev => {
+            const currentSelection = prev[personalizationId] || [];
+            const index = currentSelection.findIndex(opt => opt.id === optionId);
+            if (index === -1) return prev;
+            
+            const newSelection = [...currentSelection];
+            newSelection.splice(index, 1);
+            return { ...prev, [personalizationId]: newSelection };
+        });
+    };
+
+    const getOptionCount = (personalizationId: string, optionId: string) => {
+        return (selectedOptions[personalizationId] || []).filter(o => o.id === optionId).length;
     };
 
     const currentProductTotalPrice = useMemo(() => {
@@ -1031,17 +1056,66 @@ export default function CustomerView() {
                                             </div>
                                             <div className="space-y-3">
                                                 {pers.options.map(opt => {
-                                                    const isSelected = isOptionSelected(pers.id, opt.id);
+                                                    const count = getOptionCount(pers.id, opt.id);
+                                                    const isSelected = count > 0;
+                                                    const currentSelectionCount = (selectedOptions[pers.id] || []).length;
+                                                    const maxReached = pers.maxSelection ? currentSelectionCount >= pers.maxSelection : false;
+                                                    
+                                                    // Logic for disabling:
+                                                    // If repetition allowed: Disable ADD if maxReached. Always allow REMOVE if count > 0.
+                                                    // If no repetition: Disable TOGGLE ON if maxReached. Always allow TOGGLE OFF.
+                                                    const isDisabled = !isSelected && maxReached;
+
                                                     return (
                                                         <div 
                                                             key={opt.id} 
-                                                            onClick={() => handleOptionToggle(pers, opt)} 
-                                                            className={`p-4 rounded-xl border flex justify-between items-center cursor-pointer transition-all active:scale-[0.98] group ${isSelected ? 'bg-emerald-500/10 border-emerald-500 shadow-lg shadow-emerald-900/20' : 'bg-gray-800/40 border-gray-700/50 hover:bg-gray-800 hover:border-gray-600'}`}
+                                                            className={`p-4 rounded-xl border flex justify-between items-center transition-all group ${isSelected ? 'bg-emerald-500/10 border-emerald-500 shadow-lg shadow-emerald-900/20' : (isDisabled ? 'opacity-50 cursor-not-allowed bg-gray-800/20 border-gray-800' : 'bg-gray-800/40 border-gray-700/50 hover:bg-gray-800 hover:border-gray-600 cursor-pointer')}`}
+                                                            onClick={() => {
+                                                                if (pers.allowRepetition) {
+                                                                     if (!maxReached) handleOptionToggle(pers, opt);
+                                                                } else {
+                                                                     if (!isDisabled) handleOptionToggle(pers, opt);
+                                                                }
+                                                            }}
                                                         >
-                                                            <div className="flex items-center gap-3">
-                                                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected ? 'border-emerald-500 bg-emerald-500' : 'border-gray-600 group-hover:border-gray-500'}`}>
-                                                                    {isSelected && <IconCheck className="w-3 h-3 text-white" />}
-                                                                </div>
+                                                            <div className="flex items-center gap-3 flex-1">
+                                                                {pers.allowRepetition ? (
+                                                                    <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                                                                        {count > 0 ? (
+                                                                            <div className="flex items-center bg-gray-900 rounded-lg border border-gray-700">
+                                                                                <button 
+                                                                                    onClick={() => removeOptionInstance(pers.id, opt.id)}
+                                                                                    className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                                                                                >
+                                                                                    <IconMinus className="w-3 h-3"/>
+                                                                                </button>
+                                                                                <span className="w-6 text-center text-sm font-bold text-white">{count}</span>
+                                                                                <button 
+                                                                                    onClick={() => {
+                                                                                        if (!maxReached) handleOptionToggle(pers, opt);
+                                                                                    }}
+                                                                                    className={`w-8 h-8 flex items-center justify-center transition-colors ${maxReached ? 'text-gray-600 cursor-not-allowed' : 'text-emerald-500 hover:text-emerald-400'}`}
+                                                                                >
+                                                                                    <IconPlus className="w-3 h-3"/>
+                                                                                </button>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <button 
+                                                                                onClick={() => {
+                                                                                    if (!maxReached) handleOptionToggle(pers, opt);
+                                                                                }}
+                                                                                disabled={isDisabled}
+                                                                                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${isDisabled ? 'border-gray-700' : 'border-gray-600 group-hover:border-gray-500'}`}
+                                                                            >
+                                                                                <IconPlus className="w-3 h-3 text-gray-500"/>
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected ? 'border-emerald-500 bg-emerald-500' : 'border-gray-600 group-hover:border-gray-500'}`}>
+                                                                        {isSelected && <IconCheck className="w-3 h-3 text-white" />}
+                                                                    </div>
+                                                                )}
                                                                 <span className={`font-bold text-sm ${isSelected ? 'text-white' : 'text-gray-300 group-hover:text-white'}`}>{opt.name}</span>
                                                             </div>
                                                             {Number(opt.price) > 0 && <span className="text-emerald-400 font-black text-xs bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20">+{formatCurrency(Number(opt.price), settings.company.currency.code)}</span>}
