@@ -7,7 +7,7 @@ import { Product, Category, Order, OrderStatus, Conversation, AdminChatMessage, 
 import { MOCK_CONVERSATIONS, CURRENCIES } from '../constants';
 import { generateProductDescription, getAdvancedInsights } from '../services/geminiService';
 import { getProducts, getCategories, saveProduct, deleteProduct, saveCategory, deleteCategory, getPersonalizations, savePersonalization, deletePersonalization, getPromotions, savePromotion, deletePromotion, updateProductAvailability, updatePersonalizationOptionAvailability, getZones, saveZone, deleteZone, saveZoneLayout, getAppSettings, saveAppSettings, subscribeToNewOrders, unsubscribeFromChannel, updateOrder, getActiveOrders, saveOrder } from '../services/supabaseService';
-import { IconComponent, IconHome, IconMenu, IconAvailability, IconShare, IconTutorials, IconOrders, IconAnalytics, IconChatAdmin, IconLogout, IconSearch, IconBell, IconEdit, IconPlus, IconTrash, IconSparkles, IconSend, IconMoreVertical, IconExternalLink, IconCalendar, IconChevronDown, IconX, IconReceipt, IconSettings, IconStore, IconDelivery, IconPayment, IconClock, IconTableLayout, IconPrinter, IconChevronUp, IconPencil, IconDuplicate, IconGripVertical, IconPercent, IconInfo, IconTag, IconLogoutAlt, IconSun, IconMoon, IconArrowLeft, IconWhatsapp, IconQR, IconLocationMarker, IconUpload, IconCheck, IconBluetooth, IconUSB, IconToggleOn, IconToggleOff } from '../constants';
+import { IconComponent, IconHome, IconMenu, IconAvailability, IconShare, IconTutorials, IconOrders, IconAnalytics, IconChatAdmin, IconLogout, IconSearch, IconBell, IconEdit, IconPlus, IconMinus, IconTrash, IconSparkles, IconSend, IconMoreVertical, IconExternalLink, IconCalendar, IconChevronDown, IconX, IconReceipt, IconSettings, IconStore, IconDelivery, IconPayment, IconClock, IconTableLayout, IconPrinter, IconChevronUp, IconPencil, IconDuplicate, IconGripVertical, IconPercent, IconInfo, IconTag, IconLogoutAlt, IconSun, IconMoon, IconArrowLeft, IconWhatsapp, IconQR, IconLocationMarker, IconUpload, IconCheck, IconBluetooth, IconUSB, IconToggleOn, IconToggleOff } from '../constants';
 
 const IconEye: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.432 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" className={className} />;
 
@@ -1866,18 +1866,13 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                             <>
                                 {order.status === OrderStatus.Pending && (
                                     <button onClick={() => handleAdvanceStatus(OrderStatus.Confirmed)} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
-                                        <IconCheck className="h-5 w-5"/> Confirmar Pedido
+                                        <IconCheck className="h-5 w-5"/> Confirmar Nuevo Pedido
                                     </button>
                                 )}
                                 {order.status === OrderStatus.Confirmed && (
-                                    <>
-                                        <button onClick={() => window.print()} className="w-full sm:w-auto bg-gray-700 hover:bg-gray-600 text-white font-bold py-4 px-6 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
-                                            <IconPrinter className="h-5 w-5"/> Imprimir
-                                        </button>
-                                        <button onClick={() => handleAdvanceStatus(OrderStatus.Preparing)} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
-                                            <IconReceipt className="h-5 w-5"/> Empezar Preparación
-                                        </button>
-                                    </>
+                                    <button onClick={() => handleAdvanceStatus(OrderStatus.Preparing)} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
+                                        <IconPrinter className="h-5 w-5"/> Empezar Preparación (Imprimir Comanda)
+                                    </button>
                                 )}
                                 {order.status === OrderStatus.Preparing && (
                                     <>
@@ -1891,7 +1886,7 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                                 )}
                                 {order.status === OrderStatus.Ready && (
                                     <button onClick={() => handleAdvanceStatus(order.orderType === OrderType.Delivery ? OrderStatus.Delivering : OrderStatus.Completed)} className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
-                                        {order.orderType === OrderType.Delivery ? 'Enviar Repartidor' : 'Entregar a Cliente'}
+                                        {order.orderType === OrderType.Delivery ? 'Enviar Repartidor' : 'Entregado a Cliente'}
                                     </button>
                                 )}
                                 {order.status === OrderStatus.Delivering && (
@@ -2105,10 +2100,205 @@ const EmptyOrdersView: React.FC<{ onNewOrderClick: () => void }> = ({ onNewOrder
     </div>
 );
 
+
+
+// ... (previous code)
+
+const ManualOrderProductModal: React.FC<{
+    product: Product | null;
+    isOpen: boolean;
+    onClose: () => void;
+    onAddToCart: (product: Product, quantity: number, comments: string, options: PersonalizationOption[]) => void;
+    allPersonalizations: Personalization[];
+}> = ({ product, isOpen, onClose, onAddToCart, allPersonalizations }) => {
+    const [quantity, setQuantity] = useState(1);
+    const [comments, setComments] = useState('');
+    const [selectedOptions, setSelectedOptions] = useState<{ [key: string]: PersonalizationOption[] }>({});
+
+    useEffect(() => {
+        if (isOpen) {
+            setQuantity(1);
+            setComments('');
+            setSelectedOptions({});
+        }
+    }, [isOpen, product]);
+
+    if (!isOpen || !product) return null;
+
+    const productPersonalizations = allPersonalizations.filter(p => 
+        product.personalizationIds?.includes(p.id) || (product as any).personalization_ids?.includes(p.id)
+    );
+
+    const handleOptionToggle = (pers: Personalization, option: PersonalizationOption) => {
+        setSelectedOptions(prev => {
+            const current = prev[pers.id] || [];
+            const isSelected = current.find(o => o.id === option.id);
+            
+            if (pers.allowRepetition) {
+                if (isSelected) {
+                     return { ...prev, [pers.id]: [...current, option] };
+                } else {
+                     return { ...prev, [pers.id]: [...current, option] };
+                }
+            } else {
+                if (pers.maxSelection === 1) {
+                    return { ...prev, [pers.id]: [option] };
+                } else {
+                    if (isSelected) {
+                        return { ...prev, [pers.id]: current.filter(o => o.id !== option.id) };
+                    } else {
+                        if (pers.maxSelection && current.length >= pers.maxSelection) return prev;
+                        return { ...prev, [pers.id]: [...current, option] };
+                    }
+                }
+            }
+        });
+    };
+
+    const getOptionCount = (persId: string, optId: string) => {
+        return (selectedOptions[persId] || []).filter(o => o.id === optId).length;
+    };
+
+    const handleAddOption = (pers: Personalization, opt: PersonalizationOption) => {
+        setSelectedOptions(prev => {
+            const current = prev[pers.id] || [];
+            if (pers.maxSelection && current.length >= pers.maxSelection) return prev;
+            return { ...prev, [pers.id]: [...current, opt] };
+        });
+    };
+
+    const handleRemoveOption = (pers: Personalization, opt: PersonalizationOption) => {
+        setSelectedOptions(prev => {
+            const current = prev[pers.id] || [];
+            const index = current.findIndex(o => o.id === opt.id);
+            if (index === -1) return prev;
+            const newOptions = [...current];
+            newOptions.splice(index, 1);
+            return { ...prev, [pers.id]: newOptions };
+        });
+    };
+
+    const calculateTotal = () => {
+        let total = product.price * quantity;
+        Object.values(selectedOptions).flat().forEach(opt => {
+            total += opt.price * quantity;
+        });
+        return total;
+    };
+
+    const handleConfirm = () => {
+        for (const pers of productPersonalizations) {
+            const count = (selectedOptions[pers.id] || []).length;
+            if (pers.minSelection && count < pers.minSelection) {
+                alert(`Por favor selecciona al menos ${pers.minSelection} opción(es) para "${pers.name}"`);
+                return;
+            }
+        }
+
+        const flatOptions = Object.values(selectedOptions).flat();
+        onAddToCart(product, quantity, comments, flatOptions);
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose}></div>
+            <div className="bg-white dark:bg-gray-900 w-full max-w-lg rounded-2xl shadow-2xl relative z-10 flex flex-col max-h-[90vh] border dark:border-gray-700">
+                <div className="p-6 border-b dark:border-gray-700 flex justify-between items-center">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">{product.name}</h3>
+                    <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"><IconX className="h-6 w-6"/></button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                    <p className="text-gray-600 dark:text-gray-300">{product.description}</p>
+                    
+                    {productPersonalizations.map(pers => (
+                        <div key={pers.id} className="space-y-3">
+                            <div className="flex justify-between">
+                                <h4 className="font-bold text-gray-800 dark:text-gray-200">{pers.name}</h4>
+                                <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
+                                    {(pers.minSelection || 0) > 0 ? 'Requerido' : 'Opcional'} 
+                                    {pers.maxSelection ? ` (Máx ${pers.maxSelection})` : ''}
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-1 gap-2">
+                                {pers.options.map(opt => {
+                                    const count = getOptionCount(pers.id, opt.id);
+                                    const isSelected = count > 0;
+                                    const currentTotal = (selectedOptions[pers.id] || []).length;
+                                    const maxReached = pers.maxSelection ? currentTotal >= pers.maxSelection : false;
+
+                                    return (
+                                        <div key={opt.id} className={`flex items-center justify-between p-3 rounded-lg border ${isSelected ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'}`}>
+                                            <div className="flex items-center gap-3">
+                                                {pers.allowRepetition ? (
+                                                     <div className="flex items-center gap-3">
+                                                         {count > 0 && (
+                                                             <button onClick={() => handleRemoveOption(pers, opt)} className="p-1 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600"><IconMinus className="h-3 w-3"/></button>
+                                                         )}
+                                                         <span className="font-bold w-4 text-center">{count}</span>
+                                                         <button 
+                                                            onClick={() => handleAddOption(pers, opt)} 
+                                                            disabled={maxReached}
+                                                            className={`p-1 rounded ${maxReached ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}
+                                                         >
+                                                             <IconPlus className="h-3 w-3"/>
+                                                         </button>
+                                                     </div>
+                                                ) : (
+                                                    <div onClick={() => handleOptionToggle(pers, opt)} className={`w-5 h-5 rounded-full border flex items-center justify-center cursor-pointer ${isSelected ? 'border-emerald-500 bg-emerald-500' : 'border-gray-400'}`}>
+                                                        {isSelected && <IconCheck className="h-3 w-3 text-white"/>}
+                                                    </div>
+                                                )}
+                                                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{opt.name}</span>
+                                            </div>
+                                            {opt.price > 0 && <span className="text-sm font-bold text-emerald-600">+${opt.price.toFixed(2)}</span>}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ))}
+
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Notas de cocina</label>
+                        <textarea 
+                            value={comments}
+                            onChange={e => setComments(e.target.value)}
+                            placeholder="Sin cebolla, salsa aparte, etc."
+                            className="w-full p-3 border dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none"
+                            rows={3}
+                        />
+                    </div>
+                </div>
+
+                <div className="p-6 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-b-2xl">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-4">
+                            <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="p-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300"><IconMinus className="h-4 w-4"/></button>
+                            <span className="text-xl font-bold text-gray-900 dark:text-white">{quantity}</span>
+                            <button onClick={() => setQuantity(quantity + 1)} className="p-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300"><IconPlus className="h-4 w-4"/></button>
+                        </div>
+                        <span className="text-2xl font-black text-emerald-600">${calculateTotal().toFixed(2)}</span>
+                    </div>
+                    <button 
+                        onClick={handleConfirm}
+                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg transition-transform active:scale-[0.98]"
+                    >
+                        Agregar al Pedido
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [zones, setZones] = useState<Zone[]>([]);
+    const [personalizations, setPersonalizations] = useState<Personalization[]>([]);
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState('all');
     const [orderType, setOrderType] = useState<OrderType>(OrderType.TakeAway);
@@ -2122,13 +2312,15 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
     useEffect(() => {
         if (isOpen) {
             const loadData = async () => {
-                const [p, c, z] = await Promise.all([getProducts(), getCategories(), getZones()]);
+                const [p, c, z, pers] = await Promise.all([getProducts(), getCategories(), getZones(), getPersonalizations()]);
                 setProducts(p);
                 setCategories(c);
                 setZones(z);
+                setPersonalizations(pers);
             };
             loadData();
             clearCart();
+            setSelectedProduct(null);
         }
     }, [isOpen]);
 
@@ -2219,7 +2411,7 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
                             {filteredProducts.map(product => (
                                 <div 
                                     key={product.id} 
-                                    onClick={() => addToCart(product, 1)}
+                                    onClick={() => setSelectedProduct(product)}
                                     className="bg-white dark:bg-gray-800 p-3 rounded-xl border dark:border-gray-700 cursor-pointer hover:border-emerald-500 hover:shadow-md transition-all group"
                                 >
                                     <div className="h-28 w-full bg-gray-200 dark:bg-gray-700 rounded-lg mb-3 overflow-hidden">
@@ -2351,6 +2543,13 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
                     </div>
                 </div>
             </div>
+            <ManualOrderProductModal 
+                product={selectedProduct}
+                isOpen={!!selectedProduct}
+                onClose={() => setSelectedProduct(null)}
+                onAddToCart={addToCart}
+                allPersonalizations={personalizations}
+            />
          </div>
     )
 }
