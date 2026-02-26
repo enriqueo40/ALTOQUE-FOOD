@@ -1861,7 +1861,7 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="p-6 bg-[#151922] border-t border-gray-800 flex flex-col sm:flex-row gap-4 justify-end items-center rounded-b-xl shrink-0">
+                    <div className="p-6 bg-[#151922] border-t border-gray-800 flex flex-col sm:flex-row gap-4 justify-end items-center rounded-b-xl shrink-0 sticky bottom-0 z-20">
                         {order.status !== OrderStatus.Completed && order.status !== OrderStatus.Cancelled && (
                             <>
                                 {order.status === OrderStatus.Pending && (
@@ -2500,6 +2500,14 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
                                         </div>
                                         <div className="flex-1">
                                             <p className="font-bold text-sm line-clamp-1">{item.name}</p>
+                                            {item.selectedOptions && item.selectedOptions.length > 0 && (
+                                                <p className="text-xs text-gray-500 line-clamp-1">
+                                                    {item.selectedOptions.map(opt => opt.name).join(', ')}
+                                                </p>
+                                            )}
+                                            {item.comments && (
+                                                <p className="text-xs text-gray-400 italic line-clamp-1">"{item.comments}"</p>
+                                            )}
                                             <p className="text-xs text-gray-500">${item.price.toFixed(2)}</p>
                                         </div>
                                     </div>
