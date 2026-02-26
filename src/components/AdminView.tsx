@@ -7,6 +7,7 @@ import { Product, Category, Order, OrderStatus, Conversation, AdminChatMessage, 
 import { MOCK_CONVERSATIONS, CURRENCIES } from '../constants';
 import { generateProductDescription, getAdvancedInsights } from '../services/geminiService';
 import { getProducts, getCategories, saveProduct, deleteProduct, saveCategory, deleteCategory, getPersonalizations, savePersonalization, deletePersonalization, getPromotions, savePromotion, deletePromotion, updateProductAvailability, updatePersonalizationOptionAvailability, getZones, saveZone, deleteZone, saveZoneLayout, getAppSettings, saveAppSettings, subscribeToNewOrders, unsubscribeFromChannel, updateOrder, getActiveOrders, saveOrder } from '../services/supabaseService';
+import { getDiscountedPrice } from '../utils/pricing';
 import { IconComponent, IconHome, IconMenu, IconAvailability, IconShare, IconTutorials, IconOrders, IconAnalytics, IconChatAdmin, IconLogout, IconSearch, IconBell, IconEdit, IconPlus, IconMinus, IconTrash, IconSparkles, IconSend, IconMoreVertical, IconExternalLink, IconCalendar, IconChevronDown, IconX, IconReceipt, IconSettings, IconStore, IconDelivery, IconPayment, IconClock, IconTableLayout, IconPrinter, IconChevronUp, IconPencil, IconDuplicate, IconGripVertical, IconPercent, IconInfo, IconTag, IconLogoutAlt, IconSun, IconMoon, IconArrowLeft, IconWhatsapp, IconQR, IconLocationMarker, IconUpload, IconCheck, IconBluetooth, IconUSB, IconToggleOn, IconToggleOff } from '../constants';
 
 const IconEye: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.432 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" className={className} />;
@@ -1583,12 +1584,12 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
     const statusInfo = getStatusInfo(order.status);
 
     return (
-        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${isClosing ? 'pointer-events-none' : ''}`}>
-            <div className={`absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity duration-300 ${isClosing ? 'opacity-0' : 'opacity-100'}`} onClick={handleClose}></div>
-            <div className={`bg-[#151922] w-full max-w-5xl rounded-xl shadow-2xl transform transition-all duration-300 flex flex-col max-h-[95vh] border border-gray-800 ${isClosing ? 'scale-95 opacity-0 translate-y-4' : 'scale-100 opacity-100 translate-y-0'}`}>
+        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 print:static print:p-0 ${isClosing ? 'pointer-events-none' : ''}`}>
+            <div className={`absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity duration-300 print:hidden ${isClosing ? 'opacity-0' : 'opacity-100'}`} onClick={handleClose}></div>
+            <div className={`bg-[#151922] w-full max-w-5xl rounded-xl shadow-2xl transform transition-all duration-300 flex flex-col max-h-[95vh] border border-gray-800 print:static print:max-h-none print:shadow-none print:border-none print:bg-white print:transform-none ${isClosing ? 'scale-95 opacity-0 translate-y-4' : 'scale-100 opacity-100 translate-y-0'}`}>
                 
                 {/* Print-only Ticket (Comanda) */}
-                <div className="hidden print:block fixed inset-0 z-[9999] bg-white p-8 m-0 w-full h-full overflow-hidden text-black font-mono leading-tight">
+                <div className="hidden print:block absolute top-0 left-0 w-full bg-white p-8 m-0 text-black font-mono leading-tight z-[9999]">
                     <div className="text-center mb-6 border-b-2 border-black pb-4">
                         <h1 className="text-4xl font-black uppercase mb-2">COMANDA COCINA</h1>
                         <div className="flex justify-between items-end border-t-2 border-black pt-2 mt-2">
@@ -1623,9 +1624,9 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                                     <div className="flex-1">
                                         <span className="text-2xl font-bold block leading-none mb-2">{item.name}</span>
                                         {item.selectedOptions && item.selectedOptions.length > 0 && (
-                                            <div className="flex flex-wrap gap-x-4 gap-y-1 mb-2">
+                                            <div className="flex flex-col gap-1 mb-2 ml-4">
                                                 {item.selectedOptions.map((opt, i) => (
-                                                    <span key={i} className="text-lg font-medium italic text-gray-800">+ {opt.name}</span>
+                                                    <span key={i} className="text-xl font-bold italic text-gray-800">- {opt.name}</span>
                                                 ))}
                                             </div>
                                         )}
@@ -1725,7 +1726,9 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                                          <h3 className="font-bold text-white text-lg">Detalle del pedido</h3>
                                      </div>
                                      <div className="space-y-1 bg-[#1e2330] rounded-xl border border-gray-800 overflow-hidden">
-                                         {order.items.map((item, idx) => (
+                                         {order.items.map((item, idx) => {
+                                             const optionsPrice = item.selectedOptions ? item.selectedOptions.reduce((sum, opt) => sum + opt.price, 0) : 0;
+                                             return (
                                              <div key={idx} className="flex justify-between items-center p-4 border-b border-gray-800 last:border-0 hover:bg-gray-800/50 transition-colors">
                                                  <div className="flex items-center gap-4">
                                                      <span className="font-black text-emerald-500 text-xl w-8 text-center">{item.quantity}x</span>
@@ -1734,16 +1737,16 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                                                          {item.selectedOptions && item.selectedOptions.length > 0 && (
                                                              <div className="flex flex-wrap gap-1 mt-1">
                                                                  {item.selectedOptions.map((opt, i) => (
-                                                                     <span key={i} className="text-xs text-gray-400">{opt.name}{i < item.selectedOptions!.length - 1 ? ',' : ''}</span>
+                                                                     <span key={i} className="text-xs text-gray-400">{opt.name} {opt.price > 0 ? `(+$${opt.price.toFixed(2)})` : ''}{i < item.selectedOptions!.length - 1 ? ',' : ''}</span>
                                                                  ))}
                                                              </div>
                                                          )}
                                                          {item.comments && <p className="text-sm text-orange-400 italic mt-1 bg-orange-500/10 px-2 py-0.5 rounded inline-block">Nota: {item.comments}</p>}
                                                      </div>
                                                  </div>
-                                                 <span className="font-bold text-gray-300 text-lg">${(item.price * item.quantity).toFixed(2)}</span>
+                                                 <span className="font-bold text-gray-300 text-lg">${((item.price + optionsPrice) * item.quantity).toFixed(2)}</span>
                                              </div>
-                                         ))}
+                                         )})}
                                      </div>
                                      
                                      {order.generalComments && (
@@ -2298,6 +2301,7 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
     const [categories, setCategories] = useState<Category[]>([]);
     const [zones, setZones] = useState<Zone[]>([]);
     const [personalizations, setPersonalizations] = useState<Personalization[]>([]);
+    const [promotions, setPromotions] = useState<Promotion[]>([]);
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState('all');
@@ -2312,11 +2316,12 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
     useEffect(() => {
         if (isOpen) {
             const loadData = async () => {
-                const [p, c, z, pers] = await Promise.all([getProducts(), getCategories(), getZones(), getPersonalizations()]);
+                const [p, c, z, pers, promos] = await Promise.all([getProducts(), getCategories(), getZones(), getPersonalizations(), getPromotions()]);
                 setProducts(p);
                 setCategories(c);
                 setZones(z);
                 setPersonalizations(pers);
+                setPromotions(promos);
             };
             loadData();
             clearCart();
@@ -2350,7 +2355,7 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
             },
             items: cartItems,
             total: cartTotal,
-            status: OrderStatus.Confirmed, // Manual orders start as Confirmed
+            status: OrderStatus.Pending, // Manual orders start as Pending to show full sequence
             branchId: 'main-branch', // Default
             orderType: orderType,
             tableId: orderType === OrderType.DineIn ? selectedTable : undefined,
@@ -2408,24 +2413,37 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
                     {/* Grid */}
                     <div className="flex-1 overflow-y-auto p-4">
                         <div className="grid grid-cols-3 gap-4">
-                            {filteredProducts.map(product => (
+                            {filteredProducts.map(product => {
+                                const { price: discountedPrice, promotion } = getDiscountedPrice(product, promotions);
+                                const hasDiscount = discountedPrice < product.price;
+                                return (
                                 <div 
                                     key={product.id} 
-                                    onClick={() => setSelectedProduct(product)}
-                                    className="bg-white dark:bg-gray-800 p-3 rounded-xl border dark:border-gray-700 cursor-pointer hover:border-emerald-500 hover:shadow-md transition-all group"
+                                    onClick={() => setSelectedProduct({...product, price: discountedPrice})}
+                                    className="bg-white dark:bg-gray-800 p-3 rounded-xl border dark:border-gray-700 cursor-pointer hover:border-emerald-500 hover:shadow-md transition-all group relative"
                                 >
-                                    <div className="h-28 w-full bg-gray-200 dark:bg-gray-700 rounded-lg mb-3 overflow-hidden">
+                                    <div className="h-28 w-full bg-gray-200 dark:bg-gray-700 rounded-lg mb-3 overflow-hidden relative">
                                         <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
+                                        {hasDiscount && (
+                                            <div className="absolute top-0 left-0 bg-rose-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-br-lg rounded-tl-lg shadow-sm">
+                                                -{promotion?.discountType === DiscountType.Percentage ? `${promotion.discountValue}%` : `$${promotion?.discountValue}`}
+                                            </div>
+                                        )}
                                     </div>
                                     <h4 className="font-bold text-gray-800 dark:text-gray-100 text-sm line-clamp-2 leading-tight min-h-[2.5em]">{product.name}</h4>
                                     <div className="flex justify-between items-center mt-2">
-                                        <span className="font-bold text-emerald-600 text-sm">${product.price.toFixed(2)}</span>
+                                        <div className="flex flex-col">
+                                            {hasDiscount && (
+                                                <span className="text-xs text-gray-500 line-through font-medium">${product.price.toFixed(2)}</span>
+                                            )}
+                                            <span className={`font-bold text-sm ${hasDiscount ? 'text-rose-500' : 'text-emerald-600'}`}>${discountedPrice.toFixed(2)}</span>
+                                        </div>
                                         <div className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 p-1 rounded-md">
                                             <IconPlus className="h-4 w-4"/>
                                         </div>
                                     </div>
                                 </div>
-                            ))}
+                            )})}
                         </div>
                     </div>
                 </div>

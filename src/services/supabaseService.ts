@@ -158,12 +158,18 @@ export const getProducts = async (): Promise<Product[]> => {
             console.error("Error fetching products:", error);
             throw error;
         }
-        return (data?.map((p: any) => ({
-            ...p,
-            imageUrl: p.image_url || p.imageUrl, // Handle both just in case
-            categoryId: p.category_id || p.categoryId,
-            personalizationIds: p.personalization_ids || p.personalizationIds
-        })) || []) as Product[];
+        return (data?.map((p: any) => {
+            let pIds = p.personalization_ids || p.personalizationIds || [];
+            if (typeof pIds === 'string') {
+                try { pIds = JSON.parse(pIds); } catch (e) { pIds = []; }
+            }
+            return {
+                ...p,
+                imageUrl: p.image_url || p.imageUrl, // Handle both just in case
+                categoryId: p.category_id || p.categoryId,
+                personalizationIds: pIds
+            };
+        }) || []) as Product[];
     } catch (err) {
         console.error("Failed to get products:", err);
         return [];
@@ -182,7 +188,7 @@ export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & 
         image_url: productData.imageUrl,
         category_id: productData.categoryId,
         available: productData.available,
-        personalization_ids: productData.personalizationIds
+        personalization_ids: Array.isArray(productData.personalizationIds) ? JSON.stringify(productData.personalizationIds) : productData.personalizationIds
     };
 
     const { data, error } = await getClient()
