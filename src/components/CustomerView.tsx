@@ -258,6 +258,14 @@ const FloatingCartButton = ({ itemCount, total, onClick, currencyCode }: { itemC
     </div>
 );
 
+const getProductPersonalizationIds = (product: any) => {
+    let ids = product.personalizationIds || product.personalization_ids || [];
+    if (typeof ids === 'string') {
+        try { ids = JSON.parse(ids); } catch (e) { ids = []; }
+    }
+    return Array.isArray(ids) ? ids : [];
+};
+
 export default function CustomerView() {
     const [view, setView] = useState<'menu' | 'cart' | 'checkout' | 'confirmation' | 'account'>('menu');
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -395,8 +403,8 @@ export default function CustomerView() {
 
         // Validation: Check required personalizations
         const productPersonalizations = allPersonalizations.filter(pers => {
-            const ids = selectedProduct.personalizationIds || (selectedProduct as any).personalization_ids || [];
-            return Array.isArray(ids) && ids.includes(pers.id);
+            const ids = getProductPersonalizationIds(selectedProduct);
+            return ids.includes(pers.id);
         });
 
         for (const pers of productPersonalizations) {
@@ -1026,8 +1034,8 @@ export default function CustomerView() {
                                 
                                 {allPersonalizations
                                     .filter(pers => {
-                                        const ids = selectedProduct.personalizationIds || (selectedProduct as any).personalization_ids || [];
-                                        return Array.isArray(ids) && ids.includes(pers.id);
+                                        const ids = getProductPersonalizationIds(selectedProduct);
+                                        return ids.includes(pers.id);
                                     })
                                     .map(pers => (
                                         <div key={pers.id} className="mb-8 space-y-4 border-b border-gray-800 pb-6 last:border-0">

@@ -261,6 +261,14 @@ const ProductListItem: React.FC<{product: Product, onEdit: () => void, onDuplica
     )
 }
 
+const getProductPersonalizationIds = (prod: any) => {
+    let ids = prod.personalizationIds || prod.personalization_ids || [];
+    if (typeof ids === 'string') {
+        try { ids = JSON.parse(ids); } catch (e) { ids = []; }
+    }
+    return Array.isArray(ids) ? ids : [];
+};
+
 const ProductModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (product: Omit<Product, 'id' | 'created_at'> & { id?: string }) => void; product: Product | null; categories: Category[]; personalizations: Personalization[] }> = ({ isOpen, onClose, onSave, product, categories, personalizations }) => {
     const [formData, setFormData] = useState<Partial<Product>>({});
     const [isGenerating, setIsGenerating] = useState(false);
@@ -826,13 +834,21 @@ const ProductsView: React.FC = () => {
     );
 };
 
-const PersonalizationModal: React.FC<{isOpen: boolean, onClose: () => void, onSave: (p: Omit<Personalization, 'id' | 'created_at'> & { id?: string }) => void, personalization: Personalization | null}> = ({isOpen, onClose, onSave, personalization}) => {
+const PersonalizationModal: React.FC<{
+    isOpen: boolean, 
+    onClose: () => void, 
+    onSave: (p: Omit<Personalization, 'id' | 'created_at'> & { id?: string }, selectedProductIds?: string[]) => void, 
+    personalization: Personalization | null,
+    products?: Product[]
+}> = ({isOpen, onClose, onSave, personalization, products = []}) => {
     const [name, setName] = useState('');
     const [label, setLabel] = useState('');
     const [allowRepetition, setAllowRepetition] = useState(false);
     const [options, setOptions] = useState<Omit<PersonalizationOption, 'id' | 'available'>[]>([{name: '', price: 0}]);
     const [minSelection, setMinSelection] = useState(0);
     const [maxSelection, setMaxSelection] = useState<number | null>(null);
+    const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+    const [searchTerm, setSearchTerm] = useState('');
 
     const lightInputClasses = "w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 placeholder-gray-400 dark:placeholder-gray-400 dark:text-white";
 
@@ -845,6 +861,12 @@ const PersonalizationModal: React.FC<{isOpen: boolean, onClose: () => void, onSa
                 setOptions(personalization.options.map(({id, available, ...rest}) => rest));
                 setMinSelection(personalization.minSelection || 0);
                 setMaxSelection(personalization.maxSelection === undefined ? null : personalization.maxSelection);
+                
+                // Find products that have this personalization
+                const assignedIds = products
+                    .filter(p => getProductPersonalizationIds(p).includes(personalization.id))
+                    .map(p => p.id);
+                setSelectedProductIds(assignedIds);
             } else {
                 setName('');
                 setLabel('');
@@ -852,9 +874,11 @@ const PersonalizationModal: React.FC<{isOpen: boolean, onClose: () => void, onSa
                 setAllowRepetition(false);
                 setMinSelection(0);
                 setMaxSelection(null);
+                setSelectedProductIds([]);
             }
+            setSearchTerm('');
         }
-    }, [isOpen, personalization]);
+    }, [isOpen, personalization, products]);
 
     const handleOptionChange = (index: number, field: 'name' | 'price', value: string) => {
         const newOptions = [...options];
@@ -870,6 +894,14 @@ const PersonalizationModal: React.FC<{isOpen: boolean, onClose: () => void, onSa
         }
     };
 
+    const toggleProductSelection = (productId: string) => {
+        setSelectedProductIds(prev => 
+            prev.includes(productId) 
+                ? prev.filter(id => id !== productId)
+                : [...prev, productId]
+        );
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const newPersonalization = {
@@ -881,10 +913,12 @@ const PersonalizationModal: React.FC<{isOpen: boolean, onClose: () => void, onSa
             maxSelection,
             options: options.map((opt, i) => ({...opt, id: `opt-${Date.now()}-${i}`, available: true }))
         };
-        onSave(newPersonalization);
+        onSave(newPersonalization, selectedProductIds);
     };
     
     if (!isOpen) return null;
+
+    const filteredProducts = products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
     
     return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1006,6 +1040,40 @@ const PersonalizationModal: React.FC<{isOpen: boolean, onClose: () => void, onSa
                                     />
                                 </div>
                             </div>
+
+                            <div className="pt-6 border-t border-gray-800">
+                                <label className="block text-sm font-medium text-gray-300 mb-2">Productos Aplicables</label>
+                                <p className="text-xs text-gray-500 mb-3">Selecciona los productos que tendrán esta personalización.</p>
+                                
+                                <input 
+                                    type="text" 
+                                    placeholder="Buscar productos..." 
+                                    value={searchTerm}
+                                    onChange={e => setSearchTerm(e.target.value)}
+                                    className="w-full bg-[#1e2330] border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:ring-1 focus:ring-emerald-500 outline-none mb-3"
+                                />
+                                
+                                <div className="max-h-48 overflow-y-auto bg-[#1e2330] border border-gray-700 rounded-lg p-2 space-y-1">
+                                    {filteredProducts.length > 0 ? (
+                                        filteredProducts.map(p => (
+                                            <label key={p.id} className="flex items-center gap-3 p-2 hover:bg-gray-800 rounded-md cursor-pointer transition-colors">
+                                                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedProductIds.includes(p.id) ? 'bg-emerald-600 border-emerald-600' : 'border-gray-600 bg-[#151922]'}`}>
+                                                    {selectedProductIds.includes(p.id) && <IconCheck className="h-3 w-3 text-white"/>}
+                                                </div>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={selectedProductIds.includes(p.id)} 
+                                                    onChange={() => toggleProductSelection(p.id)} 
+                                                    className="hidden"
+                                                />
+                                                <span className="text-sm text-gray-300">{p.name}</span>
+                                            </label>
+                                        ))
+                                    ) : (
+                                        <div className="text-center py-4 text-sm text-gray-500">No se encontraron productos</div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
 
                         <div className="p-6 border-t border-gray-800 bg-[#151922] flex justify-end gap-3">
@@ -1060,6 +1128,7 @@ const PersonalizationModal: React.FC<{isOpen: boolean, onClose: () => void, onSa
 
 const PersonalizationsView: React.FC = () => {
     const [personalizations, setPersonalizations] = useState<Personalization[]>([]);
+    const [products, setProducts] = useState<Product[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1069,10 +1138,14 @@ const PersonalizationsView: React.FC = () => {
         try {
             setIsLoading(true);
             setError(null);
-            const data = await getPersonalizations();
-            setPersonalizations(data);
+            const [pData, prodData] = await Promise.all([
+                getPersonalizations(),
+                getProducts()
+            ]);
+            setPersonalizations(pData);
+            setProducts(prodData);
         } catch (err) {
-            setError("No se pudieron cargar las personalizaciones.");
+            setError("No se pudieron cargar los datos.");
             console.error(err);
         } finally {
             setIsLoading(false);
@@ -1088,9 +1161,33 @@ const PersonalizationsView: React.FC = () => {
         setIsModalOpen(true);
     };
 
-    const handleSave = async (personalizationData: Omit<Personalization, 'id' | 'created_at'> & { id?: string }) => {
+    const handleSave = async (personalizationData: Omit<Personalization, 'id' | 'created_at'> & { id?: string }, selectedProductIds?: string[]) => {
         try {
-            await savePersonalization(personalizationData);
+            const savedPers = await savePersonalization(personalizationData);
+            
+            // If selectedProductIds is provided, update products
+            if (selectedProductIds) {
+                // Find products that currently have this personalization
+                const productsWithPers = products.filter(p => getProductPersonalizationIds(p).includes(savedPers.id));
+                
+                // Find products that need it added
+                const productsToAdd = products.filter(p => selectedProductIds.includes(p.id) && !getProductPersonalizationIds(p).includes(savedPers.id));
+                
+                // Find products that need it removed
+                const productsToRemove = productsWithPers.filter(p => !selectedProductIds.includes(p.id));
+                
+                // Update products in DB
+                for (const p of productsToAdd) {
+                    const newIds = [...getProductPersonalizationIds(p), savedPers.id];
+                    await saveProduct({ ...p, personalizationIds: newIds, personalization_ids: newIds } as any);
+                }
+                
+                for (const p of productsToRemove) {
+                    const newIds = getProductPersonalizationIds(p).filter(id => id !== savedPers.id);
+                    await saveProduct({ ...p, personalizationIds: newIds, personalization_ids: newIds } as any);
+                }
+            }
+            
             await fetchData();
             setIsModalOpen(false);
         } catch (error) {
@@ -1149,6 +1246,7 @@ const PersonalizationsView: React.FC = () => {
                 onClose={() => setIsModalOpen(false)}
                 onSave={handleSave}
                 personalization={editingPersonalization}
+                products={products}
             />
         </div>
     );
@@ -2129,7 +2227,7 @@ const ManualOrderProductModal: React.FC<{
     if (!isOpen || !product) return null;
 
     const productPersonalizations = allPersonalizations.filter(p => 
-        product.personalizationIds?.includes(p.id) || (product as any).personalization_ids?.includes(p.id)
+        getProductPersonalizationIds(product).includes(p.id)
     );
 
     const handleOptionToggle = (pers: Personalization, option: PersonalizationOption) => {
@@ -2611,8 +2709,10 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
             setIsLoading(false);
         };
         load();
+    }, []);
 
-        // Realtime Subscription
+    // Realtime Subscription
+    useEffect(() => {
         const channel = subscribeToNewOrders(
             (newOrder) => {
                 // Play simple notification sound if possible (browser policy permitting)
@@ -2628,6 +2728,16 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
             unsubscribeFromChannel();
         };
     }, []);
+
+    // Keep selectedOrder in sync with orders array
+    useEffect(() => {
+        if (selectedOrder) {
+            const updated = orders.find(o => o.id === selectedOrder.id);
+            if (updated && (updated.status !== selectedOrder.status || updated.paymentStatus !== selectedOrder.paymentStatus)) {
+                setSelectedOrder(updated);
+            }
+        }
+    }, [orders, selectedOrder]);
 
     const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
         // Optimistic update
