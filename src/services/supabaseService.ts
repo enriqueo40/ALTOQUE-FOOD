@@ -188,7 +188,7 @@ export const saveProduct = async (product: Omit<Product, 'id' | 'created_at'> & 
         image_url: productData.imageUrl,
         category_id: productData.categoryId,
         available: productData.available,
-        personalization_ids: Array.isArray(productData.personalizationIds) ? JSON.stringify(productData.personalizationIds) : productData.personalizationIds
+        personalization_ids: productData.personalizationIds || []
     };
 
     const { data, error } = await getClient()
