@@ -401,22 +401,6 @@ export default function CustomerView() {
     const handleAddToCartWithDetails = () => {
         if (!selectedProduct) return;
 
-        // Validation: Check required personalizations
-        const productPersonalizations = allPersonalizations.filter(pers => {
-            const ids = getProductPersonalizationIds(selectedProduct);
-            return ids.includes(pers.id);
-        });
-
-        for (const pers of productPersonalizations) {
-            if (pers.minSelection && pers.minSelection > 0) {
-                const selectedCount = (selectedOptions[pers.id] || []).length;
-                if (selectedCount < pers.minSelection) {
-                    alert(`Por favor, selecciona al menos ${pers.minSelection} opción(es) para "${pers.name}"`);
-                    return;
-                }
-            }
-        }
-
         const { price: basePrice } = getDiscountedPrice(selectedProduct, allPromotions);
         const flatOptions = Object.values(selectedOptions).flat();
         addToCart({ ...selectedProduct, price: basePrice }, productQuantity, productComments, flatOptions);
@@ -1043,11 +1027,7 @@ export default function CustomerView() {
                                                 <div>
                                                     <h3 className="font-black text-white uppercase tracking-wider text-base mb-1">{pers.name}</h3>
                                                     <p className="text-xs text-gray-400 font-medium">
-                                                        {pers.minSelection && pers.minSelection > 0 ? (
-                                                            <span className="text-rose-400 font-bold uppercase tracking-wide">Obligatorio</span>
-                                                        ) : (
-                                                            <span className="text-gray-500 font-bold uppercase tracking-wide">Opcional</span>
-                                                        )}
+                                                        <span className="text-gray-500 font-bold uppercase tracking-wide">Opcional</span>
                                                         {pers.maxSelection && pers.maxSelection > 1 && (
                                                             <span className="text-gray-500"> • Máx {pers.maxSelection}</span>
                                                         )}

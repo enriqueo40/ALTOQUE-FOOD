@@ -1655,6 +1655,10 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
 
         onUpdateStatus(order.id, nextStatus);
         
+        if (nextStatus === OrderStatus.Completed && order.paymentStatus !== 'paid') {
+            onUpdatePayment(order.id, 'paid');
+        }
+        
         // Auto-print ticket when moving to Preparing
         if (nextStatus === OrderStatus.Preparing) {
             setTimeout(() => window.print(), 500);
@@ -1672,8 +1676,8 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
             case OrderStatus.Confirmed: return { label: 'Confirmado', className: 'bg-blue-500/20 text-blue-500 border-blue-500/30' };
             case OrderStatus.Preparing: return { label: 'Preparando', className: 'bg-orange-500/20 text-orange-500 border-orange-500/30' };
             case OrderStatus.Ready: return { label: 'Listo', className: 'bg-purple-500/20 text-purple-500 border-purple-500/30' };
-            case OrderStatus.Delivering: return { label: 'En camino', className: 'bg-cyan-500/20 text-cyan-500 border-cyan-500/30' };
-            case OrderStatus.Completed: return { label: 'Completado', className: 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30' };
+            case OrderStatus.Delivering: return { label: order.orderType === OrderType.Delivery ? 'En camino' : 'Entregado/Servido', className: 'bg-cyan-500/20 text-cyan-500 border-cyan-500/30' };
+            case OrderStatus.Completed: return { label: 'Pagado y Cerrado', className: 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30' };
             case OrderStatus.Cancelled: return { label: 'Cancelado', className: 'bg-red-500/20 text-red-500 border-red-500/30' };
             default: return { label: status, className: 'bg-gray-500/20 text-gray-500' };
         }
@@ -1986,13 +1990,13 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                                     </>
                                 )}
                                 {order.status === OrderStatus.Ready && (
-                                    <button onClick={() => handleAdvanceStatus(order.orderType === OrderType.Delivery ? OrderStatus.Delivering : OrderStatus.Completed)} className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
-                                        {order.orderType === OrderType.Delivery ? 'Enviar Repartidor' : 'Entregado a Cliente'}
+                                    <button onClick={() => handleAdvanceStatus(OrderStatus.Delivering)} className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
+                                        {order.orderType === OrderType.Delivery ? 'Enviar Repartidor' : 'Entregar a Cliente / Servir'}
                                     </button>
                                 )}
                                 {order.status === OrderStatus.Delivering && (
                                     <button onClick={() => handleAdvanceStatus(OrderStatus.Completed)} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
-                                        <IconCheck className="h-5 w-5"/> Completar Entrega
+                                        <IconCheck className="h-5 w-5"/> Marcar como Pagado y Cerrado
                                     </button>
                                 )}
                                 
@@ -2018,7 +2022,7 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
     );
 };
 
-const OrderStatusBadge: React.FC<{status: OrderStatus}> = ({status}) => {
+const OrderStatusBadge: React.FC<{status: OrderStatus, orderType?: OrderType}> = ({status, orderType}) => {
     const colors = {
         [OrderStatus.Pending]: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800',
         [OrderStatus.Confirmed]: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800',
@@ -2034,8 +2038,8 @@ const OrderStatusBadge: React.FC<{status: OrderStatus}> = ({status}) => {
         [OrderStatus.Confirmed]: 'Confirmado',
         [OrderStatus.Preparing]: 'Preparando',
         [OrderStatus.Ready]: 'Listo',
-        [OrderStatus.Delivering]: 'En camino',
-        [OrderStatus.Completed]: 'Completado',
+        [OrderStatus.Delivering]: orderType === OrderType.Delivery ? 'En camino' : 'Entregado/Servido',
+        [OrderStatus.Completed]: 'Pagado y Cerrado',
         [OrderStatus.Cancelled]: 'Cancelado',
     };
 
@@ -2114,7 +2118,8 @@ const OrdersKanbanBoard: React.FC<{ orders: Order[], onOrderClick: (order: Order
         { status: OrderStatus.Confirmed, title: 'Confirmados', color: 'border-blue-400 bg-blue-50 dark:bg-blue-900/10' },
         { status: OrderStatus.Preparing, title: 'Preparando', color: 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/10' },
         { status: OrderStatus.Ready, title: 'Listos', color: 'border-purple-400 bg-purple-50 dark:bg-purple-900/10' },
-        { status: OrderStatus.Delivering, title: 'En Reparto', color: 'border-cyan-400 bg-cyan-50 dark:bg-cyan-900/10' },
+        { status: OrderStatus.Delivering, title: 'Entregados / En Reparto', color: 'border-cyan-400 bg-cyan-50 dark:bg-cyan-900/10' },
+        { status: OrderStatus.Completed, title: 'Pagados y Cerrados', color: 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/10' },
     ];
 
     return (
@@ -2173,7 +2178,7 @@ const OrderListView: React.FC<{ orders: Order[], onOrderClick: (order: Order) =>
                                 <TimeAgo date={order.createdAt} />
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                                <OrderStatusBadge status={order.status} />
+                                <OrderStatusBadge status={order.status} orderType={order.orderType} />
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                                  <span className={`px-2 py-1 rounded-md text-xs font-bold ${order.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
@@ -2288,14 +2293,6 @@ const ManualOrderProductModal: React.FC<{
     };
 
     const handleConfirm = () => {
-        for (const pers of productPersonalizations) {
-            const count = (selectedOptions[pers.id] || []).length;
-            if (pers.minSelection && count < pers.minSelection) {
-                alert(`Por favor selecciona al menos ${pers.minSelection} opción(es) para "${pers.name}"`);
-                return;
-            }
-        }
-
         const flatOptions = Object.values(selectedOptions).flat();
         onAddToCart(product, quantity, comments, flatOptions);
         onClose();
@@ -2318,7 +2315,7 @@ const ManualOrderProductModal: React.FC<{
                             <div className="flex justify-between">
                                 <h4 className="font-bold text-gray-800 dark:text-gray-200">{pers.name}</h4>
                                 <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
-                                    {(pers.minSelection || 0) > 0 ? 'Requerido' : 'Opcional'} 
+                                    Opcional 
                                     {pers.maxSelection ? ` (Máx ${pers.maxSelection})` : ''}
                                 </span>
                             </div>
