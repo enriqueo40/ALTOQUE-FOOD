@@ -55,6 +55,7 @@ export const useCart = () => {
 
     return {
         cartItems,
+        setCartItems,
         addToCart,
         removeFromCart,
         updateQuantity,

@@ -1602,7 +1602,7 @@ const MenuManagement: React.FC = () => {
 
 // --- Order Management Components ---
 
-const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onUpdateStatus: (id: string, status: OrderStatus) => void; onUpdatePayment: (id: string, status: PaymentStatus) => void }> = ({ order, onClose, onUpdateStatus, onUpdatePayment }) => {
+const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onUpdateStatus: (id: string, status: OrderStatus) => void; onUpdatePayment: (id: string, status: PaymentStatus) => void; onEditOrder: (order: Order) => void; }> = ({ order, onClose, onUpdateStatus, onUpdatePayment, onEditOrder }) => {
     const [isClosing, setIsClosing] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -1633,7 +1633,7 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
     };
 
     const handleEditOrder = () => {
-        alert("Función de editar pedido en desarrollo.");
+        onEditOrder(order);
         setShowMenu(false);
     };
 
@@ -2394,7 +2394,7 @@ const ManualOrderProductModal: React.FC<{
     );
 };
 
-const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
+const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; orderToEdit?: Order | null }> = ({ isOpen, onClose, orderToEdit }) => {
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [zones, setZones] = useState<Zone[]>([]);
@@ -2407,9 +2407,10 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
     const [selectedTable, setSelectedTable] = useState<string>('');
     const [customerName, setCustomerName] = useState('');
     const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('pending');
+    const [generalComments, setGeneralComments] = useState('');
     
     // Cart logic
-    const { cartItems, addToCart, removeFromCart, updateQuantity, cartTotal, clearCart } = useCart();
+    const { cartItems, setCartItems, addToCart, removeFromCart, updateQuantity, cartTotal, clearCart } = useCart();
 
     useEffect(() => {
         if (isOpen) {
@@ -2422,10 +2423,25 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
                 setPromotions(promos);
             };
             loadData();
-            clearCart();
+            
+            if (orderToEdit) {
+                setCartItems(orderToEdit.items);
+                setCustomerName(orderToEdit.customer.name);
+                setOrderType(orderToEdit.orderType || OrderType.TakeAway);
+                setSelectedTable(orderToEdit.tableId || '');
+                setPaymentStatus(orderToEdit.paymentStatus || 'pending');
+                setGeneralComments(orderToEdit.generalComments || '');
+            } else {
+                clearCart();
+                setCustomerName('');
+                setOrderType(OrderType.TakeAway);
+                setSelectedTable('');
+                setPaymentStatus('pending');
+                setGeneralComments('');
+            }
             setSelectedProduct(null);
         }
-    }, [isOpen]);
+    }, [isOpen, orderToEdit]);
 
     const filteredProducts = useMemo(() => {
         return products.filter(p => {
@@ -2448,23 +2464,28 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
         const newOrder: any = {
             customer: {
                 name: customerName,
-                phone: '',
-                address: { colonia: '', calle: '', numero: '', entreCalles: '', referencias: '' }
+                phone: orderToEdit?.customer.phone || '',
+                address: orderToEdit?.customer.address || { colonia: '', calle: '', numero: '', entreCalles: '', referencias: '' }
             },
             items: cartItems,
             total: cartTotal,
-            status: OrderStatus.Pending, // Manual orders start as Pending to show full sequence
-            branchId: 'main-branch', // Default
+            status: orderToEdit ? orderToEdit.status : OrderStatus.Pending, // Keep status if editing
+            branchId: orderToEdit?.branchId || 'main-branch', // Default
             orderType: orderType,
             tableId: orderType === OrderType.DineIn ? selectedTable : undefined,
-            paymentStatus: paymentStatus
+            paymentStatus: paymentStatus,
+            generalComments: generalComments
         };
 
         try {
-            await saveOrder(newOrder);
+            if (orderToEdit) {
+                await updateOrder(orderToEdit.id, newOrder);
+            } else {
+                await saveOrder(newOrder);
+            }
             onClose();
         } catch (error) {
-            alert("Error al crear pedido");
+            alert("Error al guardar pedido");
         }
     };
     
@@ -2598,6 +2619,17 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
                                 ))}
                             </select>
                         )}
+
+                        {/* General Comments */}
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Comentarios Generales</label>
+                            <textarea 
+                                placeholder="Notas adicionales para el pedido..." 
+                                value={generalComments}
+                                onChange={e => setGeneralComments(e.target.value)}
+                                className="w-full p-2 border dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-emerald-500 outline-none text-sm resize-none h-20"
+                            />
+                        </div>
                     </div>
 
                     {/* Cart Items */}
@@ -2641,6 +2673,14 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
 
                     {/* Footer / Checkout */}
                     <div className="p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                        <div className="mb-4">
+                            <textarea 
+                                placeholder="Comentarios generales del pedido..."
+                                value={generalComments}
+                                onChange={e => setGeneralComments(e.target.value)}
+                                className="w-full p-2 border dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 outline-none text-sm resize-none h-16"
+                            />
+                        </div>
                         <div className="flex justify-between mb-4">
                             <span className="text-gray-500">Subtotal</span>
                             <span className="font-bold text-lg">${cartTotal.toFixed(2)}</span>
@@ -2682,6 +2722,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
     const [orders, setOrders] = useState<Order[]>([]);
     const [activeTab, setActiveTab] = useState('panel-pedidos');
     const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
+    const [orderToEdit, setOrderToEdit] = useState<Order | null>(null);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
     const [storeOpen, setStoreOpen] = useState(true);
@@ -2724,8 +2765,17 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
             }
         );
 
+        const handleEditOrderEvent = (e: any) => {
+            const orderToEdit = e.detail;
+            setOrderToEdit(orderToEdit);
+            setIsNewOrderModalOpen(true);
+        };
+
+        window.addEventListener('edit-order', handleEditOrderEvent);
+
         return () => {
             unsubscribeFromChannel();
+            window.removeEventListener('edit-order', handleEditOrderEvent);
         };
     }, []);
 
@@ -2765,6 +2815,13 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
              alert(`Error updating payment status: ${errorMsg}`);
         }
     }
+    
+    const handleEditOrder = (order: Order) => {
+        const latestOrder = orders.find(o => o.id === order.id) || order;
+        setOrderToEdit(latestOrder);
+        setIsNewOrderModalOpen(true);
+        setSelectedOrder(null);
+    };
     
     const activeZone = useMemo(() => zones.find(z => z.id === activeZoneId), [zones, activeZoneId]);
     
@@ -3033,12 +3090,20 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
              <div className="mt-6 flex-1">
                 {renderContent()}
             </div>
-            <NewOrderModal isOpen={isNewOrderModalOpen} onClose={() => setIsNewOrderModalOpen(false)} />
+            <NewOrderModal 
+                isOpen={isNewOrderModalOpen} 
+                onClose={() => {
+                    setIsNewOrderModalOpen(false);
+                    setOrderToEdit(null);
+                }}
+                orderToEdit={orderToEdit}
+            />
             <OrderDetailModal 
                 order={selectedOrder} 
                 onClose={() => setSelectedOrder(null)} 
                 onUpdateStatus={updateOrderStatus}
                 onUpdatePayment={updatePaymentStatus}
+                onEditOrder={handleEditOrder}
             />
         </div>
     );
