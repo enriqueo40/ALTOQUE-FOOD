@@ -1179,12 +1179,12 @@ const PersonalizationsView: React.FC = () => {
                 // Update products in DB
                 for (const p of productsToAdd) {
                     const newIds = [...getProductPersonalizationIds(p), savedPers.id];
-                    await saveProduct({ ...p, personalizationIds: newIds, personalization_ids: newIds } as any);
+                    await saveProduct({ ...p, personalizationIds: newIds });
                 }
                 
                 for (const p of productsToRemove) {
                     const newIds = getProductPersonalizationIds(p).filter(id => id !== savedPers.id);
-                    await saveProduct({ ...p, personalizationIds: newIds, personalization_ids: newIds } as any);
+                    await saveProduct({ ...p, personalizationIds: newIds });
                 }
             }
             
