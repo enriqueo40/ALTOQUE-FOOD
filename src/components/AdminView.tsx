@@ -931,7 +931,7 @@ const PersonalizationModal: React.FC<{
                     </div>
                     
                     <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6 min-h-0">
                             <div>
                                 <label className="block text-sm font-medium text-gray-300 mb-1">Nombre de personalización</label>
                                 <p className="text-xs text-gray-500 mb-2">Instrucciones para el cliente.</p>
@@ -1334,7 +1334,7 @@ const PromotionModal: React.FC<{
                 </header>
                 <div className="flex flex-1 overflow-hidden">
                     <form onSubmit={handleSubmit} className="flex-1 flex flex-col lg:w-2/3">
-                        <div className="p-6 flex-1 overflow-y-auto space-y-6">
+                        <div className="p-6 flex-1 overflow-y-auto space-y-6 min-h-0">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre</label>
                                 <input type="text" name="name" value={formData.name} onChange={handleChange} required className={`${lightInputClasses} mt-1`}/>
@@ -1645,8 +1645,8 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
     };
 
     const handleAdvanceStatus = (nextStatus: OrderStatus) => {
-        // Check payment status before completing or delivering
-        if ((nextStatus === OrderStatus.Completed || nextStatus === OrderStatus.Delivering) && order.paymentStatus !== 'paid') {
+        // Check payment status before delivering
+        if (nextStatus === OrderStatus.Delivering && order.paymentStatus !== 'paid') {
             const confirmed = window.confirm(
                 "ADVERTENCIA: Este pedido NO ha sido marcado como PAGADO.\n\n¿Desea continuar de todos modos?"
             );
@@ -1817,7 +1817,7 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                     </div>
 
                     {/* Content Grid */}
-                    <div className="flex-1 overflow-y-auto p-6 bg-[#151922]">
+                    <div className="flex-1 overflow-y-auto p-6 bg-[#151922] min-h-0">
                          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                             {/* Left Column: Order Details */}
                             <div className="lg:col-span-2 space-y-8">
@@ -2132,7 +2132,7 @@ const OrdersKanbanBoard: React.FC<{ orders: Order[], onOrderClick: (order: Order
                             <h3 className="font-bold text-gray-800 dark:text-gray-100 uppercase text-xs tracking-wider">{col.title}</h3>
                             <span className="bg-gray-800 text-white text-xs font-bold px-2 py-0.5 rounded-full">{colOrders.length}</span>
                         </div>
-                        <div className="space-y-3 flex-1 overflow-y-auto pr-2 pb-10 custom-scrollbar">
+                        <div className="space-y-3 flex-1 overflow-y-auto pr-2 pb-10 custom-scrollbar min-h-0">
                             {colOrders.map(order => (
                                 <OrderCard key={order.id} order={order} onClick={() => onOrderClick(order)} />
                             ))}
@@ -2307,7 +2307,7 @@ const ManualOrderProductModal: React.FC<{
                     <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"><IconX className="h-6 w-6"/></button>
                 </div>
                 
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 min-h-0">
                     <p className="text-gray-600 dark:text-gray-300">{product.description}</p>
                     
                     {productPersonalizations.map(pers => (
@@ -2527,7 +2527,7 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; orderToEdi
                     </div>
 
                     {/* Grid */}
-                    <div className="flex-1 overflow-y-auto p-4">
+                    <div className="flex-1 overflow-y-auto p-4 min-h-0">
                         <div className="grid grid-cols-3 gap-4">
                             {filteredProducts.map(product => {
                                 const { price: discountedPrice, promotion } = getDiscountedPrice(product, promotions);
@@ -2630,7 +2630,7 @@ const NewOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; orderToEdi
                     </div>
 
                     {/* Cart Items */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
                         {cartItems.length === 0 ? (
                             <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-2">
                                 <IconReceipt className="h-12 w-12 opacity-50"/>

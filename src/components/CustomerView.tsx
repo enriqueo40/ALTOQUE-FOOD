@@ -1036,15 +1036,9 @@ export default function CustomerView() {
                                                         )}
                                                     </p>
                                                 </div>
-                                                {(pers.minSelection && pers.minSelection > 0) ? (
-                                                    <div className="bg-rose-500/10 px-2 py-1 rounded text-[10px] font-bold text-rose-500 border border-rose-500/20 uppercase">
-                                                        Requerido
-                                                    </div>
-                                                ) : (
-                                                    <div className="bg-gray-500/10 px-2 py-1 rounded text-[10px] font-bold text-gray-400 border border-gray-500/20 uppercase">
-                                                        Opcional
-                                                    </div>
-                                                )}
+                                                <div className="bg-gray-500/10 px-2 py-1 rounded text-[10px] font-bold text-gray-400 border border-gray-500/20 uppercase">
+                                                    Opcional
+                                                </div>
                                             </div>
                                             <div className="space-y-3">
                                                 {pers.options.map(opt => {
