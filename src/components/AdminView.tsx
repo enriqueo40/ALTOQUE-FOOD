@@ -2074,45 +2074,94 @@ const TimeAgo: React.FC<{ date: Date; className?: string }> = ({ date, className
     return <span className={`${className} ${isLate ? 'text-red-500 font-bold' : 'text-gray-500'}`}>{text}</span>;
 };
 
-const OrderCard: React.FC<{ order: Order; onClick: () => void }> = ({ order, onClick }) => (
-    <div onClick={onClick} className={`group relative bg-white dark:bg-gray-800 rounded-xl shadow-sm border p-4 cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5 ${order.status === OrderStatus.Pending ? 'border-yellow-400 ring-1 ring-yellow-400/20' : 'border-gray-200 dark:border-gray-700'}`}>
-        <div className="flex justify-between items-start mb-3">
-            <div className="flex items-center gap-2">
-                 <span className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${order.orderType === OrderType.Delivery ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' : 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300'}`}>
-                    {order.orderType === OrderType.Delivery ? <IconDelivery className="h-4 w-4"/> : <IconStore className="h-4 w-4"/>}
-                 </span>
-                 <div>
-                     <p className="font-bold text-gray-900 dark:text-gray-100 leading-tight">{order.customer.name}</p>
-                     <p className="text-xs text-gray-500 dark:text-gray-400">#{order.id.slice(0, 4)}</p>
-                 </div>
-            </div>
-            <div className="text-right">
-                <p className="font-bold text-emerald-600 dark:text-emerald-400">${order.total.toFixed(2)}</p>
-                <TimeAgo date={order.createdAt} className="text-xs block"/>
-            </div>
-        </div>
-        
-        <div className="space-y-1 mb-4">
-            {order.items.slice(0, 3).map((item, i) => (
-                <div key={i} className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
-                    <span className="flex-1 truncate"><span className="font-bold text-gray-800 dark:text-gray-200">{item.quantity}x</span> {item.name}</span>
+const OrderCard: React.FC<{ order: Order; onClick: () => void; onUpdateStatus: (orderId: string, status: OrderStatus) => void }> = ({ order, onClick, onUpdateStatus }) => {
+    const getNextStatusAction = () => {
+        switch (order.status) {
+            case OrderStatus.Pending:
+                return (
+                    <div className="flex gap-2 mt-3 pt-3 border-t dark:border-gray-700">
+                        <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(order.id, OrderStatus.Confirmed); }} className="flex-1 bg-blue-600 text-white text-xs font-bold py-2 rounded hover:bg-blue-700 transition-colors">Confirmar</button>
+                        <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(order.id, OrderStatus.Cancelled); }} className="px-3 bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 text-xs font-bold py-2 rounded hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors">Rechazar</button>
+                    </div>
+                );
+            case OrderStatus.Confirmed:
+                return (
+                    <div className="mt-3 pt-3 border-t dark:border-gray-700">
+                        <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(order.id, OrderStatus.Preparing); }} className="w-full bg-indigo-600 text-white text-xs font-bold py-2 rounded hover:bg-indigo-700 transition-colors">Preparar</button>
+                    </div>
+                );
+            case OrderStatus.Preparing:
+                return (
+                    <div className="mt-3 pt-3 border-t dark:border-gray-700">
+                        <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(order.id, OrderStatus.Ready); }} className="w-full bg-purple-600 text-white text-xs font-bold py-2 rounded hover:bg-purple-700 transition-colors">Marcar Listo</button>
+                    </div>
+                );
+            case OrderStatus.Ready:
+                if (order.orderType === OrderType.Delivery) {
+                    return (
+                        <div className="mt-3 pt-3 border-t dark:border-gray-700">
+                            <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(order.id, OrderStatus.Delivering); }} className="w-full bg-cyan-600 text-white text-xs font-bold py-2 rounded hover:bg-cyan-700 transition-colors">En Reparto</button>
+                        </div>
+                    );
+                } else {
+                    return (
+                        <div className="mt-3 pt-3 border-t dark:border-gray-700">
+                            <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(order.id, OrderStatus.Completed); }} className="w-full bg-emerald-600 text-white text-xs font-bold py-2 rounded hover:bg-emerald-700 transition-colors">Entregar y Cerrar</button>
+                        </div>
+                    );
+                }
+            case OrderStatus.Delivering:
+                return (
+                    <div className="mt-3 pt-3 border-t dark:border-gray-700">
+                        <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(order.id, OrderStatus.Completed); }} className="w-full bg-emerald-600 text-white text-xs font-bold py-2 rounded hover:bg-emerald-700 transition-colors">Completar Pedido</button>
+                    </div>
+                );
+            default:
+                return null;
+        }
+    };
+
+    return (
+        <div onClick={onClick} className={`group relative bg-white dark:bg-gray-800 rounded-xl shadow-sm border p-4 cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5 ${order.status === OrderStatus.Pending ? 'border-yellow-400 ring-1 ring-yellow-400/20' : 'border-gray-200 dark:border-gray-700'}`}>
+            <div className="flex justify-between items-start mb-3">
+                <div className="flex items-center gap-2">
+                     <span className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${order.orderType === OrderType.Delivery ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' : 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300'}`}>
+                        {order.orderType === OrderType.Delivery ? <IconDelivery className="h-4 w-4"/> : <IconStore className="h-4 w-4"/>}
+                     </span>
+                     <div>
+                         <p className="font-bold text-gray-900 dark:text-gray-100 leading-tight">{order.customer.name}</p>
+                         <p className="text-xs text-gray-500 dark:text-gray-400">#{order.id.slice(0, 4)}</p>
+                     </div>
                 </div>
-            ))}
-            {order.items.length > 3 && <p className="text-xs text-gray-400 italic">+ {order.items.length - 3} más...</p>}
-        </div>
+                <div className="text-right">
+                    <p className="font-bold text-emerald-600 dark:text-emerald-400">${order.total.toFixed(2)}</p>
+                    <TimeAgo date={order.createdAt} className="text-xs block"/>
+                </div>
+            </div>
+            
+            <div className="space-y-1 mb-4">
+                {order.items.slice(0, 3).map((item, i) => (
+                    <div key={i} className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
+                        <span className="flex-1 truncate"><span className="font-bold text-gray-800 dark:text-gray-200">{item.quantity}x</span> {item.name}</span>
+                    </div>
+                ))}
+                {order.items.length > 3 && <p className="text-xs text-gray-400 italic">+ {order.items.length - 3} más...</p>}
+            </div>
 
-        <div className="flex justify-between items-center pt-3 border-t dark:border-gray-700">
-             <span className={`text-xs font-semibold px-2 py-0.5 rounded ${order.paymentStatus === 'paid' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}`}>
-                 {order.paymentStatus === 'paid' ? 'PAGADO' : 'PENDIENTE'}
-             </span>
-             <button className="opacity-0 group-hover:opacity-100 transition-opacity text-emerald-600 text-sm font-bold flex items-center hover:underline">
-                 Ver detalles <IconArrowLeft className="h-3 w-3 rotate-180 ml-1"/>
-             </button>
+            <div className="flex justify-between items-center">
+                 <span className={`text-xs font-semibold px-2 py-0.5 rounded ${order.paymentStatus === 'paid' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}`}>
+                     {order.paymentStatus === 'paid' ? 'PAGADO' : 'PENDIENTE'}
+                 </span>
+                 <button className="opacity-0 group-hover:opacity-100 transition-opacity text-emerald-600 text-sm font-bold flex items-center hover:underline">
+                     Ver detalles <IconArrowLeft className="h-3 w-3 rotate-180 ml-1"/>
+                 </button>
+            </div>
+            {getNextStatusAction()}
         </div>
-    </div>
-);
+    );
+};
 
-const OrdersKanbanBoard: React.FC<{ orders: Order[], onOrderClick: (order: Order) => void }> = ({ orders, onOrderClick }) => {
+const OrdersKanbanBoard: React.FC<{ orders: Order[], onOrderClick: (order: Order) => void, onUpdateStatus: (orderId: string, status: OrderStatus) => void }> = ({ orders, onOrderClick, onUpdateStatus }) => {
     const columns = [
         { status: OrderStatus.Pending, title: 'Nuevos', color: 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/10' },
         { status: OrderStatus.Confirmed, title: 'Confirmados', color: 'border-blue-400 bg-blue-50 dark:bg-blue-900/10' },
@@ -2134,7 +2183,7 @@ const OrdersKanbanBoard: React.FC<{ orders: Order[], onOrderClick: (order: Order
                         </div>
                         <div className="space-y-3 flex-1 overflow-y-auto pr-2 pb-10 custom-scrollbar min-h-0">
                             {colOrders.map(order => (
-                                <OrderCard key={order.id} order={order} onClick={() => onOrderClick(order)} />
+                                <OrderCard key={order.id} order={order} onClick={() => onOrderClick(order)} onUpdateStatus={onUpdateStatus} />
                             ))}
                             {colOrders.length === 0 && (
                                 <div className="text-center py-10 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50/50 dark:bg-gray-800/30">
@@ -2149,7 +2198,33 @@ const OrdersKanbanBoard: React.FC<{ orders: Order[], onOrderClick: (order: Order
     );
 };
 
-const OrderListView: React.FC<{ orders: Order[], onOrderClick: (order: Order) => void }> = ({ orders, onOrderClick }) => {
+const OrderListView: React.FC<{ orders: Order[], onOrderClick: (order: Order) => void, onUpdateStatus: (orderId: string, status: OrderStatus) => void }> = ({ orders, onOrderClick, onUpdateStatus }) => {
+    const getNextStatusAction = (order: Order) => {
+        switch (order.status) {
+            case OrderStatus.Pending:
+                return (
+                    <div className="flex gap-2">
+                        <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(order.id, OrderStatus.Confirmed); }} className="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded hover:bg-blue-700 transition-colors">Confirmar</button>
+                        <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(order.id, OrderStatus.Cancelled); }} className="bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 text-xs font-bold px-3 py-1.5 rounded hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors">Rechazar</button>
+                    </div>
+                );
+            case OrderStatus.Confirmed:
+                return <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(order.id, OrderStatus.Preparing); }} className="bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded hover:bg-indigo-700 transition-colors">Preparar</button>;
+            case OrderStatus.Preparing:
+                return <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(order.id, OrderStatus.Ready); }} className="bg-purple-600 text-white text-xs font-bold px-3 py-1.5 rounded hover:bg-purple-700 transition-colors">Marcar Listo</button>;
+            case OrderStatus.Ready:
+                if (order.orderType === OrderType.Delivery) {
+                    return <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(order.id, OrderStatus.Delivering); }} className="bg-cyan-600 text-white text-xs font-bold px-3 py-1.5 rounded hover:bg-cyan-700 transition-colors">En Reparto</button>;
+                } else {
+                    return <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(order.id, OrderStatus.Completed); }} className="bg-emerald-600 text-white text-xs font-bold px-3 py-1.5 rounded hover:bg-emerald-700 transition-colors">Entregar y Cerrar</button>;
+                }
+            case OrderStatus.Delivering:
+                return <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(order.id, OrderStatus.Completed); }} className="bg-emerald-600 text-white text-xs font-bold px-3 py-1.5 rounded hover:bg-emerald-700 transition-colors">Completar</button>;
+            default:
+                return null;
+        }
+    };
+
     return (
         <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg border dark:border-gray-700 overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -2162,6 +2237,7 @@ const OrderListView: React.FC<{ orders: Order[], onOrderClick: (order: Order) =>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pago</th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Acciones</th>
                     </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -2187,6 +2263,9 @@ const OrderListView: React.FC<{ orders: Order[], onOrderClick: (order: Order) =>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-emerald-600 dark:text-emerald-400 text-right">
                                 ${order.total.toFixed(2)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                                {getNextStatusAction(order)}
                             </td>
                         </tr>
                     ))}
@@ -2892,10 +2971,10 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                              <EmptyOrdersView onNewOrderClick={() => setIsNewOrderModalOpen(true)} />
                         ) : (
                             viewMode === 'board' ? (
-                                <OrdersKanbanBoard orders={orders} onOrderClick={setSelectedOrder} />
+                                <OrdersKanbanBoard orders={orders} onOrderClick={setSelectedOrder} onUpdateStatus={updateOrderStatus} />
                             ) : (
                                 <div className="flex-1 overflow-auto rounded-lg border dark:border-gray-700">
-                                    <OrderListView orders={orders} onOrderClick={setSelectedOrder} />
+                                    <OrderListView orders={orders} onOrderClick={setSelectedOrder} onUpdateStatus={updateOrderStatus} />
                                 </div>
                             )
                         )}
