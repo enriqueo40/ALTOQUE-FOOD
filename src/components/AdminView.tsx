@@ -2123,17 +2123,17 @@ const OrderCard: React.FC<{ order: Order; onClick: () => void; onUpdateStatus: (
 
     return (
         <div onClick={onClick} className={`group relative bg-white dark:bg-gray-800 rounded-xl shadow-sm border p-4 cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5 ${order.status === OrderStatus.Pending ? 'border-yellow-400 ring-1 ring-yellow-400/20' : 'border-gray-200 dark:border-gray-700'}`}>
-            <div className="flex justify-between items-start mb-3">
-                <div className="flex items-center gap-2">
-                     <span className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${order.orderType === OrderType.Delivery ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' : 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300'}`}>
+            <div className="flex justify-between items-start mb-3 gap-2">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                     <span className={`flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${order.orderType === OrderType.Delivery ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' : 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300'}`}>
                         {order.orderType === OrderType.Delivery ? <IconDelivery className="h-4 w-4"/> : <IconStore className="h-4 w-4"/>}
                      </span>
-                     <div>
-                         <p className="font-bold text-gray-900 dark:text-gray-100 leading-tight">{order.customer.name}</p>
+                     <div className="min-w-0 flex-1">
+                         <p className="font-bold text-gray-900 dark:text-gray-100 leading-tight truncate">{order.customer.name}</p>
                          <p className="text-xs text-gray-500 dark:text-gray-400">#{order.id.slice(0, 4)}</p>
                      </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right flex-shrink-0">
                     <p className="font-bold text-emerald-600 dark:text-emerald-400">${order.total.toFixed(2)}</p>
                     <TimeAgo date={order.createdAt} className="text-xs block"/>
                 </div>
@@ -2148,11 +2148,11 @@ const OrderCard: React.FC<{ order: Order; onClick: () => void; onUpdateStatus: (
                 {order.items.length > 3 && <p className="text-xs text-gray-400 italic">+ {order.items.length - 3} más...</p>}
             </div>
 
-            <div className="flex justify-between items-center">
-                 <span className={`text-xs font-semibold px-2 py-0.5 rounded ${order.paymentStatus === 'paid' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}`}>
+            <div className="flex justify-between items-center gap-2">
+                 <span className={`flex-shrink-0 text-xs font-semibold px-2 py-0.5 rounded ${order.paymentStatus === 'paid' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}`}>
                      {order.paymentStatus === 'paid' ? 'PAGADO' : 'PENDIENTE'}
                  </span>
-                 <button className="opacity-0 group-hover:opacity-100 transition-opacity text-emerald-600 text-sm font-bold flex items-center hover:underline">
+                 <button className="opacity-0 group-hover:opacity-100 transition-opacity text-emerald-600 text-xs font-bold flex items-center hover:underline whitespace-nowrap">
                      Ver detalles <IconArrowLeft className="h-3 w-3 rotate-180 ml-1"/>
                  </button>
             </div>
@@ -2172,14 +2172,14 @@ const OrdersKanbanBoard: React.FC<{ orders: Order[], onOrderClick: (order: Order
     ];
 
     return (
-        <div className="flex space-x-4 overflow-x-auto pb-4 h-full px-2">
+        <div className="flex space-x-3 overflow-x-auto pb-4 h-full px-2">
             {columns.map(col => {
                 const colOrders = orders.filter(o => o.status === col.status);
                 return (
-                    <div key={col.status} className="w-80 flex-shrink-0 flex flex-col h-full">
-                        <div className={`flex justify-between items-center mb-3 px-4 py-2 rounded-lg border-l-4 bg-white dark:bg-gray-800 shadow-sm ${col.color}`}>
-                            <h3 className="font-bold text-gray-800 dark:text-gray-100 uppercase text-xs tracking-wider">{col.title}</h3>
-                            <span className="bg-gray-800 text-white text-xs font-bold px-2 py-0.5 rounded-full">{colOrders.length}</span>
+                    <div key={col.status} className="flex-1 min-w-[200px] max-w-[350px] flex flex-col h-full">
+                        <div className={`flex justify-between items-center mb-3 px-3 py-2 rounded-lg border-l-4 bg-white dark:bg-gray-800 shadow-sm ${col.color}`}>
+                            <h3 className="font-bold text-gray-800 dark:text-gray-100 uppercase text-[11px] tracking-wider truncate mr-2">{col.title}</h3>
+                            <span className="bg-gray-800 text-white text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0">{colOrders.length}</span>
                         </div>
                         <div className="space-y-3 flex-1 overflow-y-auto pr-2 pb-10 custom-scrollbar min-h-0">
                             {colOrders.map(order => (
