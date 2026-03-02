@@ -179,6 +179,7 @@ export interface BranchSettings {
   whatsappNumber: string;
   logoUrl: string;
   coverImageUrl: string;
+  isOpen?: boolean;
 }
 
 export enum ShippingCostType {

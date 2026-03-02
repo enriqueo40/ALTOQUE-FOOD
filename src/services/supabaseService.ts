@@ -97,8 +97,7 @@ export const getAppSettings = async (): Promise<AppSettings> => {
 export const saveAppSettings = async (settings: AppSettings): Promise<void> => {
     const { error } = await getClient()
         .from('app_settings')
-        .update({ settings, updated_at: new Date().toISOString() })
-        .eq('id', 1);
+        .upsert({ id: 1, settings, updated_at: new Date().toISOString() });
 
     if (error) {
         console.error("Error saving app settings:", error);

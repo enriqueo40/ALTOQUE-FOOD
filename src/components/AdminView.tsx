@@ -3591,6 +3591,7 @@ const GeneralSettings: React.FC<{ onSave: () => Promise<void>; settings: AppSett
 
 const BranchSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppSettings, setSettings: React.Dispatch<React.SetStateAction<AppSettings>> }> = ({ onSave, settings, setSettings }) => {
     const [originalSettings, setOriginalSettings] = useState(settings.branch);
+    const [isEditingWhatsapp, setIsEditingWhatsapp] = useState(false);
     
     useEffect(() => {
         setOriginalSettings(settings.branch)
@@ -3598,6 +3599,11 @@ const BranchSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppS
     
     const handleCancel = () => {
         setSettings(prev => ({...prev, branch: originalSettings}));
+    };
+
+    const handleCancelWhatsapp = () => {
+        setSettings(prev => ({...prev, branch: {...prev.branch, whatsappNumber: originalSettings.whatsappNumber}}));
+        setIsEditingWhatsapp(false);
     };
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'logoUrl' | 'coverImageUrl') => {
@@ -3680,8 +3686,27 @@ const BranchSettingsView: React.FC<{ onSave: () => Promise<void>; settings: AppS
             <SettingsCard title="Número de WhatsApp para pedidos" noActions>
                 <p className="text-sm text-gray-500 dark:text-gray-400">El número al que llegarán las comandas de los pedidos a domicilio</p>
                 <div className="flex justify-between items-center mt-2">
-                    <span className="font-mono text-gray-800 dark:text-gray-200">{settings.branch.whatsappNumber}</span>
-                    <button type="button" className="px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-600">Cambiar número</button>
+                    {isEditingWhatsapp ? (
+                        <input 
+                            type="text" 
+                            value={settings.branch.whatsappNumber} 
+                            onChange={e => setSettings(p => ({...p, branch: {...p.branch, whatsappNumber: e.target.value}}))} 
+                            className={`${inputClasses} flex-1 mr-4`}
+                            placeholder="+58 414 1234567"
+                            autoFocus
+                        />
+                    ) : (
+                        <span className="font-mono text-gray-800 dark:text-gray-200">{settings.branch.whatsappNumber || 'No configurado'}</span>
+                    )}
+                    
+                    {isEditingWhatsapp ? (
+                        <div className="flex gap-2">
+                            <button type="button" onClick={handleCancelWhatsapp} className="px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-600">Cancelar</button>
+                            <button type="button" onClick={() => { setIsEditingWhatsapp(false); onSave(); }} className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-semibold hover:bg-green-700">Guardar</button>
+                        </div>
+                    ) : (
+                        <button type="button" onClick={() => setIsEditingWhatsapp(true)} className="px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-600">Cambiar número</button>
+                    )}
                 </div>
             </SettingsCard>
             
