@@ -145,47 +145,56 @@ const RestaurantHero: React.FC<{
                     </a>
                 )}
 
-                {/* Toggle Delivery/Pickup */}
-                <div className="w-full max-w-sm bg-gray-800/50 rounded-full p-1 flex relative border border-gray-700/50 backdrop-blur-sm mb-6">
-                    <div 
-                        className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-gray-700 rounded-full transition-all duration-300 ease-out shadow-lg ${orderType === OrderType.TakeAway ? 'translate-x-[100%] left-1' : 'left-1'}`}
-                    ></div>
-                    <button 
-                        onClick={() => setOrderType(OrderType.Delivery)} 
-                        className={`flex-1 relative z-10 py-3 text-xs font-bold uppercase tracking-widest transition-colors duration-200 ${orderType === OrderType.Delivery ? 'text-emerald-400' : 'text-gray-400 hover:text-gray-200'}`}
-                    >
-                        A domicilio
-                    </button>
-                    <button 
-                        onClick={() => setOrderType(OrderType.TakeAway)} 
-                        className={`flex-1 relative z-10 py-3 text-xs font-bold uppercase tracking-widest transition-colors duration-200 ${orderType === OrderType.TakeAway ? 'text-emerald-400' : 'text-gray-400 hover:text-gray-200'}`}
-                    >
-                        Para recoger
-                    </button>
-                </div>
+                {tableInfo ? (
+                    <div className="w-full max-w-sm bg-emerald-500/10 rounded-xl p-4 border border-emerald-500/20 backdrop-blur-sm mb-6 flex flex-col items-center">
+                        <span className="text-emerald-400 font-black text-xl uppercase tracking-widest mb-1">MESA {tableInfo.table}</span>
+                        <span className="text-emerald-500/80 font-bold text-sm uppercase tracking-wider">{tableInfo.zone}</span>
+                    </div>
+                ) : (
+                    <>
+                        {/* Toggle Delivery/Pickup */}
+                        <div className="w-full max-w-sm bg-gray-800/50 rounded-full p-1 flex relative border border-gray-700/50 backdrop-blur-sm mb-6">
+                            <div 
+                                className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-gray-700 rounded-full transition-all duration-300 ease-out shadow-lg ${orderType === OrderType.TakeAway ? 'translate-x-[100%] left-1' : 'left-1'}`}
+                            ></div>
+                            <button 
+                                onClick={() => setOrderType(OrderType.Delivery)} 
+                                className={`flex-1 relative z-10 py-3 text-xs font-bold uppercase tracking-widest transition-colors duration-200 ${orderType === OrderType.Delivery ? 'text-emerald-400' : 'text-gray-400 hover:text-gray-200'}`}
+                            >
+                                A domicilio
+                            </button>
+                            <button 
+                                onClick={() => setOrderType(OrderType.TakeAway)} 
+                                className={`flex-1 relative z-10 py-3 text-xs font-bold uppercase tracking-widest transition-colors duration-200 ${orderType === OrderType.TakeAway ? 'text-emerald-400' : 'text-gray-400 hover:text-gray-200'}`}
+                            >
+                                Para recoger
+                            </button>
+                        </div>
 
-                {/* Info Grid */}
-                <div className="grid grid-cols-2 gap-8 w-full max-w-sm border-t border-gray-800 pt-6">
-                    <div className="text-center">
-                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">
-                            {orderType === OrderType.Delivery ? 'TIEMPO ENVÍO' : 'TIEMPO RECOGER'}
-                        </p>
-                        <p className="text-white font-bold text-sm">
-                            {orderType === OrderType.Delivery 
-                                ? `${shipping.deliveryTime.min} - ${shipping.deliveryTime.max} min`
-                                : `${shipping.pickupTime.min} min`
-                            }
-                        </p>
-                    </div>
-                    <div className="text-center border-l border-gray-800">
-                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">COSTO ENVÍO</p>
-                        <p className="text-white font-bold text-sm">
-                            {shipping.costType === ShippingCostType.Fixed && shipping.fixedCost 
-                                ? formatCurrency(shipping.fixedCost, company.currency.code)
-                                : (shipping.costType === ShippingCostType.Free ? 'Gratis' : 'Por definir')}
-                        </p>
-                    </div>
-                </div>
+                        {/* Info Grid */}
+                        <div className="grid grid-cols-2 gap-8 w-full max-w-sm border-t border-gray-800 pt-6">
+                            <div className="text-center">
+                                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">
+                                    {orderType === OrderType.Delivery ? 'TIEMPO ENVÍO' : 'TIEMPO RECOGER'}
+                                </p>
+                                <p className="text-white font-bold text-sm">
+                                    {orderType === OrderType.Delivery 
+                                        ? `${shipping.deliveryTime.min} - ${shipping.deliveryTime.max} min`
+                                        : `${shipping.pickupTime.min} min`
+                                    }
+                                </p>
+                            </div>
+                            <div className="text-center border-l border-gray-800">
+                                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">COSTO ENVÍO</p>
+                                <p className="text-white font-bold text-sm">
+                                    {shipping.costType === ShippingCostType.Fixed && shipping.fixedCost 
+                                        ? formatCurrency(shipping.fixedCost, company.currency.code)
+                                        : (shipping.costType === ShippingCostType.Free ? 'Gratis' : 'Por definir')}
+                                </p>
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
             
             {currentSchedule && (
