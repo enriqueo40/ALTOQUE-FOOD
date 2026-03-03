@@ -1685,9 +1685,11 @@ const TableDetailModal: React.FC<{
                                                     <li key={i} className="flex justify-between text-sm">
                                                         <div className="flex-1">
                                                             <span className="font-medium text-gray-900 dark:text-gray-100">{item.quantity}x {item.name}</span>
-                                                            {item.selectedOptions && item.selectedOptions.length > 0 && (
+                                                            {item.personalizations && item.personalizations.length > 0 && (
                                                                 <ul className="ml-4 mt-1 text-xs text-gray-500 space-y-0.5">
-                                                                    <li>- {item.selectedOptions.map(o => o.name).join(', ')}</li>
+                                                                    {item.personalizations.map((p, pIdx) => (
+                                                                        <li key={pIdx}>- {p.name}: {p.options.map(o => o.name).join(', ')}</li>
+                                                                    ))}
                                                                 </ul>
                                                             )}
                                                         </div>
@@ -3047,28 +3049,6 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
              alert(`Error updating payment status: ${errorMsg}`);
         }
     }
-    
-    const handleCloseTableAccount = async (tableOrdersToClose: Order[]) => {
-        if (window.confirm(`¿Estás seguro de cerrar la cuenta de esta mesa? Se marcarán ${tableOrdersToClose.length} rondas como Pagadas y Completadas.`)) {
-            // Optimistic update
-            setOrders(prev => prev.map(o => 
-                tableOrdersToClose.some(to => to.id === o.id) 
-                    ? { ...o, status: OrderStatus.Completed, paymentStatus: 'paid' } 
-                    : o
-            ));
-            setSelectedTableOrders(null);
-            
-            try {
-                // Update all orders in parallel
-                await Promise.all(tableOrdersToClose.map(o => 
-                    updateOrder(o.id, { status: OrderStatus.Completed, paymentStatus: 'paid' })
-                ));
-            } catch (error) {
-                console.error("Error closing table account:", error);
-                alert("Hubo un error al cerrar la cuenta. Por favor, intenta de nuevo.");
-            }
-        }
-    };
     
     const handleEditOrder = (order: Order) => {
         const latestOrder = orders.find(o => o.id === order.id) || order;
