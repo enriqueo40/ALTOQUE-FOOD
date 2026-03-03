@@ -1602,6 +1602,147 @@ const MenuManagement: React.FC = () => {
 
 // --- Order Management Components ---
 
+const TableDetailModal: React.FC<{
+    tableOrders: { zone: string, table: string, orders: Order[] } | null;
+    onClose: () => void;
+    onUpdateStatus: (id: string, status: OrderStatus) => void;
+    onUpdatePayment: (id: string, status: PaymentStatus) => void;
+    onCloseAccount: (orders: Order[]) => void;
+}> = ({ tableOrders, onClose, onUpdateStatus, onUpdatePayment, onCloseAccount }) => {
+    if (!tableOrders || tableOrders.orders.length === 0) return null;
+
+    const { zone, table, orders } = tableOrders;
+    const totalAccumulated = orders.reduce((sum, o) => sum + o.total, 0);
+    const customerName = orders[0]?.customer.name || 'Cliente';
+    
+    // Calculate if all orders are ready/completed
+    const allOrdersReady = orders.every(o => o.status === OrderStatus.Ready || o.status === OrderStatus.Completed);
+    const allOrdersPaid = orders.every(o => o.paymentStatus === 'paid');
+
+    return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+            <div className="bg-white dark:bg-gray-900 w-full sm:w-[600px] h-[90vh] sm:h-auto sm:max-h-[90vh] sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up sm:animate-fade-in">
+                {/* Header */}
+                <div className="bg-gray-50 dark:bg-gray-800/50 p-4 sm:p-6 border-b dark:border-gray-800 flex justify-between items-start sticky top-0 z-10">
+                    <div>
+                        <div className="flex items-center gap-3 mb-1">
+                            <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 text-xs font-bold px-2.5 py-1 rounded-md flex items-center gap-1.5">
+                                <IconStore className="h-3.5 w-3.5" />
+                                MESA {table}
+                            </span>
+                            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">{zone}</span>
+                        </div>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white mt-2">{customerName}</h2>
+                    </div>
+                    <button onClick={onClose} className="p-2 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors shadow-sm border dark:border-gray-700">
+                        <IconX className="h-5 w-5 text-gray-500" />
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
+                    <div className="space-y-6">
+                        {/* Summary Card */}
+                        <div className="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30 rounded-xl p-4 flex justify-between items-center">
+                            <div>
+                                <p className="text-sm text-emerald-800 dark:text-emerald-400 font-medium mb-1">Total Acumulado</p>
+                                <p className="text-3xl font-black text-emerald-600 dark:text-emerald-500">${totalAccumulated.toFixed(2)}</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Rondas ordenadas</p>
+                                <p className="text-xl font-bold text-gray-900 dark:text-white">{orders.length}</p>
+                            </div>
+                        </div>
+
+                        {/* Rounds List */}
+                        <div>
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                                <IconMenu className="h-5 w-5 text-gray-400" />
+                                Detalle de Rondas
+                            </h3>
+                            <div className="space-y-4">
+                                {orders.map((order, index) => (
+                                    <div key={order.id} className="border dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-800 shadow-sm">
+                                        <div className="bg-gray-50 dark:bg-gray-800/80 px-4 py-3 border-b dark:border-gray-700 flex justify-between items-center">
+                                            <div className="flex items-center gap-3">
+                                                <span className="font-bold text-gray-700 dark:text-gray-200">Ronda {index + 1}</span>
+                                                <span className="text-xs text-gray-500">#{order.id.slice(0, 4)}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${
+                                                    order.status === OrderStatus.Pending ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                                                    order.status === OrderStatus.Preparing ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+                                                    order.status === OrderStatus.Ready ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                                                    'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                                                }`}>
+                                                    {order.status}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="p-4">
+                                            <ul className="space-y-3 mb-4">
+                                                {order.items.map((item, i) => (
+                                                    <li key={i} className="flex justify-between text-sm">
+                                                        <div className="flex-1">
+                                                            <span className="font-medium text-gray-900 dark:text-gray-100">{item.quantity}x {item.name}</span>
+                                                            {item.selectedOptions && item.selectedOptions.length > 0 && (
+                                                                <ul className="ml-4 mt-1 text-xs text-gray-500 space-y-0.5">
+                                                                    <li>- {item.selectedOptions.map(o => o.name).join(', ')}</li>
+                                                                </ul>
+                                                            )}
+                                                        </div>
+                                                        <span className="font-medium text-gray-900 dark:text-gray-100 ml-4">${(item.price * item.quantity).toFixed(2)}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                            <div className="flex justify-between items-center pt-3 border-t dark:border-gray-700">
+                                                <span className="text-sm font-medium text-gray-500">Subtotal Ronda</span>
+                                                <span className="font-bold text-gray-900 dark:text-white">${order.total.toFixed(2)}</span>
+                                            </div>
+                                            
+                                            {/* Quick Actions for this round */}
+                                            {order.status !== OrderStatus.Completed && (
+                                                <div className="mt-4 flex gap-2">
+                                                    {order.status === OrderStatus.Pending && (
+                                                        <button onClick={() => onUpdateStatus(order.id, OrderStatus.Preparing)} className="flex-1 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 rounded text-xs font-semibold transition-colors">
+                                                            Preparar
+                                                        </button>
+                                                    )}
+                                                    {order.status === OrderStatus.Preparing && (
+                                                        <button onClick={() => onUpdateStatus(order.id, OrderStatus.Ready)} className="flex-1 py-1.5 bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400 rounded text-xs font-semibold transition-colors">
+                                                            Listo
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer Actions */}
+                <div className="bg-gray-50 dark:bg-gray-800/80 p-4 sm:p-6 border-t dark:border-gray-800 sticky bottom-0 z-10">
+                    <button 
+                        onClick={() => onCloseAccount(orders)}
+                        className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-lg shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2"
+                    >
+                        <IconCheck className="h-5 w-5" />
+                        Cerrar Cuenta y Cobrar Mesa
+                    </button>
+                    {!allOrdersReady && (
+                        <p className="text-center text-xs text-yellow-600 dark:text-yellow-500 mt-2 font-medium">
+                            ⚠️ Hay rondas que aún no están marcadas como "Listas".
+                        </p>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onUpdateStatus: (id: string, status: OrderStatus) => void; onUpdatePayment: (id: string, status: PaymentStatus) => void; onEditOrder: (order: Order) => void; }> = ({ order, onClose, onUpdateStatus, onUpdatePayment, onEditOrder }) => {
     const [isClosing, setIsClosing] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
@@ -2800,6 +2941,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
     const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
     const [orderToEdit, setOrderToEdit] = useState<Order | null>(null);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+    const [selectedTableOrders, setSelectedTableOrders] = useState<{zone: string, table: string, orders: Order[]} | null>(null);
     const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
     const [storeOpen, setStoreOpen] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
@@ -2863,7 +3005,21 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                 setSelectedOrder(updated);
             }
         }
-    }, [orders, selectedOrder]);
+        if (selectedTableOrders) {
+            const updatedOrders = orders.filter(o => 
+                o.tableId === `${selectedTableOrders.zone} - ${selectedTableOrders.table}` && 
+                o.status !== OrderStatus.Completed && 
+                o.status !== OrderStatus.Cancelled
+            );
+            if (updatedOrders.length !== selectedTableOrders.orders.length || updatedOrders.some((o, i) => o.status !== selectedTableOrders.orders[i]?.status || o.paymentStatus !== selectedTableOrders.orders[i]?.paymentStatus)) {
+                if (updatedOrders.length === 0) {
+                    setSelectedTableOrders(null);
+                } else {
+                    setSelectedTableOrders({ ...selectedTableOrders, orders: updatedOrders });
+                }
+            }
+        }
+    }, [orders, selectedOrder, selectedTableOrders]);
 
     const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
         // Optimistic update
@@ -2892,6 +3048,28 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
         }
     }
     
+    const handleCloseTableAccount = async (tableOrdersToClose: Order[]) => {
+        if (window.confirm(`¿Estás seguro de cerrar la cuenta de esta mesa? Se marcarán ${tableOrdersToClose.length} rondas como Pagadas y Completadas.`)) {
+            // Optimistic update
+            setOrders(prev => prev.map(o => 
+                tableOrdersToClose.some(to => to.id === o.id) 
+                    ? { ...o, status: OrderStatus.Completed, paymentStatus: 'paid' } 
+                    : o
+            ));
+            setSelectedTableOrders(null);
+            
+            try {
+                // Update all orders in parallel
+                await Promise.all(tableOrdersToClose.map(o => 
+                    updateOrder(o.id, { status: OrderStatus.Completed, paymentStatus: 'paid' })
+                ));
+            } catch (error) {
+                console.error("Error closing table account:", error);
+                alert("Hubo un error al cerrar la cuenta. Por favor, intenta de nuevo.");
+            }
+        }
+    };
+    
     const handleEditOrder = (order: Order) => {
         const latestOrder = orders.find(o => o.id === order.id) || order;
         setOrderToEdit(latestOrder);
@@ -2904,13 +3082,13 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
     // Calculate Table Status
     const getTableStatus = (zoneName: string, tableName: string) => {
         const tableIdentifier = `${zoneName} - ${tableName}`;
-        const activeOrder = orders.find(o => 
+        const activeOrders = orders.filter(o => 
             o.tableId === tableIdentifier && 
             o.status !== OrderStatus.Completed && 
             o.status !== OrderStatus.Cancelled
         );
         
-        return activeOrder ? { status: 'occupied', order: activeOrder } : { status: 'free', order: null };
+        return activeOrders.length > 0 ? { status: 'occupied', orders: activeOrders } : { status: 'free', orders: [] };
     };
     
     const tableStats = useMemo(() => {
@@ -3056,13 +3234,13 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                                 >
                                     {/* Render Tables */}
                                     {activeZone.tables.map(table => {
-                                        const { status, order } = getTableStatus(activeZone.name, table.name);
+                                        const { status, orders: tableOrders } = getTableStatus(activeZone.name, table.name);
                                         const isOccupied = status === 'occupied';
                                         
                                         return (
                                             <div
                                                 key={table.id}
-                                                onClick={() => isOccupied && order ? setSelectedOrder(order) : null}
+                                                onClick={() => isOccupied && tableOrders.length > 0 ? setSelectedTableOrders({zone: activeZone.name, table: table.name, orders: tableOrders}) : null}
                                                 style={{
                                                     gridRow: `${table.row} / span ${table.height}`,
                                                     gridColumn: `${table.col} / span ${table.width}`,
@@ -3080,17 +3258,17 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                                                     {table.name}
                                                 </span>
                                                 
-                                                {isOccupied && order && (
+                                                {isOccupied && tableOrders.length > 0 && (
                                                     <div className="absolute -top-2 -right-2">
                                                         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold shadow-sm">
-                                                            {order.items.reduce((acc, i) => acc + i.quantity, 0)}
+                                                            {tableOrders.reduce((acc, o) => acc + o.items.reduce((sum, i) => sum + i.quantity, 0), 0)}
                                                         </span>
                                                     </div>
                                                 )}
                                                 
                                                 {isOccupied && (
                                                     <div className="mt-1 px-2 py-0.5 bg-white dark:bg-gray-800 rounded text-[10px] font-medium text-gray-600 dark:text-gray-300 shadow-sm border border-gray-100 dark:border-gray-700 truncate max-w-[90%]">
-                                                        Ocupada
+                                                        {tableOrders.length} {tableOrders.length === 1 ? 'Ronda' : 'Rondas'}
                                                     </div>
                                                 )}
                                             </div>
@@ -3180,6 +3358,13 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                 onUpdateStatus={updateOrderStatus}
                 onUpdatePayment={updatePaymentStatus}
                 onEditOrder={handleEditOrder}
+            />
+            <TableDetailModal
+                tableOrders={selectedTableOrders}
+                onClose={() => setSelectedTableOrders(null)}
+                onUpdateStatus={updateOrderStatus}
+                onUpdatePayment={updatePaymentStatus}
+                onCloseAccount={handleCloseTableAccount}
             />
         </div>
     );
