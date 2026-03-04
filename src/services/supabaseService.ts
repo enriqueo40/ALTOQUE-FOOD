@@ -509,40 +509,57 @@ export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created
     }
 };
 
+// Helper transformation
+const mapOrderFromDB = (payload: any): Order => {
+    return {
+       id: payload.id,
+       customer: payload.customer,
+       items: payload.items,
+       status: payload.status,
+       total: payload.total,
+       createdAt: new Date(payload.created_at),
+       branchId: payload.branch_id,
+       orderType: payload.order_type,
+       tableId: payload.table_id,
+       generalComments: payload.general_comments,
+       paymentStatus: payload.payment_status,
+       paymentProof: payload.customer?.paymentProof,
+       tip: payload.tip
+    };
+};
+
 export const getActiveOrders = async (retries = 1): Promise<Order[]> => {
     try {
-        const result: any = await withTimeout(getClient()
+        const client = getClient();
+        
+        // 1. Fetch Active Orders (Pending, Confirmed, Preparing, Ready, Delivering)
+        const { data: activeData, error: activeError } = await client
             .from('orders')
             .select('*')
-            .neq('status', 'Cancelled') 
-            .order('created_at', { ascending: false }));
-        
-        const { data, error } = result;
+            .neq('status', 'Cancelled')
+            .neq('status', 'Completed')
+            .order('created_at', { ascending: false });
 
-        if (error) {
-            console.error('Error fetching orders:', error);
-            if (retries > 0) {
-                console.log(`Retrying getActiveOrders... (${retries} attempts left)`);
-                return getActiveOrders(retries - 1);
-            }
-            return [];
-        }
+        if (activeError) throw activeError;
+
+        // 2. Fetch Recent Completed Orders (Last 7 Days)
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         
-        return data.map((o: any) => ({
-            id: o.id,
-            customer: o.customer, 
-            items: o.items,
-            status: o.status,
-            total: o.total,
-            createdAt: new Date(o.created_at),
-            branchId: o.branch_id,
-            orderType: o.order_type,
-            tableId: o.table_id,
-            generalComments: o.general_comments,
-            paymentStatus: o.payment_status,
-            paymentProof: o.customer?.paymentProof,
-            tip: o.tip
-        })) as Order[];
+        const { data: completedData, error: completedError } = await client
+            .from('orders')
+            .select('*')
+            .eq('status', 'Completed')
+            .gte('created_at', sevenDaysAgo.toISOString())
+            .order('created_at', { ascending: false });
+
+        if (completedError) throw completedError;
+
+        // Combine and Sort
+        const allOrders = [...(activeData || []), ...(completedData || [])];
+        allOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+        return allOrders.map(mapOrderFromDB);
     } catch (err) {
         console.error("Failed to get active orders:", err);
         if (retries > 0) {
@@ -573,21 +590,7 @@ export const getActiveTableOrder = async (tableId: string): Promise<Order | null
 
         if (!data) return null;
 
-        return {
-            id: data.id,
-            customer: data.customer,
-            items: data.items,
-            status: data.status,
-            total: data.total,
-            createdAt: new Date(data.created_at),
-            branchId: data.branch_id,
-            orderType: data.order_type,
-            tableId: data.table_id,
-            generalComments: data.general_comments,
-            paymentStatus: data.payment_status,
-            paymentProof: data.customer?.paymentProof,
-            tip: data.tip
-        } as Order;
+        return mapOrderFromDB(data);
     } catch (err) {
         console.error("Failed to get active table order:", err);
         return null;
@@ -610,25 +613,6 @@ export const updateOrder = async (orderId: string, updates: Partial<Order>): Pro
     }
 };
 
-// Helper transformation
-const transformOrderPayload = (payload: any) => {
-    return {
-       id: payload.id,
-       customer: payload.customer,
-       items: payload.items,
-       status: payload.status,
-       total: payload.total,
-       createdAt: new Date(payload.created_at),
-       branchId: payload.branch_id,
-       orderType: payload.order_type,
-       tableId: payload.table_id,
-       generalComments: payload.general_comments,
-       paymentStatus: payload.payment_status,
-       paymentProof: payload.customer?.paymentProof,
-       tip: payload.tip
-    };
-};
-
 // Real-time Subscription for Admin (Orders) - Multi-Listener Capable
 export const subscribeToNewOrders = (
     onInsert: (payload: any) => void, 
@@ -647,12 +631,12 @@ export const subscribeToNewOrders = (
         ordersChannel
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
                  console.log("New Order Inserted:", payload.new);
-                 const transformed = transformOrderPayload(payload.new);
+                 const transformed = mapOrderFromDB(payload.new);
                  // Broadcast to all insert listeners
                  orderInsertListeners.forEach(listener => listener(transformed));
             })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
-                 const transformed = transformOrderPayload(payload.new);
+                 const transformed = mapOrderFromDB(payload.new);
                  // Broadcast to all update listeners
                  orderUpdateListeners.forEach(listener => listener(transformed));
             })
