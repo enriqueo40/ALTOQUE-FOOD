@@ -2979,6 +2979,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                 setOrders(prev => [newOrder, ...prev]);
             },
             (updatedOrder) => {
+                 try { const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); audio.volume=0.5; audio.play().catch(e=>{}); } catch(e){}
                  setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
             }
         );

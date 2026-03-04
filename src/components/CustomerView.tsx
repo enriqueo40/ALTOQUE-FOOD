@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Product, Category, CartItem, Order, OrderStatus, Customer, AppSettings, PaymentMethod, OrderType, Personalization, Promotion, PersonalizationOption, DiscountType, PromotionAppliesTo, ShippingCostType, Schedule } from '../types';
 import { useCart } from '../hooks/useCart';
 import { IconPlus, IconMinus, IconArrowLeft, IconTrash, IconX, IconWhatsapp, IconTableLayout, IconSearch, IconCheck, IconUpload, IconReceipt, IconClock, IconStore, IconLocationMarker, INITIAL_SETTINGS, PRODUCTS, CATEGORIES } from '../constants';
-import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel } from '../services/supabaseService';
+import { getProducts, getCategories, getAppSettings, saveOrder, getPersonalizations, getPromotions, subscribeToMenuUpdates, unsubscribeFromChannel, getActiveTableOrder, updateOrder } from '../services/supabaseService';
 
 // --- Componentes de UI Auxiliares ---
 
@@ -63,8 +63,10 @@ const RestaurantHero: React.FC<{
     settings: AppSettings, 
     tableInfo: { table: string, zone: string } | null,
     orderType: OrderType,
-    setOrderType: (type: OrderType) => void
-}> = ({ settings, tableInfo, orderType, setOrderType }) => {
+    setOrderType: (type: OrderType) => void,
+    onViewAccount?: () => void,
+    sessionItemsCount?: number
+}> = ({ settings, tableInfo, orderType, setOrderType, onViewAccount, sessionItemsCount = 0 }) => {
     const { branch, company, shipping, schedules } = settings;
     const [showSchedule, setShowSchedule] = useState(false);
     const [isOpenNow, setIsOpenNow] = useState(false);
@@ -126,12 +128,16 @@ const RestaurantHero: React.FC<{
                 <h1 className="text-2xl font-black text-white uppercase tracking-tight mb-1">{company.name}</h1>
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">{branch.alias}</p>
 
-                <div className="flex items-center gap-2 mb-4">
+                <button 
+                    onClick={() => setShowSchedule(true)}
+                    className="flex items-center gap-2 mb-4 hover:bg-gray-800/50 px-3 py-1.5 rounded-full transition-colors cursor-pointer border border-transparent hover:border-gray-700"
+                >
                     <span className={`w-2 h-2 rounded-full ${isOpenNow ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
                     <span className={`text-xs font-bold uppercase tracking-wider ${isOpenNow ? 'text-emerald-500' : 'text-rose-500'}`}>
                         {isOpenNow ? 'Abierto' : 'Cerrado'}
                     </span>
-                </div>
+                    <IconClock className="w-3 h-3 text-gray-400" />
+                </button>
 
                 {branch.googleMapsLink && (
                     <a 
@@ -146,9 +152,17 @@ const RestaurantHero: React.FC<{
                 )}
 
                 {tableInfo ? (
-                    <div className="w-full max-w-sm bg-emerald-500/10 rounded-xl p-4 border border-emerald-500/20 backdrop-blur-sm mb-6 flex flex-col items-center">
+                    <div className="w-full max-w-sm bg-emerald-500/10 rounded-xl p-4 border border-emerald-500/20 backdrop-blur-sm mb-6 flex flex-col items-center relative">
                         <span className="text-emerald-400 font-black text-xl uppercase tracking-widest mb-1">MESA {tableInfo.table}</span>
                         <span className="text-emerald-500/80 font-bold text-sm uppercase tracking-wider">{tableInfo.zone}</span>
+                        {sessionItemsCount > 0 && (
+                            <button 
+                                onClick={onViewAccount}
+                                className="mt-3 bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wider hover:bg-emerald-600 transition-colors"
+                            >
+                                Ver Cuenta ({sessionItemsCount})
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <>
@@ -286,6 +300,7 @@ export default function CustomerView() {
     const [error, setError] = useState<string | null>(null);
     const [activeCategory, setActiveCategory] = useState<string>('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [generalComments, setGeneralComments] = useState('');
     
     // Estados de Pago y UI
     const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('Efectivo');
@@ -493,11 +508,55 @@ export default function CustomerView() {
         return () => unsubscribeFromChannel();
     }, []);
 
+    // Sincronización de cuenta de mesa persistente
+    useEffect(() => {
+        const syncTableOrder = async () => {
+            if (tableInfo) {
+                const tableId = `${tableInfo.zone} - ${tableInfo.table}`;
+                const activeOrder = await getActiveTableOrder(tableId);
+                if (activeOrder) {
+                    setSessionItems(activeOrder.items);
+                    if (activeOrder.customer?.name) {
+                        setCustomerName(activeOrder.customer.name);
+                    }
+                }
+            }
+        };
+        syncTableOrder();
+    }, [tableInfo]);
+
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
             const reader = new FileReader();
-            reader.onload = (res) => setPaymentProof(res.target?.result as string);
+            reader.onload = (res) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const MAX_SIZE = 800;
+
+                    if (width > height) {
+                        if (width > MAX_SIZE) {
+                            height *= MAX_SIZE / width;
+                            width = MAX_SIZE;
+                        }
+                    } else {
+                        if (height > MAX_SIZE) {
+                            width *= MAX_SIZE / height;
+                            height = MAX_SIZE;
+                        }
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(img, 0, 0, width, height);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                    setPaymentProof(dataUrl);
+                };
+                img.src = res.target?.result as string;
+            };
             reader.readAsDataURL(file);
         }
     };
@@ -521,37 +580,83 @@ export default function CustomerView() {
         try {
             if (isFinalClosing && isTableSession) {
                 // FLUJO: CIERRE DE CUENTA
-                const finalOrderData: any = {
-                    customer,
-                    items: sessionItems,
-                    total: finalTotal,
-                    status: OrderStatus.Completed, // Mark as completed or a special status
-                    orderType,
-                    tableId: `${tableInfo?.zone} - ${tableInfo?.table}`,
-                    paymentStatus: paymentProof ? 'paid' : 'pending',
-                    paymentProof: paymentProof || undefined, // Explicitly pass paymentProof at top level
-                    tip: tipAmount,
-                    generalComments: 'CIERRE DE CUENTA FINAL'
-                };
-                await saveOrder(finalOrderData);
+                const tableId = `${tableInfo?.zone} - ${tableInfo?.table}`;
+                const activeOrder = await getActiveTableOrder(tableId);
+                
+                if (activeOrder) {
+                    await updateOrder(activeOrder.id, {
+                        status: OrderStatus.Completed,
+                        paymentStatus: paymentProof ? 'paid' : 'pending',
+                        paymentProof: paymentProof || undefined,
+                        tip: tipAmount,
+                        generalComments: generalComments || 'CIERRE DE CUENTA FINAL',
+                        customer: { ...activeOrder.customer, ...customer }
+                    });
+                } else {
+                    const finalOrderData: any = {
+                        customer,
+                        items: sessionItems,
+                        total: finalTotal,
+                        status: OrderStatus.Completed,
+                        orderType,
+                        tableId,
+                        paymentStatus: paymentProof ? 'paid' : 'pending',
+                        paymentProof: paymentProof || undefined,
+                        tip: tipAmount,
+                        generalComments: generalComments || 'CIERRE DE CUENTA FINAL'
+                    };
+                    await saveOrder(finalOrderData);
+                }
             } else if (cartItems.length > 0) {
                 // FLUJO: ENVIAR RONDA A COCINA (No limpia sesión, la acumula)
-                const newOrderData: any = {
-                    customer, 
-                    items: cartItems, 
-                    total: finalTotal,
-                    status: OrderStatus.Pending, 
-                    orderType,
-                    tableId: isTableSession ? `${tableInfo?.zone} - ${tableInfo?.table}` : undefined,
-                    paymentStatus: 'pending',
-                    paymentProof: paymentProof || undefined, // Explicitly pass paymentProof at top level
-                    tip: tipAmount
-                };
-                await saveOrder(newOrderData);
-                
                 if (isTableSession) {
-                    setSessionItems(prev => [...prev, ...cartItems]);
+                    const tableId = `${tableInfo?.zone} - ${tableInfo?.table}`;
+                    const activeOrder = await getActiveTableOrder(tableId);
+                    
+                    const newSessionItems = [...sessionItems, ...cartItems];
+                    const newTotal = newSessionItems.reduce((acc, item) => {
+                        const optsPrice = item.selectedOptions ? item.selectedOptions.reduce((s, o) => s + (Number(o.price) || 0), 0) : 0;
+                        return acc + ((Number(item.price) || 0) + optsPrice) * item.quantity;
+                    }, 0);
+
+                    if (activeOrder) {
+                        await updateOrder(activeOrder.id, {
+                            items: newSessionItems,
+                            total: newTotal,
+                            status: OrderStatus.Pending, // Volver a pendiente para que cocina vea la nueva ronda
+                            generalComments: generalComments || activeOrder.generalComments,
+                            customer: { ...activeOrder.customer, ...customer }
+                        });
+                    } else {
+                        const newOrderData: any = {
+                            customer, 
+                            items: cartItems, 
+                            total: newTotal,
+                            status: OrderStatus.Pending, 
+                            orderType,
+                            tableId,
+                            paymentStatus: 'pending',
+                            paymentProof: paymentProof || undefined,
+                            tip: tipAmount,
+                            generalComments
+                        };
+                        await saveOrder(newOrderData);
+                    }
+                    setSessionItems(newSessionItems);
                     setCustomerName(name);
+                } else {
+                    const newOrderData: any = {
+                        customer, 
+                        items: cartItems, 
+                        total: finalTotal,
+                        status: OrderStatus.Pending, 
+                        orderType,
+                        paymentStatus: 'pending',
+                        paymentProof: paymentProof || undefined,
+                        tip: tipAmount,
+                        generalComments
+                    };
+                    await saveOrder(newOrderData);
                 }
             }
 
@@ -676,6 +781,8 @@ export default function CustomerView() {
                                 tableInfo={tableInfo}
                                 orderType={orderType}
                                 setOrderType={setOrderType}
+                                onViewAccount={() => setView('account')}
+                                sessionItemsCount={sessionItems.reduce((acc, item) => acc + item.quantity, 0)}
                             />
 
                             {/* ... (Search and Categories) ... */}
@@ -831,10 +938,8 @@ export default function CustomerView() {
                                 <textarea 
                                     className="w-full bg-[#1e293b] border border-gray-700 rounded-xl p-4 text-sm text-white placeholder-gray-500 focus:ring-1 focus:ring-emerald-500 outline-none resize-none h-24"
                                     placeholder="¿Algo más que debamos saber?"
-                                    // Note: You might want to add a state for general comments if needed globally, 
-                                    // currently using productComments or we can add a new state. 
-                                    // For now, let's assume it's per order, but the hook doesn't have a global comment.
-                                    // We'll leave it visual for now or bind to a new state if requested.
+                                    value={generalComments}
+                                    onChange={(e) => setGeneralComments(e.target.value)}
                                 />
                             </div>
 
@@ -853,6 +958,54 @@ export default function CustomerView() {
                                 </div>
                             </div>
                         </div> 
+                    )}
+
+                    {view === 'account' && (
+                        <div className="p-5 animate-fade-in pb-32">
+                            <div className="space-y-4">
+                                {sessionItems.length === 0 ? (
+                                    <div className="text-center py-10 text-gray-500">
+                                        <p>No hay productos en tu cuenta aún.</p>
+                                    </div>
+                                ) : (
+                                    sessionItems.map((i, index) => (
+                                        <div key={index} className="flex gap-4 bg-[#1e293b] p-4 rounded-xl border border-gray-800/60 shadow-sm">
+                                            <img src={i.imageUrl} className="w-20 h-20 rounded-lg object-cover" />
+                                            <div className="flex-1 flex flex-col justify-between">
+                                                <div className="flex justify-between items-start">
+                                                    <span className="font-bold text-sm text-white">{i.name}</span>
+                                                    <span className="font-bold text-emerald-400 text-sm">{formatCurrency(i.price * i.quantity, settings.company.currency.code)}</span>
+                                                </div>
+                                                {i.selectedOptions && i.selectedOptions.length > 0 && (
+                                                    <p className="text-xs text-gray-500 line-clamp-1">
+                                                        {i.selectedOptions.map(o => o.name).join(', ')}
+                                                    </p>
+                                                )}
+                                                <div className="flex items-center justify-between mt-2">
+                                                    <span className="text-sm font-bold text-gray-400">Cant: {i.quantity}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+
+                            <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#0f172a] border-t border-gray-800 z-50">
+                                <div className="container mx-auto max-w-md">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <span className="text-gray-400 text-sm">Total Acumulado</span>
+                                        <span className="text-2xl font-black text-white">{formatCurrency(sessionTotal, settings.company.currency.code)}</span>
+                                    </div>
+                                    <button 
+                                        onClick={() => { setIsFinalClosing(true); setView('checkout'); }} 
+                                        disabled={sessionItems.length === 0}
+                                        className={`w-full py-4 rounded-xl font-bold text-base transition-colors shadow-lg ${sessionItems.length === 0 ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}
+                                    >
+                                        Cerrar Cuenta
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     )}
 
                     {view === 'checkout' && ( 

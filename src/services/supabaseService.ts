@@ -551,6 +551,46 @@ export const getActiveOrders = async (retries = 1): Promise<Order[]> => {
     }
 };
 
+export const getActiveTableOrder = async (tableId: string): Promise<Order | null> => {
+    try {
+        const { data, error } = await getClient()
+            .from('orders')
+            .select('*')
+            .eq('table_id', tableId)
+            .neq('status', 'Completed')
+            .neq('status', 'Cancelled')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (error) {
+            if (error.code === 'PGRST116') return null; // No rows found
+            console.error('Error fetching active table order:', error);
+            return null;
+        }
+
+        if (!data) return null;
+
+        return {
+            id: data.id,
+            customer: data.customer,
+            items: data.items,
+            status: data.status,
+            total: data.total,
+            createdAt: new Date(data.created_at),
+            branchId: data.branch_id,
+            orderType: data.order_type,
+            tableId: data.table_id,
+            generalComments: data.general_comments,
+            paymentStatus: data.payment_status,
+            paymentProof: data.customer?.paymentProof
+        } as Order;
+    } catch (err) {
+        console.error("Failed to get active table order:", err);
+        return null;
+    }
+};
+
 export const updateOrder = async (orderId: string, updates: Partial<Order>): Promise<void> => {
     const dbUpdates: any = { ...updates };
     if (updates.branchId) { dbUpdates.branch_id = updates.branchId; delete dbUpdates.branchId; }
