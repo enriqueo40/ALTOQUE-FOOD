@@ -497,7 +497,8 @@ export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'created
         order_type: order.orderType || null,      
         table_id: order.tableId || null,          
         general_comments: order.generalComments || null, 
-        payment_status: order.paymentStatus || 'pending' 
+        payment_status: order.paymentStatus || 'pending',
+        tip: order.tip || 0
     };
 
     const { error } = await getClient().from('orders').insert(dbOrderPayload);
@@ -539,7 +540,8 @@ export const getActiveOrders = async (retries = 1): Promise<Order[]> => {
             tableId: o.table_id,
             generalComments: o.general_comments,
             paymentStatus: o.payment_status,
-            paymentProof: o.customer?.paymentProof 
+            paymentProof: o.customer?.paymentProof,
+            tip: o.tip
         })) as Order[];
     } catch (err) {
         console.error("Failed to get active orders:", err);
@@ -583,7 +585,8 @@ export const getActiveTableOrder = async (tableId: string): Promise<Order | null
             tableId: data.table_id,
             generalComments: data.general_comments,
             paymentStatus: data.payment_status,
-            paymentProof: data.customer?.paymentProof
+            paymentProof: data.customer?.paymentProof,
+            tip: data.tip
         } as Order;
     } catch (err) {
         console.error("Failed to get active table order:", err);
@@ -621,7 +624,8 @@ const transformOrderPayload = (payload: any) => {
        tableId: payload.table_id,
        generalComments: payload.general_comments,
        paymentStatus: payload.payment_status,
-       paymentProof: payload.customer?.paymentProof
+       paymentProof: payload.customer?.paymentProof,
+       tip: payload.tip
     };
 };
 

@@ -80,7 +80,7 @@ export const getAdvancedInsights = async (query: string, orders: Order[]): Promi
     try {
         const ai = getAi();
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-3.1-pro-preview',
             contents: prompt,
             config: {
                 thinkingConfig: { 

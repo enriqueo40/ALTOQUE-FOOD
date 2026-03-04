@@ -1613,6 +1613,7 @@ const TableDetailModal: React.FC<{
 
     const { zone, table, orders } = tableOrders;
     const totalAccumulated = orders.reduce((sum, o) => sum + o.total, 0);
+    const totalTips = orders.reduce((sum, o) => sum + (o.tip || 0), 0);
     const customerName = orders[0]?.customer.name || 'Cliente';
     
     // Calculate if all orders are ready/completed
@@ -1647,6 +1648,11 @@ const TableDetailModal: React.FC<{
                             <div>
                                 <p className="text-sm text-emerald-800 dark:text-emerald-400 font-medium mb-1">Total Acumulado</p>
                                 <p className="text-3xl font-black text-emerald-600 dark:text-emerald-500">${totalAccumulated.toFixed(2)}</p>
+                                {totalTips > 0 && (
+                                    <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1 font-medium">
+                                        (Incluye ${totalTips.toFixed(2)} de propina)
+                                    </p>
+                                )}
                             </div>
                             <div className="text-right">
                                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Rondas ordenadas</p>
@@ -2075,6 +2081,14 @@ const OrderDetailModal: React.FC<{ order: Order | null; onClose: () => void; onU
                                     </div>
                                     <div className="bg-[#1e2330] rounded-xl p-8 border border-gray-800 text-center relative overflow-hidden">
                                         <div className="relative z-10">
+                                            {order.tip && order.tip > 0 && (
+                                                <div className="flex flex-col items-center mb-2">
+                                                    <span className="text-sm text-gray-400">Subtotal: ${(order.total - order.tip).toFixed(2)}</span>
+                                                    <span className="text-sm font-bold text-emerald-400 flex items-center gap-1">
+                                                        <span className="text-xs">✨</span> Propina: ${order.tip.toFixed(2)}
+                                                    </span>
+                                                </div>
+                                            )}
                                             <p className="text-5xl font-black text-emerald-500 mb-6 tracking-tight">${order.total.toFixed(2)}</p>
                                             
                                             {order.paymentStatus === 'paid' ? (

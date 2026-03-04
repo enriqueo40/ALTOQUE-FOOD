@@ -76,6 +76,7 @@ export interface Order {
     orderType?: OrderType;
     tableId?: string;
     generalComments?: string;
+    tip?: number;
 }
 
 export interface ChatMessage {
