@@ -588,7 +588,7 @@ export default function CustomerView() {
                         status: OrderStatus.Completed,
                         paymentStatus: paymentProof ? 'paid' : 'pending',
                         paymentProof: paymentProof || undefined,
-                        tip: tipAmount,
+                        tip: (activeOrder.tip || 0) + tipAmount,
                         generalComments: generalComments || 'CIERRE DE CUENTA FINAL',
                         customer: { ...activeOrder.customer, ...customer }
                     });
@@ -625,7 +625,8 @@ export default function CustomerView() {
                             total: newTotal,
                             status: OrderStatus.Pending, // Volver a pendiente para que cocina vea la nueva ronda
                             generalComments: generalComments || activeOrder.generalComments,
-                            customer: { ...activeOrder.customer, ...customer }
+                            customer: { ...activeOrder.customer, ...customer },
+                            tip: (activeOrder.tip || 0) + tipAmount
                         });
                     } else {
                         const newOrderData: any = {
