@@ -2986,15 +2986,32 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
 
     // Realtime Subscription
     useEffect(() => {
-        const channel = subscribeToNewOrders(
+        const unsubscribe = subscribeToNewOrders(
             (newOrder) => {
                 // Play simple notification sound if possible (browser policy permitting)
                 try { const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); audio.volume=0.5; audio.play().catch(e=>{}); } catch(e){}
-                setOrders(prev => [newOrder, ...prev]);
+                
+                setOrders(prev => {
+                    // Prevent duplicates if the order already exists
+                    if (prev.some(o => o.id === newOrder.id)) {
+                        return prev.map(o => o.id === newOrder.id ? newOrder : o);
+                    }
+                    return [newOrder, ...prev];
+                });
             },
             (updatedOrder) => {
                  try { const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); audio.volume=0.5; audio.play().catch(e=>{}); } catch(e){}
-                 setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+                 setOrders(prev => {
+                     // If order exists, update it. If not (and it's relevant), add it.
+                     const exists = prev.some(o => o.id === updatedOrder.id);
+                     if (exists) {
+                         return prev.map(o => o.id === updatedOrder.id ? updatedOrder : o);
+                     } else {
+                         // Optional: Add logic to decide if we should add it (e.g. if it matches current filters)
+                         // For now, we add it to be safe, assuming the backend subscription filters are broad.
+                         return [updatedOrder, ...prev];
+                     }
+                 });
             }
         );
 
@@ -3005,9 +3022,9 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
         };
 
         window.addEventListener('edit-order', handleEditOrderEvent);
-
+        
         return () => {
-            unsubscribeFromChannel();
+            unsubscribe();
             window.removeEventListener('edit-order', handleEditOrderEvent);
         };
     }, []);
