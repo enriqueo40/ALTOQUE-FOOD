@@ -7,8 +7,9 @@ import { Product, Category, Order, OrderStatus, Conversation, AdminChatMessage, 
 import { MOCK_CONVERSATIONS, CURRENCIES } from '../constants';
 import { generateProductDescription, getAdvancedInsights } from '../services/geminiService';
 import { getProducts, getCategories, saveProduct, deleteProduct, saveCategory, deleteCategory, getPersonalizations, savePersonalization, deletePersonalization, getPromotions, savePromotion, deletePromotion, updateProductAvailability, updatePersonalizationOptionAvailability, getZones, saveZone, deleteZone, saveZoneLayout, getAppSettings, saveAppSettings, subscribeToNewOrders, unsubscribeFromChannel, updateOrder, getActiveOrders, saveOrder } from '../services/supabaseService';
+import { soundService } from '../services/soundService';
 import { getDiscountedPrice } from '../utils/pricing';
-import { IconComponent, IconHome, IconMenu, IconAvailability, IconShare, IconTutorials, IconOrders, IconAnalytics, IconChatAdmin, IconLogout, IconSearch, IconBell, IconEdit, IconPlus, IconMinus, IconTrash, IconSparkles, IconSend, IconMoreVertical, IconExternalLink, IconCalendar, IconChevronDown, IconX, IconReceipt, IconSettings, IconStore, IconDelivery, IconPayment, IconClock, IconTableLayout, IconPrinter, IconChevronUp, IconPencil, IconDuplicate, IconGripVertical, IconPercent, IconInfo, IconTag, IconLogoutAlt, IconSun, IconMoon, IconArrowLeft, IconWhatsapp, IconQR, IconLocationMarker, IconUpload, IconCheck, IconBluetooth, IconUSB, IconToggleOn, IconToggleOff } from '../constants';
+import { IconComponent, IconHome, IconMenu, IconAvailability, IconShare, IconTutorials, IconOrders, IconAnalytics, IconChatAdmin, IconLogout, IconSearch, IconBell, IconEdit, IconPlus, IconMinus, IconTrash, IconSparkles, IconSend, IconMoreVertical, IconExternalLink, IconCalendar, IconChevronDown, IconX, IconReceipt, IconSettings, IconStore, IconDelivery, IconPayment, IconClock, IconTableLayout, IconPrinter, IconChevronUp, IconPencil, IconDuplicate, IconGripVertical, IconPercent, IconInfo, IconTag, IconLogoutAlt, IconSun, IconMoon, IconArrowLeft, IconWhatsapp, IconQR, IconLocationMarker, IconUpload, IconCheck, IconBluetooth, IconUSB, IconToggleOn, IconToggleOff, IconVolumeUp, IconVolumeOff } from '../constants';
 
 const IconEye: React.FC<{ className?: string }> = ({ className }) => <IconComponent d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.432 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" className={className} />;
 
@@ -64,10 +65,13 @@ const Sidebar: React.FC<{ currentPage: AdminViewPage; setCurrentPage: (page: Adm
     );
 };
 
-const Header: React.FC<{ title: string; onSettingsClick: () => void; onPreviewClick: () => void; theme: 'light' | 'dark'; toggleTheme: () => void; }> = ({ title, onSettingsClick, onPreviewClick, theme, toggleTheme }) => (
+const Header: React.FC<{ title: string; onSettingsClick: () => void; onPreviewClick: () => void; theme: 'light' | 'dark'; toggleTheme: () => void; isSoundEnabled: boolean; toggleSound: () => void; }> = ({ title, onSettingsClick, onPreviewClick, theme, toggleTheme, isSoundEnabled, toggleSound }) => (
     <header className="h-20 bg-white dark:bg-gray-800 border-b dark:border-gray-700 flex items-center justify-between px-8 shrink-0">
         <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{title}</h2>
         <div className="flex items-center space-x-6">
+            <button onClick={toggleSound} className={`flex items-center space-x-2 text-sm font-medium p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 ${isSoundEnabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400 dark:text-gray-500'}`} title={isSoundEnabled ? "Silenciar notificaciones" : "Activar sonido"}>
+                {isSoundEnabled ? <IconVolumeUp className="h-5 w-5" /> : <IconVolumeOff className="h-5 w-5" />}
+            </button>
             <a href="#/menu" target="_blank" rel="noopener noreferrer" className="flex items-center space-x-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
                 <span>Menú digital</span>
                 <IconExternalLink className="h-4 w-4" />
@@ -2988,8 +2992,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
     useEffect(() => {
         const unsubscribe = subscribeToNewOrders(
             (newOrder) => {
-                // Play simple notification sound if possible (browser policy permitting)
-                try { const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); audio.volume=0.5; audio.play().catch(e=>{}); } catch(e){}
+                soundService.play();
                 
                 setOrders(prev => {
                     // Prevent duplicates if the order already exists
@@ -3000,7 +3003,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
                 });
             },
             (updatedOrder) => {
-                 try { const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); audio.volume=0.5; audio.play().catch(e=>{}); } catch(e){}
+                 soundService.play();
                  setOrders(prev => {
                      // If order exists, update it. If not (and it's relevant), add it.
                      const exists = prev.some(o => o.id === updatedOrder.id);
@@ -5042,6 +5045,13 @@ const AdminView: React.FC = () => {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false); // Placeholder for preview modal logic
     const [theme, toggleTheme] = useTheme();
+    const [isSoundEnabled, setIsSoundEnabled] = useState(soundService.getEnabled());
+
+    const toggleSound = () => {
+        const newState = !isSoundEnabled;
+        setIsSoundEnabled(newState);
+        soundService.setEnabled(newState);
+    };
     
     // State for Zone Editor Logic
     const [isZoneEditorOpen, setIsZoneEditorOpen] = useState(false);
@@ -5093,6 +5103,8 @@ const AdminView: React.FC = () => {
                     onPreviewClick={() => setIsPreviewOpen(true)}
                     theme={theme}
                     toggleTheme={toggleTheme}
+                    isSoundEnabled={isSoundEnabled}
+                    toggleSound={toggleSound}
                 />
                 <main className="flex-1 overflow-auto p-8 scroll-smooth">
                     <div className="max-w-7xl mx-auto">
