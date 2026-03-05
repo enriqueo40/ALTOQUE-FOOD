@@ -6,7 +6,7 @@ import { useCart } from '../hooks/useCart';
 import { Product, Category, Order, OrderStatus, Conversation, AdminChatMessage, OrderType, Personalization, PersonalizationOption, Promotion, DiscountType, PromotionAppliesTo, Zone, Table, AppSettings, Currency, BranchSettings, PaymentSettings, ShippingSettings, PaymentMethod, DaySchedule, Schedule, ShippingCostType, TimeRange, PrintingMethod, PaymentStatus, Customer } from '../types';
 import { MOCK_CONVERSATIONS, CURRENCIES } from '../constants';
 import { generateProductDescription, getAdvancedInsights } from '../services/geminiService';
-import { getProducts, getCategories, saveProduct, deleteProduct, saveCategory, deleteCategory, getPersonalizations, savePersonalization, deletePersonalization, getPromotions, savePromotion, deletePromotion, updateProductAvailability, updatePersonalizationOptionAvailability, getZones, saveZone, deleteZone, saveZoneLayout, getAppSettings, saveAppSettings, subscribeToNewOrders, unsubscribeFromChannel, updateOrder, getActiveOrders, saveOrder } from '../services/supabaseService';
+import { getProducts, getCategories, saveProduct, deleteProduct, saveCategory, deleteCategory, getPersonalizations, savePersonalization, deletePersonalization, getPromotions, savePromotion, deletePromotion, updateProductAvailability, updatePersonalizationOptionAvailability, getZones, saveZone, deleteZone, saveZoneLayout, getAppSettings, saveAppSettings, subscribeToNewOrders, unsubscribeFromChannel, updateOrder, getActiveOrders, saveOrder, resetOrdersChannel } from '../services/supabaseService';
 import { soundService } from '../services/soundService';
 import { getDiscountedPrice } from '../utils/pricing';
 import { IconComponent, IconHome, IconMenu, IconAvailability, IconShare, IconTutorials, IconOrders, IconAnalytics, IconChatAdmin, IconLogout, IconSearch, IconBell, IconEdit, IconPlus, IconMinus, IconTrash, IconSparkles, IconSend, IconMoreVertical, IconExternalLink, IconCalendar, IconChevronDown, IconX, IconReceipt, IconSettings, IconStore, IconDelivery, IconPayment, IconClock, IconTableLayout, IconPrinter, IconChevronUp, IconPencil, IconDuplicate, IconGripVertical, IconPercent, IconInfo, IconTag, IconLogoutAlt, IconSun, IconMoon, IconArrowLeft, IconWhatsapp, IconQR, IconLocationMarker, IconUpload, IconCheck, IconBluetooth, IconUSB, IconToggleOn, IconToggleOff, IconVolumeUp, IconVolumeOff } from '../constants';
@@ -2990,34 +2990,45 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
 
     // Realtime Subscription
     useEffect(() => {
-        const unsubscribe = subscribeToNewOrders(
-            (newOrder) => {
-                soundService.play();
-                
-                setOrders(prev => {
-                    // Prevent duplicates if the order already exists
-                    if (prev.some(o => o.id === newOrder.id)) {
-                        return prev.map(o => o.id === newOrder.id ? newOrder : o);
-                    }
-                    return [newOrder, ...prev];
-                });
-            },
-            (updatedOrder) => {
-                 soundService.play();
-                 setOrders(prev => {
-                     // If order exists, update it. If not (and it's relevant), add it.
-                     const exists = prev.some(o => o.id === updatedOrder.id);
-                     if (exists) {
-                         return prev.map(o => o.id === updatedOrder.id ? updatedOrder : o);
-                     } else {
-                         // Optional: Add logic to decide if we should add it (e.g. if it matches current filters)
-                         // For now, we add it to be safe, assuming the backend subscription filters are broad.
-                         return [updatedOrder, ...prev];
-                     }
-                 });
-            }
-        );
+        let unsubscribe: (() => void) | undefined;
 
+        const setupSubscription = async () => {
+            // Reset channel to ensure clean state
+            await resetOrdersChannel();
+            
+            unsubscribe = subscribeToNewOrders(
+                (newOrder) => {
+                    console.log("AdminView: New Order Received", newOrder);
+                    soundService.play();
+                    
+                    setOrders(prev => {
+                        // Prevent duplicates if the order already exists
+                        if (prev.some(o => o.id === newOrder.id)) {
+                            return prev.map(o => o.id === newOrder.id ? newOrder : o);
+                        }
+                        return [newOrder, ...prev];
+                    });
+                },
+                (updatedOrder) => {
+                     console.log("AdminView: Order Updated", updatedOrder);
+                     soundService.play();
+                     setOrders(prev => {
+                         // If order exists, update it. If not (and it's relevant), add it.
+                         const exists = prev.some(o => o.id === updatedOrder.id);
+                         if (exists) {
+                             return prev.map(o => o.id === updatedOrder.id ? updatedOrder : o);
+                         } else {
+                             // Optional: Add logic to decide if we should add it (e.g. if it matches current filters)
+                             // For now, we add it to be safe, assuming the backend subscription filters are broad.
+                             return [updatedOrder, ...prev];
+                         }
+                     });
+                }
+            );
+        };
+
+        setupSubscription();
+        
         const handleEditOrderEvent = (e: any) => {
             const orderToEdit = e.detail;
             setOrderToEdit(orderToEdit);
@@ -3027,7 +3038,7 @@ const OrderManagement: React.FC<{ onSettingsClick: () => void }> = ({ onSettings
         window.addEventListener('edit-order', handleEditOrderEvent);
         
         return () => {
-            unsubscribe();
+            if (unsubscribe) unsubscribe();
             window.removeEventListener('edit-order', handleEditOrderEvent);
         };
     }, []);
